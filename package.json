@@ -60,10 +60,7 @@
     "zod": "^3.24.1",
     "@auth/core": "latest",
     "nodemailer": "latest",
-    "ws": "latest",
-    "next-auth": "latest",
-    "openai": "latest",
-    "resend": "latest"
+    "next-auth": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",

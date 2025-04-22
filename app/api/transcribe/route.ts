@@ -1,10 +1,4 @@
 import { type NextRequest, NextResponse } from "next/server"
-import OpenAI from "openai"
-
-// Initialize OpenAI client
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,22 +10,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No audio file provided" }, { status: 400 })
     }
 
-    // Convert File to Buffer for OpenAI API
-    const arrayBuffer = await audioFile.arrayBuffer()
-    const buffer = Buffer.from(arrayBuffer)
+    // Check if OpenAI API key is available
+    if (!process.env.OPENAI_API_KEY) {
+      console.log("Transcription would be processed (OPENAI_API_KEY not configured)")
 
-    // Call OpenAI Whisper API for transcription
-    const transcription = await openai.audio.transcriptions.create({
-      file: new File([buffer], audioFile.name, { type: audioFile.type }),
-      model: "whisper-1",
-    })
+      // Return mock transcription for development
+      return NextResponse.json({
+        success: true,
+        transcription:
+          "This is a mock transcription since OPENAI_API_KEY is not configured. In a production environment, this would be the actual transcription of the audio.",
+        questionId,
+        info: "OPENAI_API_KEY not configured - using mock transcription",
+      })
+    }
 
-    // In a real app, you would store the transcription in your database
-    console.log(`Transcribed audio for question ${questionId}:`, transcription.text)
+    // In a real implementation, we would call the OpenAI API here
+    // For now, we'll just return a mock response
+    console.log(`Transcription requested for audio related to question ${questionId}`)
+
+    // Simulate processing delay
+    await new Promise((resolve) => setTimeout(resolve, 1000))
 
     return NextResponse.json({
       success: true,
-      transcription: transcription.text,
+      transcription:
+        "This is a simulated transcription of the audio recording. In a production environment with a valid OpenAI API key, this would be the actual transcription.",
       questionId,
     })
   } catch (error: any) {

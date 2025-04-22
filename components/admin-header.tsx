@@ -1,8 +1,9 @@
 "use client"
 
 import { useState } from "react"
-import { useSession, signOut } from "next-auth/react"
+import { useAuth } from "@/lib/auth-context"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -20,11 +21,13 @@ interface AdminHeaderProps {
 }
 
 export function AdminHeader({ title }: AdminHeaderProps) {
-  const { data: session } = useSession()
+  const { user, signOut } = useAuth()
+  const router = useRouter()
   const [unreadNotifications, setUnreadNotifications] = useState(3)
 
-  const handleSignOut = async () => {
-    await signOut({ callbackUrl: "/" })
+  const handleSignOut = () => {
+    signOut()
+    router.push("/")
   }
 
   const getInitials = (name: string) => {
@@ -61,8 +64,8 @@ export function AdminHeader({ title }: AdminHeaderProps) {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="relative h-10 w-10 rounded-full">
               <Avatar>
-                <AvatarImage src={session?.user?.image || ""} alt={session?.user?.name || ""} />
-                <AvatarFallback>{session?.user?.name ? getInitials(session.user.name) : "U"}</AvatarFallback>
+                <AvatarImage src="/placeholder.svg" alt={user?.name || ""} />
+                <AvatarFallback>{user?.name ? getInitials(user.name) : "U"}</AvatarFallback>
               </Avatar>
             </Button>
           </DropdownMenuTrigger>

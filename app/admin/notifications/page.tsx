@@ -3,8 +3,7 @@
 import { Badge } from "@/components/ui/badge"
 
 import { useState } from "react"
-import { useSession } from "next-auth/react"
-import { redirect } from "next/navigation"
+import { useRequireAdmin } from "@/lib/auth-context"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
@@ -14,14 +13,15 @@ import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { AdminHeader } from "@/components/admin-header"
 import { AdminSidebar } from "@/components/admin-sidebar"
-import { Loader2, Mail } from "lucide-react"
+import { Loader2, Mail, ExternalLink } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
 export default function NotificationsPage() {
-  const { status } = useSession()
+  const { status } = useRequireAdmin()
   const [isLoading, setIsLoading] = useState(false)
   const [success, setSuccess] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
 
   // Form state
   const [emailSubject, setEmailSubject] = useState("New response received")
@@ -41,33 +41,47 @@ export default function NotificationsPage() {
     return <div>Loading...</div>
   }
 
-  if (status === "unauthenticated") {
-    redirect("/login")
-  }
-
   const handleSendTestEmail = async () => {
     setIsLoading(true)
     setSuccess(null)
     setError(null)
+    setPreviewUrl(null)
 
     try {
-      // In a real app, this would call your API
-      // const response = await fetch("/api/email", {
-      //   method: "POST",
-      //   headers: { "Content-Type": "application/json" },
-      //   body: JSON.stringify({
-      //     to: emailRecipients.split(",").map(email => email.trim()),
-      //     subject: emailSubject,
-      //     html: emailBody,
-      //   }),
-      // })
+      const response = await fetch("/api/email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: emailRecipients.split(",").map((email) => email.trim()),
+          subject: emailSubject,
+          html: `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+            <h1 style="color: #6366f1; margin-bottom: 24px;">${emailSubject}</h1>
+            <p style="margin-bottom: 16px;">${emailBody}</p>
+            <p style="margin-bottom: 16px;">This is a test email sent from AudioForm.</p>
+            <div style="padding: 16px; background-color: #f8fafc; border-radius: 4px; margin-top: 24px;">
+              <p style="margin: 0; color: #64748b; font-size: 14px;">
+                AudioForm - Audio-First Questionnaire Platform
+              </p>
+            </div>
+          </div>`,
+          text: `${emailSubject}\n\n${emailBody}\n\nThis is a test email sent from AudioForm.`,
+        }),
+      })
 
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to send test email")
+      }
 
       setSuccess("Test email sent successfully!")
-    } catch (err) {
-      setError("Failed to send test email. Please try again.")
+
+      // If there's a preview URL (for Ethereal Email), show it
+      if (data.previewUrl) {
+        setPreviewUrl(data.previewUrl)
+      }
+    } catch (err: any) {
+      setError(err.message || "Failed to send test email. Please try again.")
     } finally {
       setIsLoading(false)
     }
@@ -244,7 +258,24 @@ AudioForm Team`}
                     <Alert className="mb-4">
                       <Mail className="h-4 w-4" />
                       <AlertTitle>Success</AlertTitle>
-                      <AlertDescription>{success}</AlertDescription>
+                      <AlertDescription>
+                        {success}
+                        {previewUrl && (
+                          <div className="mt-2">
+                            <a
+                              href={previewUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center text-primary hover:underline"
+                            >
+                              View email preview <ExternalLink className="h-3 w-3 ml-1" />
+                            </a>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              (Using Ethereal Email for development - emails are not actually delivered)
+                            </p>
+                          </div>
+                        )}
+                      </AlertDescription>
                     </Alert>
                   )}
 

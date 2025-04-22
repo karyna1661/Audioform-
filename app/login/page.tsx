@@ -2,10 +2,10 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { signIn } from "next-auth/react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { useAuth } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -15,10 +15,21 @@ import { AlertCircle, Loader2 } from "lucide-react"
 
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const callbackUrl = searchParams.get("callbackUrl") || "/admin/dashboard"
+  const { signIn, status } = useAuth()
+
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (status === "authenticated") {
+      router.push(callbackUrl)
+    }
+  }, [status, router, callbackUrl])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -26,20 +37,16 @@ export default function LoginPage() {
     setError(null)
 
     try {
-      const result = await signIn("credentials", {
-        redirect: false,
-        email,
-        password,
-      })
+      const success = await signIn(email, password)
 
-      if (result?.error) {
+      if (!success) {
         setError("Invalid email or password")
         setIsLoading(false)
         return
       }
 
       // Redirect to dashboard on success
-      router.push("/admin/dashboard")
+      router.push(callbackUrl)
     } catch (error) {
       setError("An unexpected error occurred. Please try again.")
       setIsLoading(false)
@@ -104,17 +111,17 @@ export default function LoginPage() {
               <span className="w-full border-t" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
+              <span className="bg-card px-2 text-muted-foreground">Demo Credentials</span>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <Button variant="outline" type="button" disabled={isLoading}>
-              Google
-            </Button>
-            <Button variant="outline" type="button" disabled={isLoading}>
-              GitHub
-            </Button>
+          <div className="space-y-2 text-sm text-muted-foreground">
+            <p>
+              <strong>Admin:</strong> admin@example.com / password123
+            </p>
+            <p>
+              <strong>User:</strong> user@example.com / password123
+            </p>
           </div>
         </CardContent>
         <CardFooter className="flex flex-col space-y-4">

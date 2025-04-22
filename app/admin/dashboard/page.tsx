@@ -1,8 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { useSession } from "next-auth/react"
-import { redirect } from "next/navigation"
+import { useRequireAdmin } from "@/lib/auth-context"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
@@ -15,16 +14,12 @@ import { ResponseTimeChart } from "@/components/response-time-chart"
 import { Skeleton } from "@/components/ui/skeleton"
 
 export default function AdminDashboard() {
-  const { data: session, status } = useSession()
+  const { user, status } = useRequireAdmin()
   const [selectedPeriod, setSelectedPeriod] = useState("7d")
 
-  // Check if the user is authenticated
+  // Show loading state while checking authentication
   if (status === "loading") {
     return <DashboardSkeleton />
-  }
-
-  if (status === "unauthenticated") {
-    redirect("/login")
   }
 
   return (
@@ -34,7 +29,7 @@ export default function AdminDashboard() {
         <AdminHeader title="Dashboard" />
         <main className="p-6">
           <div className="mb-8">
-            <h1 className="text-3xl font-bold mb-2">Welcome back, {session?.user?.name}</h1>
+            <h1 className="text-3xl font-bold mb-2">Welcome back, {user?.name}</h1>
             <p className="text-muted-foreground">Here's what's happening with your questionnaires today.</p>
           </div>
 
