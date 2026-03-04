@@ -18,20 +18,33 @@ const initialQuestions = [
   "What would you change first to make this easier to use?",
 ]
 
-const templateQuickInsert: Record<string, string[]> = {
-  confusion: [
-    "What felt unclear at any point, and what were you expecting instead?",
-    "Where did you pause before the next step, and what caused that pause?",
-  ],
-  risk: [
-    "What would stop you from using this in your real workflow this month?",
-    "What risk would you need resolved before trusting this in production?",
-  ],
-  value: [
-    "What result felt most valuable after trying this?",
-    "What made this worth your time, or not worth continuing?",
-  ],
-}
+const decisionTargetOptions = [
+  "Onboarding flow",
+  "Pricing page",
+  "Feature experience",
+  "Messaging clarity",
+  "Dashboard usability",
+  "Other",
+]
+
+const changeTypeOptions = [
+  "Add",
+  "Remove",
+  "Simplify",
+  "Reorder",
+  "Reposition",
+  "Validate as-is",
+]
+
+const desiredOutcomeOptions = [
+  "Conversion",
+  "Clarity",
+  "Trust",
+  "Adoption",
+  "Retention",
+  "Engagement",
+  "Other",
+]
 
 const intentOptions = [
   { id: "validation", label: "Validate Direction" },
@@ -55,6 +68,67 @@ const templatePackMeta: Record<string, { label: string; description: string }> =
   },
 }
 
+function toLower(value: string): string {
+  return value.trim().toLowerCase()
+}
+
+function composeDecisionSentence(input: {
+  target: string
+  changeType: string
+  outcome: string
+  detail: string
+}): string {
+  const target = input.target.trim()
+  const changeType = input.changeType.trim()
+  const outcome = input.outcome.trim()
+  const detail = input.detail.trim()
+
+  if (detail.length > 0) return detail
+  return `Should we ${toLower(changeType)} ${toLower(target)} to improve ${toLower(outcome)}?`
+}
+
+function buildIntentAlignedPrompts(input: {
+  target: string
+  changeType: string
+  outcome: string
+  intent: string
+}): string[] {
+  const target = toLower(input.target)
+  const changeType = toLower(input.changeType)
+  const outcome = toLower(input.outcome)
+  const changePhrase = `${changeType} ${target}`.trim()
+
+  if (input.intent === "confusion") {
+    return [
+      `Describe the exact moment ${target} felt unclear or harder than expected.`,
+      `Where did you hesitate while trying to complete the flow toward ${outcome}?`,
+      `If we ${changePhrase}, what confusion would disappear first?`,
+    ]
+  }
+
+  if (input.intent === "critique") {
+    return [
+      `What is the strongest reason not to ${changePhrase} right now?`,
+      `What risk would this change introduce in real usage?`,
+      `What must we resolve before this feels safe to ship for better ${outcome}?`,
+    ]
+  }
+
+  if (input.intent === "emotion") {
+    return [
+      `When you think about this ${target}, what do you feel first?`,
+      `What part of this direction increases or reduces your confidence?`,
+      `What single improvement would make this feel clearly better for ${outcome}?`,
+    ]
+  }
+
+  return [
+    `Would ${changePhrase} move us in the right direction for ${outcome}? Why?`,
+    `What signal would increase your conviction that this is the right move?`,
+    `What would make you change your mind about this direction?`,
+  ]
+}
+
 function createSurveyId(title: string, creatorId: string): string {
   const creatorPrefix = creatorId.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 12) || "creator"
   const titlePrefix =
@@ -74,7 +148,10 @@ export default function QuestionnairesV1Page() {
   const [questions, setQuestions] = useState(initialQuestions)
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [title, setTitle] = useState("Activation Decision Pulse")
-  const [decisionFocus, setDecisionFocus] = useState("Should we simplify onboarding before adding new features?")
+  const [decisionTarget, setDecisionTarget] = useState("Onboarding flow")
+  const [changeType, setChangeType] = useState("Simplify")
+  const [desiredOutcome, setDesiredOutcome] = useState("Conversion")
+  const [decisionDetail, setDecisionDetail] = useState("")
   const [intent, setIntent] = useState("critique")
   const [templatePack, setTemplatePack] = useState("confusion")
   const [draftSurveyId, setDraftSurveyId] = useState("")
@@ -89,6 +166,12 @@ export default function QuestionnairesV1Page() {
       setDraftSurveyId(surveyId)
     }
     const normalizedQuestions = questions.map((q) => q.trim()).filter((q) => q.length > 0)
+    const decisionFocus = composeDecisionSentence({
+      target: decisionTarget,
+      changeType,
+      outcome: desiredOutcome,
+      detail: decisionDetail,
+    })
     const payload = {
       id: surveyId,
       title: title.trim(),
@@ -124,6 +207,10 @@ export default function QuestionnairesV1Page() {
         surveyId?: string
         title?: string
         decisionFocus?: string
+        decisionTarget?: string
+        changeType?: string
+        desiredOutcome?: string
+        decisionDetail?: string
         intent?: string
         templatePack?: string
         questions?: string[]
@@ -131,7 +218,11 @@ export default function QuestionnairesV1Page() {
       }
       if (parsed.title) setTitle(parsed.title)
       if (parsed.surveyId) setDraftSurveyId(parsed.surveyId)
-      if (parsed.decisionFocus) setDecisionFocus(parsed.decisionFocus)
+      if (parsed.decisionTarget) setDecisionTarget(parsed.decisionTarget)
+      if (parsed.changeType) setChangeType(parsed.changeType)
+      if (parsed.desiredOutcome) setDesiredOutcome(parsed.desiredOutcome)
+      if (parsed.decisionDetail) setDecisionDetail(parsed.decisionDetail)
+      if (!parsed.decisionDetail && parsed.decisionFocus) setDecisionDetail(parsed.decisionFocus)
       if (parsed.intent) setIntent(parsed.intent)
       if (parsed.templatePack) setTemplatePack(parsed.templatePack)
       if (Array.isArray(parsed.questions) && parsed.questions.length > 0) {
@@ -154,19 +245,39 @@ export default function QuestionnairesV1Page() {
   if (status === "loading") return <main className="min-h-dvh bg-[#f3ecdf] p-6">Loading...</main>
 
   const selected = questions[selectedIndex] || ""
+  const decisionFocus = composeDecisionSentence({
+    target: decisionTarget,
+    changeType,
+    outcome: desiredOutcome,
+    detail: decisionDetail,
+  })
+  const intentAlignedPrompts = buildIntentAlignedPrompts({
+    target: decisionTarget,
+    changeType,
+    outcome: desiredOutcome,
+    intent,
+  })
   const selectedPack = templatePackMeta[templatePack]
   const readyChecks = {
     hasTitle: title.trim().length > 0,
-    hasDecision: decisionFocus.trim().length > 0,
+    hasDecisionTarget: decisionTarget.trim().length > 0,
+    hasChangeType: changeType.trim().length > 0,
+    hasDesiredOutcome: desiredOutcome.trim().length > 0,
+    hasDecisionSpecificity: decisionFocus.trim().length > 18,
     hasTwoQuestions: questions.filter((q) => q.trim().length > 0).length >= 2,
     hasDepthPrompt: questions.some((q) => q.length > 40),
   }
+  const readinessItems = [
+    { ok: readyChecks.hasTitle, label: "Title" },
+    { ok: readyChecks.hasDecisionTarget, label: "Change target" },
+    { ok: readyChecks.hasChangeType, label: "Change type" },
+    { ok: readyChecks.hasDesiredOutcome, label: "Desired outcome" },
+    { ok: readyChecks.hasDecisionSpecificity, label: "Decision specificity" },
+    { ok: readyChecks.hasTwoQuestions, label: "Question flow" },
+    { ok: readyChecks.hasDepthPrompt, label: "Depth question" },
+  ]
   const completionScore =
-    (Number(readyChecks.hasTitle) +
-      Number(readyChecks.hasDecision) +
-      Number(readyChecks.hasTwoQuestions) +
-      Number(readyChecks.hasDepthPrompt)) /
-    4
+    readinessItems.reduce((sum, item) => sum + Number(item.ok), 0) / readinessItems.length
 
   const creatorId = user?.id || ""
   const surveyLink =
@@ -218,7 +329,10 @@ export default function QuestionnairesV1Page() {
                   JSON.stringify({
                     surveyId: draftSurveyId || createSurveyId(title, user?.id || "creator"),
                     title,
-                    decisionFocus,
+                    decisionTarget,
+                    changeType,
+                    desiredOutcome,
+                    decisionDetail,
                     intent,
                     templatePack,
                     questions,
@@ -232,6 +346,9 @@ export default function QuestionnairesV1Page() {
                     intent_type: intent,
                     question_count: questions.length,
                     decision_focus_present: decisionFocus.trim().length > 0,
+                    change_target: decisionTarget,
+                    change_type: changeType,
+                    desired_outcome: desiredOutcome,
                   })
                 } catch (error) {
                   setDraftMessage(error instanceof Error ? error.message : "Failed to save draft.")
@@ -267,19 +384,71 @@ export default function QuestionnairesV1Page() {
                     onChange={(e) => setTitle(e.target.value)}
                   />
 
-                  <label className="mt-4 block text-sm font-semibold" htmlFor="decision-focus">
-                    What product decision are you trying to make this week?
+                  <label className="mt-4 block text-sm font-semibold" htmlFor="decision-target">
+                    What are you changing?
+                  </label>
+                  <select
+                    id="decision-target"
+                    value={decisionTarget}
+                    onChange={(e) => setDecisionTarget(e.target.value)}
+                    className="mt-2 w-full rounded-2xl border border-[#cfbea4] bg-[#fffdf8] px-3 py-2 text-sm"
+                  >
+                    {decisionTargetOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+
+                  <label className="mt-4 block text-sm font-semibold" htmlFor="change-type">
+                    What kind of change?
+                  </label>
+                  <select
+                    id="change-type"
+                    value={changeType}
+                    onChange={(e) => setChangeType(e.target.value)}
+                    className="mt-2 w-full rounded-2xl border border-[#cfbea4] bg-[#fffdf8] px-3 py-2 text-sm"
+                  >
+                    {changeTypeOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+
+                  <label className="mt-4 block text-sm font-semibold" htmlFor="desired-outcome">
+                    What outcome should improve?
+                  </label>
+                  <select
+                    id="desired-outcome"
+                    value={desiredOutcome}
+                    onChange={(e) => setDesiredOutcome(e.target.value)}
+                    className="mt-2 w-full rounded-2xl border border-[#cfbea4] bg-[#fffdf8] px-3 py-2 text-sm"
+                  >
+                    {desiredOutcomeOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+
+                  <label className="mt-4 block text-sm font-semibold" htmlFor="decision-detail">
+                    Optional detail (overrides generated sentence)
                   </label>
                   <textarea
-                    id="decision-focus"
-                    className={`${body.className} mt-2 min-h-28 w-full rounded-2xl border border-[#cfbea4] bg-[#fffdf8] px-3 py-2 text-sm text-pretty`}
-                    value={decisionFocus}
-                    onChange={(e) => setDecisionFocus(e.target.value)}
-                    placeholder="Example: Should we fix onboarding friction before shipping the next feature?"
+                    id="decision-detail"
+                    className={`${body.className} mt-2 min-h-20 w-full rounded-2xl border border-[#cfbea4] bg-[#fffdf8] px-3 py-2 text-sm text-pretty`}
+                    value={decisionDetail}
+                    onChange={(e) => setDecisionDetail(e.target.value)}
+                    placeholder="Example: Should we remove onboarding step 2 to increase completion?"
                   />
                 </div>
                 <div className="rounded-2xl border border-[#cfbea4] bg-[#f6ead8] p-4">
-                  <p className="text-sm font-semibold">Starter prompts (builder language)</p>
+                  <p className="text-sm font-semibold">Decision anchor preview</p>
+                  <p className={`${body.className} mt-2 rounded-xl border border-[#cfbea4] bg-[#fff7ee] px-3 py-2 text-sm text-[#665746]`}>
+                    {decisionFocus}
+                  </p>
+                  <p className="mt-4 text-sm font-semibold">Starter decision reframes</p>
                   <div className="mt-3 grid gap-2">
                     {[
                       "What user signal would change your mind about this decision?",
@@ -289,7 +458,7 @@ export default function QuestionnairesV1Page() {
                       <button
                         key={reframe}
                         type="button"
-                        onClick={() => setDecisionFocus(reframe)}
+                        onClick={() => setDecisionDetail(reframe)}
                         className={`${body.className} rounded-xl border border-[#cfbea4] bg-[#fff7ee] px-3 py-2 text-left text-sm text-[#665746] hover:bg-[#fffdf8]`}
                       >
                         {reframe}
@@ -320,7 +489,7 @@ export default function QuestionnairesV1Page() {
                   ))}
                 </div>
                 <p className={`${body.className} mt-2 text-xs text-[#665746]`}>
-                  Intent mode sets the kind of truth you want to hear first. Then choose a prompt pack to shape the response depth.
+                  Intent mode now applies a lens to your exact decision anchor so prompt suggestions stay contextual.
                 </p>
               </div>
             </section>
@@ -399,9 +568,9 @@ export default function QuestionnairesV1Page() {
                     />
                   </div>
                   <div className="rounded-2xl border border-[#cfbea4] bg-[#f8efdf] p-3">
-                    <p className="text-sm font-semibold">Depth starters</p>
-                    <div className="mt-2 grid gap-2">
-                      {templateQuickInsert[templatePack].map((template) => (
+                  <p className="text-sm font-semibold">Depth starters</p>
+                  <div className="mt-2 grid gap-2">
+                      {intentAlignedPrompts.map((template) => (
                         <button
                           key={template}
                           type="button"
@@ -419,7 +588,18 @@ export default function QuestionnairesV1Page() {
                           {template}
                         </button>
                       ))}
-                    </div>
+                  </div>
+                    <Button
+                      variant="outline"
+                      className="mt-3 w-full border-[#cfbea4] bg-[#fff7ee]"
+                      onClick={() => {
+                        setQuestions(intentAlignedPrompts)
+                        setSelectedIndex(0)
+                        setDraftMessage("Starter prompts generated from decision context + intent mode.")
+                      }}
+                    >
+                      Apply decision-aligned starter flow
+                    </Button>
                     <Button
                       variant="outline"
                       className="mt-3 w-full border-[#cfbea4] bg-[#fff7ee]"
@@ -471,23 +651,18 @@ export default function QuestionnairesV1Page() {
             <div className="mt-4 rounded-2xl border border-[#cfbea4] bg-[#fff7ee] p-3">
               <p className="text-sm font-semibold">Readiness index</p>
               <p className="mt-1 text-3xl font-semibold text-[#6e3316]">{Math.round(completionScore * 100)}%</p>
-              <div className="mt-2 grid grid-cols-4 gap-1">
-                {[0, 1, 2, 3].map((step) => (
+              <div className="mt-2 grid grid-cols-7 gap-1">
+                {Array.from({ length: readinessItems.length }).map((_, step) => (
                   <div
                     key={step}
                     className={`h-1.5 rounded-full ${
-                      step < Math.round(completionScore * 4) ? "bg-[#b85e2d]" : "bg-[#dfcfb8]"
+                      step < Math.round(completionScore * readinessItems.length) ? "bg-[#b85e2d]" : "bg-[#dfcfb8]"
                     }`}
                   />
                 ))}
               </div>
               <ul className="mt-3 space-y-2">
-                {[
-                  { ok: readyChecks.hasTitle, label: "Title" },
-                  { ok: readyChecks.hasDecision, label: "Decision clarity" },
-                  { ok: readyChecks.hasTwoQuestions, label: "Question flow" },
-                  { ok: readyChecks.hasDepthPrompt, label: "Depth question" },
-                ].map((item) => (
+                {readinessItems.map((item) => (
                   <li key={item.label} className="flex items-center gap-2 text-sm">
                     <CheckCircle2 className={`size-4 ${item.ok ? "text-[#2d5a17]" : "text-[#8c7f70]"}`} aria-hidden="true" />
                     <span className={item.ok ? "text-[#2d5a17]" : "text-[#665746]"}>{item.label}</span>
@@ -510,8 +685,8 @@ export default function QuestionnairesV1Page() {
               <Button
                 className="w-full bg-[#b85e2d] text-[#fff6ed] hover:bg-[#a05227]"
                 onClick={async () => {
-                  if (!readyChecks.hasTitle || !readyChecks.hasDecision || !readyChecks.hasTwoQuestions) {
-                    setDraftMessage("Complete title, decision context, and at least two prompts before publishing.")
+                  if (!readyChecks.hasTitle || !readyChecks.hasDecisionSpecificity || !readyChecks.hasTwoQuestions) {
+                    setDraftMessage("Complete title, structured decision context, and at least two prompts before publishing.")
                     return
                   }
 
@@ -525,6 +700,9 @@ export default function QuestionnairesV1Page() {
                       template_pack: templatePack,
                       question_count: questions.length,
                       decision_focus_present: decisionFocus.trim().length > 0,
+                      change_target: decisionTarget,
+                      change_type: changeType,
+                      desired_outcome: desiredOutcome,
                     })
                     setPublishedSurveyId(surveyId)
                     setDraftMessage("Survey published and visible in Survey Stack.")
