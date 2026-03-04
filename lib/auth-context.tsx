@@ -4,24 +4,6 @@ import type React from "react"
 import { createContext, useContext, useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 
-// Mock user data
-const USERS = [
-  {
-    id: "1",
-    name: "Admin User",
-    email: "admin@example.com",
-    password: "password123",
-    role: "admin",
-  },
-  {
-    id: "2",
-    name: "Test User",
-    email: "user@example.com",
-    password: "password123",
-    role: "user",
-  },
-]
-
 type User = {
   id: string
   name: string
@@ -33,56 +15,99 @@ type AuthContextType = {
   user: User | null
   status: "loading" | "authenticated" | "unauthenticated"
   signIn: (email: string, password: string) => Promise<boolean>
-  signOut: () => void
+  signUp: (input: { name: string; email: string; password: string }) => Promise<{ ok: boolean; error?: string }>
+  signOut: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   status: "loading",
   signIn: async () => false,
-  signOut: () => {},
+  signUp: async () => ({ ok: false, error: "Unavailable" }),
+  signOut: async () => {},
 })
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [status, setStatus] = useState<"loading" | "authenticated" | "unauthenticated">("loading")
 
-  useEffect(() => {
-    // Check if user is stored in localStorage
-    const storedUser = localStorage.getItem("audioform_user")
-    if (storedUser) {
-      setUser(JSON.parse(storedUser))
+  const refreshSession = async () => {
+    try {
+      const response = await fetch("/api/auth/session", { method: "GET", credentials: "include" })
+      const data = await response.json()
+      if (!response.ok || !data?.authenticated) {
+        setUser(null)
+        setStatus("unauthenticated")
+        return
+      }
+      setUser(data.user as User)
       setStatus("authenticated")
-    } else {
+    } catch {
+      setUser(null)
       setStatus("unauthenticated")
     }
+  }
+
+  useEffect(() => {
+    refreshSession()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const signIn = async (email: string, password: string): Promise<boolean> => {
-    // Find user with matching email and password
-    const matchedUser = USERS.find((u) => u.email.toLowerCase() === email.toLowerCase() && u.password === password)
-
-    if (matchedUser) {
-      // Create user object without password
-      const { password: _, ...userWithoutPassword } = matchedUser
-
-      // Store in state and localStorage
-      setUser(userWithoutPassword)
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+        credentials: "include",
+      })
+      if (!response.ok) return false
+      const data = (await response.json()) as { success?: boolean; user?: User }
+      if (!data.success || !data.user) return false
+      setUser(data.user)
       setStatus("authenticated")
-      localStorage.setItem("audioform_user", JSON.stringify(userWithoutPassword))
       return true
+    } catch {
+      return false
     }
-
-    return false
   }
 
-  const signOut = () => {
-    setUser(null)
-    setStatus("unauthenticated")
-    localStorage.removeItem("audioform_user")
+  const signUp = async (input: { name: string; email: string; password: string }) => {
+    try {
+      const response = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+        credentials: "include",
+      })
+      const data = (await response.json()) as { success?: boolean; user?: User; error?: string }
+      if (!response.ok) {
+        return { ok: false, error: data?.error || "Failed to create account" }
+      }
+      if (!data.success || !data.user) {
+        return { ok: false, error: "Failed to create account" }
+      }
+      setUser(data.user)
+      setStatus("authenticated")
+      return { ok: true }
+    } catch {
+      return { ok: false, error: "Failed to create account" }
+    }
   }
 
-  return <AuthContext.Provider value={{ user, status, signIn, signOut }}>{children}</AuthContext.Provider>
+  const signOut = async () => {
+    try {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+      })
+    } finally {
+      setUser(null)
+      setStatus("unauthenticated")
+    }
+  }
+
+  return <AuthContext.Provider value={{ user, status, signIn, signUp, signOut }}>{children}</AuthContext.Provider>
 }
 
 export function useAuth() {
@@ -114,10 +139,6 @@ export function useRequireAdmin(redirectTo = "/") {
     if (status === "unauthenticated") {
       router.push("/login")
       return
-    }
-
-    if (user?.role !== "admin") {
-      router.push(redirectTo)
     }
   }, [user, status, router, redirectTo])
 

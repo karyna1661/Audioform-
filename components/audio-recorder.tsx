@@ -2,26 +2,38 @@
 
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Mic, Square, Play, Send, RotateCcw, Loader2 } from "lucide-react"
+import { Mic, Square, Play, Pause, Send, RotateCcw, Loader2 } from "lucide-react"
 
 interface AudioRecorderProps {
   onSubmit: (audioBlob: Blob) => void
   questionId: string
   isMobile: boolean
   isUploading?: boolean
+  onRecordingStart?: () => void
+  onRecordingSubmit?: (meta: { questionId: string; durationSeconds: number }) => void
 }
 
-export function AudioRecorder({ onSubmit, questionId, isMobile, isUploading = false }: AudioRecorderProps) {
+export function AudioRecorder({
+  onSubmit,
+  questionId,
+  isMobile,
+  isUploading = false,
+  onRecordingStart,
+  onRecordingSubmit,
+}: AudioRecorderProps) {
   const [isRecording, setIsRecording] = useState(false)
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [recordingTime, setRecordingTime] = useState(0)
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
+  const [playbackTime, setPlaybackTime] = useState(0)
+  const [playbackDuration, setPlaybackDuration] = useState(0)
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
+  const playbackRafRef = useRef<number | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const animationFrameRef = useRef<number | null>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
@@ -32,8 +44,15 @@ export function AudioRecorder({ onSubmit, questionId, isMobile, isUploading = fa
   // Initialize audio element
   useEffect(() => {
     audioRef.current = new Audio()
+    audioRef.current.onloadedmetadata = () => {
+      setPlaybackDuration(Number.isFinite(audioRef.current?.duration) ? audioRef.current!.duration : 0)
+    }
+    audioRef.current.ontimeupdate = () => {
+      setPlaybackTime(audioRef.current?.currentTime ?? 0)
+    }
     audioRef.current.onended = () => {
       setIsPlaying(false)
+      setPlaybackTime(audioRef.current?.duration ?? 0)
     }
 
     return () => {
@@ -56,6 +75,10 @@ export function AudioRecorder({ onSubmit, questionId, isMobile, isUploading = fa
 
       if (timerRef.current) {
         clearInterval(timerRef.current)
+      }
+
+      if (playbackRafRef.current) {
+        cancelAnimationFrame(playbackRafRef.current)
       }
     }
   }, [])
@@ -84,8 +107,16 @@ export function AudioRecorder({ onSubmit, questionId, isMobile, isUploading = fa
       sourceRef.current = source
       source.connect(analyser)
 
-      // Set up media recorder
-      const mediaRecorder = new MediaRecorder(stream)
+      // Set up media recorder with speech-optimized settings for smaller uploads on mobile.
+      const preferredMimeTypes = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus"]
+      const selectedMimeType = preferredMimeTypes.find((type) => MediaRecorder.isTypeSupported(type))
+      const recorderOptions: MediaRecorderOptions = {
+        audioBitsPerSecond: 32_000,
+      }
+      if (selectedMimeType) {
+        recorderOptions.mimeType = selectedMimeType
+      }
+      const mediaRecorder = new MediaRecorder(stream, recorderOptions)
       mediaRecorderRef.current = mediaRecorder
       audioChunksRef.current = []
 
@@ -96,7 +127,9 @@ export function AudioRecorder({ onSubmit, questionId, isMobile, isUploading = fa
       }
 
       mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" })
+        const audioBlob = new Blob(audioChunksRef.current, {
+          type: mediaRecorder.mimeType || selectedMimeType || "audio/webm",
+        })
         const audioUrl = URL.createObjectURL(audioBlob)
 
         setAudioBlob(audioBlob)
@@ -111,8 +144,9 @@ export function AudioRecorder({ onSubmit, questionId, isMobile, isUploading = fa
       }
 
       // Start recording
-      mediaRecorder.start()
+      mediaRecorder.start(250)
       setIsRecording(true)
+      onRecordingStart?.()
 
       // Start timer
       timerRef.current = setInterval(() => {
@@ -149,17 +183,28 @@ export function AudioRecorder({ onSubmit, questionId, isMobile, isUploading = fa
   // Play recorded audio
   const playAudio = () => {
     if (audioRef.current && audioUrl) {
-      audioRef.current.play()
+      void audioRef.current.play()
       setIsPlaying(true)
+
+      const syncPlayback = () => {
+        if (!audioRef.current) return
+        setPlaybackTime(audioRef.current.currentTime ?? 0)
+        if (!audioRef.current.paused) {
+          playbackRafRef.current = requestAnimationFrame(syncPlayback)
+        }
+      }
+      playbackRafRef.current = requestAnimationFrame(syncPlayback)
     }
   }
 
-  // Stop playing audio
-  const stopAudio = () => {
+  // Pause playback without resetting time
+  const pauseAudio = () => {
     if (audioRef.current) {
       audioRef.current.pause()
-      audioRef.current.currentTime = 0
       setIsPlaying(false)
+      if (playbackRafRef.current) {
+        cancelAnimationFrame(playbackRafRef.current)
+      }
     }
   }
 
@@ -178,11 +223,17 @@ export function AudioRecorder({ onSubmit, questionId, isMobile, isUploading = fa
     setAudioUrl(null)
     setIsPlaying(false)
     setRecordingTime(0)
+    setPlaybackTime(0)
+    setPlaybackDuration(0)
+    if (playbackRafRef.current) {
+      cancelAnimationFrame(playbackRafRef.current)
+    }
   }
 
   // Submit recording
   const handleSubmit = () => {
     if (audioBlob) {
+      onRecordingSubmit?.({ questionId, durationSeconds: recordingTime })
       onSubmit(audioBlob)
       resetRecorder()
     }
@@ -235,14 +286,16 @@ export function AudioRecorder({ onSubmit, questionId, isMobile, isUploading = fa
         ) : audioBlob ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
-              <div className="text-2xl font-semibold">{formatTime(recordingTime)}</div>
-              <div className="text-sm text-muted-foreground">Recording length</div>
+              <div className="text-2xl font-semibold tabular-nums">
+                {formatTime(Math.floor(playbackTime || 0))} / {formatTime(Math.floor(playbackDuration || recordingTime))}
+              </div>
+              <div className="text-sm text-muted-foreground">{isPlaying ? "Playing preview" : "Preview ready"}</div>
             </div>
           </div>
         ) : (
           <div className="flex items-center justify-center h-full">
             <div className="text-center text-muted-foreground">
-              {isMobile ? "Tap to record" : "Click to record"} your answer
+              {isMobile ? "Tap to record" : "Click to record"} your 30-second take
             </div>
           </div>
         )}
@@ -279,20 +332,21 @@ export function AudioRecorder({ onSubmit, questionId, isMobile, isUploading = fa
 
         {!isRecording && audioBlob && !isUploading && (
           <>
-            <Button size="icon" variant="outline" onClick={resetRecorder} className="rounded-full h-12 w-12">
+            <Button size="icon" variant="outline" onClick={resetRecorder} className="rounded-full h-12 w-12" aria-label="Re-record">
               <RotateCcw className="h-5 w-5" />
             </Button>
 
-            <Button
-              size="icon"
-              variant={isPlaying ? "secondary" : "outline"}
-              onClick={isPlaying ? stopAudio : playAudio}
-              className="rounded-full h-12 w-12"
-            >
-              <Play className="h-5 w-5" />
+              <Button
+                size="icon"
+                variant={isPlaying ? "secondary" : "outline"}
+                onClick={isPlaying ? pauseAudio : playAudio}
+                className="rounded-full h-12 w-12"
+                aria-label={isPlaying ? "Pause playback" : "Play recording"}
+              >
+              {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
             </Button>
 
-            <Button size="icon" onClick={handleSubmit} className="rounded-full h-12 w-12">
+            <Button size="icon" onClick={handleSubmit} className="rounded-full h-12 w-12" aria-label="Submit recording">
               <Send className="h-5 w-5" />
             </Button>
           </>
@@ -306,10 +360,14 @@ export function AudioRecorder({ onSubmit, questionId, isMobile, isUploading = fa
       </div>
 
       {audioBlob && !isUploading && (
-        <div className="text-center text-sm text-muted-foreground">{isPlaying ? "Playing..." : "Ready to submit"}</div>
+        <div className="text-center text-sm text-muted-foreground">
+          {isPlaying
+            ? `Playing preview ${formatTime(Math.floor(playbackTime))} / ${formatTime(Math.floor(playbackDuration || recordingTime))}`
+            : "Ready to submit this take"}
+        </div>
       )}
 
-      {isUploading && <div className="text-center text-sm text-muted-foreground">Uploading your response...</div>}
+      {isUploading && <div className="text-center text-sm text-muted-foreground">Uploading your voice take...</div>}
     </div>
   )
 }

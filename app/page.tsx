@@ -1,238 +1,184 @@
+"use client"
+
 import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Mic, BarChart3, FileText } from "lucide-react"
+import { useEffect, useState } from "react"
+import { Bricolage_Grotesque, Lora } from "next/font/google"
+import { Mic, Sparkles, AudioWaveform, ChevronRight } from "lucide-react"
+import { motion, useReducedMotion } from "motion/react"
+import { trackEvent } from "@/lib/analytics"
+import { useAuth } from "@/lib/auth-context"
+import { getActiveSurveyId } from "@/lib/behavior-metrics"
+
+const display = Bricolage_Grotesque({ subsets: ["latin"], weight: ["400", "600", "700"] })
+const body = Lora({ subsets: ["latin"], weight: ["400", "500", "600"] })
 
 export default function Home() {
-  return (
-    <div className="flex min-h-screen flex-col">
-      <header className="bg-white border-b">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-xl font-bold">AudioForm</h1>
-          <div className="flex gap-4">
-            <Link href="/login">
-              <Button variant="outline" size="sm">
-                Log In
-              </Button>
-            </Link>
-            <Link href="/signup">
-              <Button size="sm">Sign Up</Button>
-            </Link>
-          </div>
+  const { status } = useAuth()
+  const prefersReducedMotion = useReducedMotion()
+  const [isHydrated, setIsHydrated] = useState(false)
+  const signalLoopHref = status === "authenticated" ? "/admin/dashboard/v4" : "/signup"
+  const activeSurveyId = status === "authenticated" ? getActiveSurveyId() : null
+  const questionnaireHref = activeSurveyId ? `/questionnaire/v1?surveyId=${encodeURIComponent(activeSurveyId)}` : "/questionnaire/v1"
+
+  useEffect(() => {
+    trackEvent("creator_onboarding_started")
+    trackEvent("decision_intent_prompt_viewed")
+    setIsHydrated(true)
+  }, [])
+
+  if (!isHydrated) {
+    return (
+      <main className={`${display.className} min-h-dvh bg-[#f3ecdf] text-[#1f1b17]`}>
+        <div className="mx-auto max-w-6xl animate-pulse px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-8">
+          <header className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#dbcdb8] bg-[#f7efe2] px-4 py-3 sm:rounded-full sm:px-5">
+            <div className="h-6 w-36 rounded bg-[#e9decd]" />
+            <div className="flex w-full gap-2 sm:w-auto">
+              <div className="h-10 w-full rounded-full bg-[#e9decd] sm:w-24" />
+              <div className="h-10 w-full rounded-full bg-[#d9c3a9] sm:w-28" />
+            </div>
+          </header>
+
+          <section className="mt-8 rounded-[1.75rem] border border-[#dbcdb8] bg-[#f9f4ea] p-5 sm:mt-10 sm:rounded-[2.5rem] sm:p-12">
+            <div className="h-4 w-64 rounded bg-[#e9decd]" />
+            <div className="mt-4 h-9 rounded-md bg-[#e9decd] sm:h-14" />
+            <div className="mt-5 space-y-2">
+              <div className="h-5 rounded bg-[#e9decd]" />
+              <div className="h-5 w-[92%] rounded bg-[#e9decd]" />
+            </div>
+            <div className="mt-5 grid gap-2 sm:grid-cols-3">
+              <div className="h-20 rounded-xl bg-[#e9decd]" />
+              <div className="h-20 rounded-xl bg-[#e9decd]" />
+              <div className="h-20 rounded-xl bg-[#e9decd]" />
+            </div>
+            <div className="mt-7 flex flex-col gap-3 sm:mt-8 sm:flex-row">
+              <div className="h-11 w-full rounded-full bg-[#d9c3a9] sm:w-48" />
+              <div className="h-11 w-full rounded-full bg-[#e9decd] sm:w-80" />
+            </div>
+          </section>
+
+          <section className="mt-8 grid gap-4 md:grid-cols-3">
+            <div className="h-44 rounded-3xl bg-[#e9decd]" />
+            <div className="h-44 rounded-3xl bg-[#e9decd]" />
+            <div className="h-44 rounded-3xl bg-[#e9decd]" />
+          </section>
         </div>
-      </header>
-
-      <main className="flex-1">
-        <section className="py-20 bg-gradient-to-b from-white to-slate-50">
-          <div className="container mx-auto px-4 text-center">
-            <Badge className="mb-4">New</Badge>
-            <h1 className="text-4xl md:text-5xl font-bold mb-6">Audio-First Questionnaires</h1>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-8">
-              Collect richer, more authentic responses with voice recordings instead of typed text. Perfect for
-              researchers, educators, and organizations.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/questionnaire">
-                <Button size="lg" className="w-full sm:w-auto">
-                  Try Demo Questionnaire
-                </Button>
-              </Link>
-              <Link href="/signup">
-                <Button size="lg" variant="outline" className="w-full sm:w-auto">
-                  Create Your Own
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </section>
-
-        <section className="py-16 bg-white">
-          <div className="container mx-auto px-4">
-            <h2 className="text-3xl font-bold text-center mb-12">Why Choose AudioForm?</h2>
-            <div className="grid md:grid-cols-3 gap-8">
-              <Card>
-                <CardHeader>
-                  <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
-                    <Mic className="h-6 w-6 text-primary" />
-                  </div>
-                  <CardTitle>Natural Responses</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground">
-                    Speaking is 3x faster than typing and captures nuance, tone, and emotion that text simply can't.
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
-                    <FileText className="h-6 w-6 text-primary" />
-                  </div>
-                  <CardTitle>Automatic Transcription</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground">
-                    AI-powered transcription converts audio to text, giving you the best of both worlds for analysis.
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
-                    <BarChart3 className="h-6 w-6 text-primary" />
-                  </div>
-                  <CardTitle>Insightful Analytics</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground">
-                    Track completion rates, response times, and engagement metrics to optimize your research.
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </section>
-
-        <section className="py-16 bg-slate-50">
-          <div className="container mx-auto px-4">
-            <h2 className="text-3xl font-bold text-center mb-4">Perfect For</h2>
-            <p className="text-center text-muted-foreground max-w-2xl mx-auto mb-12">
-              AudioForm is designed for anyone who needs richer, more authentic feedback
-            </p>
-
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="bg-white p-6 rounded-lg shadow-sm">
-                <h3 className="font-semibold mb-2">Researchers</h3>
-                <p className="text-sm text-muted-foreground">
-                  Collect qualitative data with the authenticity of interviews and the scale of surveys.
-                </p>
-              </div>
-
-              <div className="bg-white p-6 rounded-lg shadow-sm">
-                <h3 className="font-semibold mb-2">Educators</h3>
-                <p className="text-sm text-muted-foreground">
-                  Gather student feedback and assess verbal communication skills more effectively.
-                </p>
-              </div>
-
-              <div className="bg-white p-6 rounded-lg shadow-sm">
-                <h3 className="font-semibold mb-2">Community Groups</h3>
-                <p className="text-sm text-muted-foreground">
-                  Make participation easier for members with varying literacy or typing comfort levels.
-                </p>
-              </div>
-
-              <div className="bg-white p-6 rounded-lg shadow-sm">
-                <h3 className="font-semibold mb-2">Market Researchers</h3>
-                <p className="text-sm text-muted-foreground">
-                  Capture emotional responses and unfiltered reactions to products and services.
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="py-16 bg-white">
-          <div className="container mx-auto px-4 text-center">
-            <h2 className="text-3xl font-bold mb-6">Ready to get started?</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto mb-8">
-              Create your first audio questionnaire in minutes. No credit card required.
-            </p>
-            <Link href="/signup">
-              <Button size="lg">Sign Up Free</Button>
-            </Link>
-          </div>
-        </section>
       </main>
+    )
+  }
 
-      <footer className="bg-slate-900 text-white py-12">
-        <div className="container mx-auto px-4">
-          <div className="grid md:grid-cols-4 gap-8">
-            <div>
-              <h3 className="font-bold text-lg mb-4">AudioForm</h3>
-              <p className="text-slate-400 text-sm">
-                The audio-first questionnaire platform for researchers and organizations.
-              </p>
-            </div>
-            <div>
-              <h4 className="font-medium mb-4">Product</h4>
-              <ul className="space-y-2 text-sm text-slate-400">
-                <li>
-                  <Link href="#" className="hover:text-white transition-colors">
-                    Features
-                  </Link>
-                </li>
-                <li>
-                  <Link href="#" className="hover:text-white transition-colors">
-                    Pricing
-                  </Link>
-                </li>
-                <li>
-                  <Link href="#" className="hover:text-white transition-colors">
-                    Case Studies
-                  </Link>
-                </li>
-                <li>
-                  <Link href="#" className="hover:text-white transition-colors">
-                    Documentation
-                  </Link>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-medium mb-4">Company</h4>
-              <ul className="space-y-2 text-sm text-slate-400">
-                <li>
-                  <Link href="#" className="hover:text-white transition-colors">
-                    About
-                  </Link>
-                </li>
-                <li>
-                  <Link href="#" className="hover:text-white transition-colors">
-                    Blog
-                  </Link>
-                </li>
-                <li>
-                  <Link href="#" className="hover:text-white transition-colors">
-                    Careers
-                  </Link>
-                </li>
-                <li>
-                  <Link href="#" className="hover:text-white transition-colors">
-                    Contact
-                  </Link>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-medium mb-4">Legal</h4>
-              <ul className="space-y-2 text-sm text-slate-400">
-                <li>
-                  <Link href="#" className="hover:text-white transition-colors">
-                    Privacy Policy
-                  </Link>
-                </li>
-                <li>
-                  <Link href="#" className="hover:text-white transition-colors">
-                    Terms of Service
-                  </Link>
-                </li>
-                <li>
-                  <Link href="#" className="hover:text-white transition-colors">
-                    Cookie Policy
-                  </Link>
-                </li>
-              </ul>
-            </div>
+  return (
+    <main className={`${display.className} min-h-dvh bg-[#f3ecdf] text-[#1f1b17]`}>
+      <div className="mx-auto max-w-6xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-8">
+        <header className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#dbcdb8] bg-[#f7efe2] px-4 py-3 sm:rounded-full sm:px-5">
+          <p className="text-sm font-medium uppercase text-balance">AudioForm</p>
+          <div className="flex w-full items-center gap-2 sm:w-auto">
+            <Link
+              href="/login"
+              onClick={() => trackEvent("creator_clicked_start", { entry_point: "home_login" })}
+              className="w-full rounded-full border border-[#dbcdb8] px-4 py-2 text-center text-sm hover:bg-[#fff6ed] sm:w-auto"
+            >
+              Log in
+            </Link>
+            <Link
+              href="/signup"
+              onClick={() => trackEvent("creator_clicked_start", { entry_point: "home_start_free" })}
+              className="w-full rounded-full bg-[#b85e2d] px-4 py-2 text-center text-sm font-medium text-[#fff6ed] hover:bg-[#a85327] sm:w-auto"
+            >
+              Start free
+            </Link>
           </div>
-          <div className="border-t border-slate-800 mt-12 pt-8 text-center text-sm text-slate-400">
-            &copy; {new Date().getFullYear()} AudioForm. All rights reserved.
+        </header>
+
+        <section className="mt-8 rounded-[1.75rem] border border-[#dbcdb8] bg-[#f9f4ea] p-5 sm:mt-10 sm:rounded-[2.5rem] sm:p-12">
+          <p className={`${body.className} text-sm uppercase text-[#5c5146] text-balance`}>High-signal feedback for builders</p>
+          <motion.div className="mt-4 max-w-3xl overflow-hidden sm:mt-5">
+            <motion.h1
+              className={`${display.className} text-3xl font-bold leading-tight text-balance sm:text-6xl`}
+              initial={prefersReducedMotion ? undefined : { opacity: 0, y: 26, scale: 0.985 }}
+              animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0, scale: 1 }}
+              transition={{ duration: 0.5, ease: "easeOut" }}
+            >
+              Feedback is everywhere. Insight is nowhere.
+            </motion.h1>
+          </motion.div>
+          <div className={`${body.className} mt-5 max-w-2xl text-pretty text-base leading-relaxed text-[#5c5146] sm:text-lg`}>
+            <motion.p
+              initial={prefersReducedMotion ? undefined : { opacity: 0, y: 16 }}
+              animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
+              transition={{ duration: 0.24, ease: "easeOut", delay: 0.36 }}
+            >
+              Builders don&apos;t struggle with feedback. They struggle with judgment.
+            </motion.p>
+            <motion.p
+              className="mt-1"
+              initial={prefersReducedMotion ? undefined : { opacity: 0, y: 16 }}
+              animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
+              transition={{ duration: 0.24, ease: "easeOut", delay: 0.44 }}
+            >
+              We&apos;re building Audioform to help you decide faster in the right direction.
+            </motion.p>
           </div>
-        </div>
-      </footer>
-    </div>
+
+          <div className="mt-5 grid gap-2 sm:grid-cols-3">
+            {[
+              "What are you trying to decide this week?",
+              "What signal would give you conviction?",
+              "What's missing from the feedback you get today?",
+            ].map((line) => (
+              <div
+                key={line}
+                className={`${body.className} flex min-h-20 items-center justify-center rounded-xl border border-[#dbcdb8] bg-[#fff6ed] px-3 py-3 text-center text-sm font-medium leading-snug text-[#5c5146]`}
+              >
+                {line}
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-7 flex flex-col gap-3 sm:mt-8 sm:flex-row sm:flex-wrap">
+            <Link
+              href={signalLoopHref}
+              onClick={() => trackEvent("creator_clicked_start", { entry_point: "home_open_dashboard" })}
+              className="w-full rounded-full bg-[#b85e2d] px-5 py-3 text-center text-sm font-medium text-[#fff6ed] hover:bg-[#a85327] sm:w-auto"
+            >
+              Start your signal loop
+            </Link>
+            <Link
+              href={questionnaireHref}
+              onClick={() => trackEvent("creator_clicked_start", { entry_point: "home_try_voice_survey" })}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[#dbcdb8] bg-[#fff6ed] px-5 py-3 text-center text-sm font-medium text-[#1f1b17] hover:bg-[#f5ebdd] sm:w-auto sm:justify-start"
+            >
+              Help us decide what to build next - leave a 30s voice take
+              <ChevronRight className="size-4" aria-hidden="true" />
+            </Link>
+          </div>
+        </section>
+
+        <section className="mt-8 grid gap-4 md:grid-cols-3">
+          {[
+            {
+              icon: <Mic className="size-5" aria-hidden="true" />,
+              title: "Ask better prompts",
+              text: "Lead with one decision-focused prompt and collect clearer, higher-conviction responses.",
+            },
+            {
+              icon: <AudioWaveform className="size-5" aria-hidden="true" />,
+              title: "Capture conviction",
+              text: "Hear confidence, hesitation, and uncertainty that text feedback often flattens.",
+            },
+            {
+              icon: <Sparkles className="size-5" aria-hidden="true" />,
+              title: "Ship faster with better signal",
+              text: "Run a weekly loop: ship update, collect voice takes, decide next move.",
+            },
+          ].map((item) => (
+            <article key={item.title} className="rounded-3xl border border-[#dbcdb8] bg-[#faf6ee] p-6">
+              <div className="inline-flex rounded-full border border-[#dbcdb8] p-2 text-[#b85e2d]">{item.icon}</div>
+              <h2 className="mt-4 text-xl font-medium text-balance">{item.title}</h2>
+              <p className="mt-2 text-pretty text-sm leading-relaxed text-[#5c5146]">{item.text}</p>
+            </article>
+          ))}
+        </section>
+      </div>
+    </main>
   )
 }

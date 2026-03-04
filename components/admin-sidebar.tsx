@@ -3,7 +3,11 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, FileQuestion, Users, BarChart3, Settings, HelpCircle, Mail, Mic } from "lucide-react"
+import { LayoutDashboard, FileQuestion, Settings, HelpCircle, Mail, Mic } from "lucide-react"
+import { Bricolage_Grotesque, Lora } from "next/font/google"
+
+const display = Bricolage_Grotesque({ subsets: ["latin"], weight: ["400", "600", "700"] })
+const body = Lora({ subsets: ["latin"], weight: ["400", "500", "600"] })
 
 export function AdminSidebar() {
   const pathname = usePathname()
@@ -12,32 +16,20 @@ export function AdminSidebar() {
     {
       label: "Dashboard",
       icon: LayoutDashboard,
-      href: "/admin/dashboard",
-      active: pathname === "/admin/dashboard",
+      href: "/admin/dashboard/v4",
+      active: pathname === "/admin/dashboard" || pathname.startsWith("/admin/dashboard/v4"),
     },
     {
       label: "Questionnaires",
       icon: FileQuestion,
       href: "/admin/questionnaires",
-      active: pathname === "/admin/questionnaires",
+      active: pathname.startsWith("/admin/questionnaires"),
     },
     {
-      label: "Responses",
+      label: "Moderation Queue",
       icon: Mic,
       href: "/admin/responses",
       active: pathname === "/admin/responses",
-    },
-    {
-      label: "Participants",
-      icon: Users,
-      href: "/admin/participants",
-      active: pathname === "/admin/participants",
-    },
-    {
-      label: "Analytics",
-      icon: BarChart3,
-      href: "/admin/analytics",
-      active: pathname === "/admin/analytics",
     },
     {
       label: "Email Notifications",
@@ -54,15 +46,15 @@ export function AdminSidebar() {
   ]
 
   return (
-    <div className="w-64 border-r bg-white h-screen flex flex-col">
-      <div className="p-4 border-b">
-        <Link href="/admin/dashboard" className="flex items-center gap-2">
-          <Mic className="h-6 w-6 text-primary" />
+    <div className={`${display.className} flex h-dvh w-64 flex-col border-r border-[#dbcdb8] bg-[#f9f4ea]`}>
+      <div className="border-b border-[#dbcdb8] p-4">
+        <Link href="/admin/dashboard/v4" className="flex items-center gap-2">
+          <Mic className="h-6 w-6 text-[#b85e2d]" />
           <span className="font-bold text-xl">AudioForm</span>
         </Link>
       </div>
 
-      <div className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">
+      <div className={`${body.className} flex-1 space-y-1 overflow-y-auto px-2 py-4`}>
         {routes.map((route) => (
           <Link
             key={route.href}
@@ -70,22 +62,22 @@ export function AdminSidebar() {
             className={cn(
               "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
               route.active
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                ? "bg-[#b85e2d] text-[#fff6ed]"
+                : "text-[#5c5146] hover:bg-[#efe4d3] hover:text-[#1f1b17]",
             )}
           >
-            <route.icon className={cn("h-5 w-5", route.active ? "text-primary-foreground" : "text-muted-foreground")} />
+            <route.icon className={cn("h-5 w-5", route.active ? "text-[#fff6ed]" : "text-[#5c5146]")} />
             {route.label}
           </Link>
         ))}
       </div>
 
-      <div className="p-4 border-t mt-auto">
+      <div className="mt-auto border-t border-[#dbcdb8] p-4">
         <Link
           href="/admin/help"
-          className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+          className={`${body.className} flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-[#5c5146] transition-colors hover:bg-[#efe4d3] hover:text-[#1f1b17]`}
         >
-          <HelpCircle className="h-5 w-5 text-muted-foreground" />
+          <HelpCircle className="h-5 w-5 text-[#5c5146]" />
           Help & Support
         </Link>
       </div>

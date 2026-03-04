@@ -1,0 +1,76 @@
+# TODO
+
+## Active
+- [x] Define Audioform behavioral architecture (JTBD + Trigger/Action/Reward/Reinforcement).
+- [x] Convert behavioral architecture into sprint implementation checklist.
+- [x] Decide dashboard variant to keep (`v1`, `v2`, or `v3`).
+- [x] Remove unselected dashboard variants.
+- [x] Roll selected dashboard pattern into `/admin` legacy page.
+- [x] Create 2 foundational redesign versions for survey creation tool.
+- [x] Create 2 foundational redesign versions for respondent questionnaire.
+- [x] Select 1 survey creation version (`v1` or `v2`).
+- [x] Select 1 questionnaire version (`v1` or `v2`).
+- [x] Run baseline-ui pass on updated pages.
+- [x] Run accessibility pass on updated pages.
+- [x] Resolve pre-existing type issues (`nodemailer` types, `useIsMobile` import mismatch).
+- [x] Implement analytics tracking layer and first-batch event wiring.
+- [ ] Final browser QA on desktop/mobile.
+- [x] Implement Phase 1 behavioral features (decision framing, depth cues, TTFR visibility).
+- [x] Implement TTFR publish/first-response capture and dashboard visibility.
+- [x] Workflow-orchestrated copy clarity pass (home, survey builder, respondent flow, dashboard).
+- [x] Verify copy consistency with Trigger → Action → Reward → Reinforcement architecture.
+- [x] Run type-check and capture review notes.
+- [x] Audit all navigation targets (`href`, `router.push`, `redirect`) against existing routes.
+- [x] Fix dead admin navigation routes (`/admin/help`, `/admin/profile`, `/admin/settings`).
+- [x] Harden login callback navigation to avoid invalid redirect targets.
+- [x] Replace mock `POST /api/responses` handling with persisted storage-backed implementation.
+- [x] Replace mock `GET /api/responses` data with stored response reads + filters.
+- [x] Enforce production-safe behavior for email/transcription provider config (no silent mock in production).
+- [x] Add `.env.example` for required runtime provider configuration.
+- [x] Draft product marketing context for Audioform infrastructure positioning.
+- [x] Create GTM marketing department operating system for content + distribution.
+- [ ] Assign DRI/owner for each GTM function (Head of GTM, PMM, Content, Distribution, Growth Ops).
+- [x] Build 30/60/90 GTM execution board from `future-work/audioform-marketing-department-gtm-os.md`.
+- [ ] Ship category positioning update on primary landing page.
+- [ ] Implement first weekly "Signal Log" content cycle (anchor + derivatives + distribution).
+- [x] Add responder -> creator conversion CTA on thank-you page with event tracking.
+- [ ] Instrument channel attribution events for X/Farcaster -> signup -> first survey published.
+- [x] Analyze Apify dataset for GTM language and content pattern signals.
+- [x] Draft internal dogfooding program to use Audioform as first reference customer.
+- [ ] Launch 4-week dogfooding pilot and publish weekly proof loop report.
+- [ ] Implement attribution for dogfooding content -> signup -> first survey publish.
+- [ ] Resolve Apify actor output visibility issue (runs start successfully, output datasets currently 404 with current token scope).
+- [x] Build scrape->analyze->report GTM pipeline with Apify actor + dataset fallback.
+- [x] Add free Reddit scrape->analyze->report pipeline for zero-cost market signal collection.
+- [x] Add free Hacker News scrape->analyze->report pipeline for zero-cost founder signal collection.
+- [x] Add unified weekly signal brief generator (Reddit + HN) aligned to dogfooding execution.
+- [x] Add relevance scoring, dedupe, and high-signal quality filters to Reddit/HN free pipelines.
+- [x] Run UX microcopy QA pass on error/empty/demo states and tighten action labels (dashboard, signup, recorder, notifications).
+- [x] Install Remotion workflow and generate first shareable product demo video render.
+- [x] Persist notification rules/templates in backend (`/api/notifications` + Supabase table).
+- [x] Auto-trigger creator notification on new response using saved notification config.
+- [x] Migrate response metadata/moderation persistence from local file store to Supabase (`response_records`).
+
+## Review
+- Verify all dashboard routes return 200 and render correctly.
+- Diff behavior between old and redesigned admin workflows.
+- Confirm no regressions in login/signup/questionnaire flows.
+- Copy rewrite review: clarified value proposition, reduced jargon, tightened CTAs, and aligned microcopy to behavioral loop.
+- Verification: `pnpm -s exec tsc --noEmit` passed after copy changes.
+- Routing integrity review: no missing internal targets after full audit across `app/` and `components/`.
+- API hardening review: `responses` route now persists uploaded audio metadata and files under local store for non-mock behavior.
+- Provider safety review: `transcribe` and `email` now fail fast in production when provider credentials are missing.
+- Marketing OS review: codified positioning as "high-signal feedback infrastructure" with narrative and GTM workflows.
+- GTM sprint-board review: added week-by-week 90-day execution board with KPI and exit criteria.
+- Thank-you conversion review: added creator CTA and follow-up action event tracking hooks.
+- Dataset insight review: analyzed 236 Apify rows and produced GTM signal report for narrative/distribution decisions.
+- Dogfooding program review: defined weekly workflow, templates, metrics, and 4-week pilot targets.
+- GTM pipeline review: added `gtm:pipeline` script to fetch X data, write raw/analysis artifacts, and refresh insight report.
+- Reddit pipeline review: added `gtm:reddit` script and generated first insight report from 818 posts.
+- HN pipeline review: added `gtm:hn` script and generated insight report from 941 records.
+- Weekly brief review: added `gtm:brief` and generated cross-channel GTM action brief.
+- Data quality review: pipeline now filters low-relevance/noisy/duplicate items before analysis and reporting.
+- Demo video review: Remotion composition pipeline is live and first MP4 rendered to `out/audioform-build-demo.mp4`.
+- Notification persistence review: rules/template now load + save through `/api/notifications` and Supabase `notification_configs`.
+- Notification automation review: `POST /api/responses` now sends creator notification when `newResponse` rule is enabled.
+- Response-store migration review: `lib/server/response-store.ts` now persists to Supabase `response_records` instead of local `responses.json`.

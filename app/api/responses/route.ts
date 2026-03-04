@@ -1,38 +1,183 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
+import {
+  createStoredResponse,
+  getStoredResponseById,
+  listStoredResponses,
+  updateStoredResponse,
+} from "@/lib/server/response-store"
+import { getSessionFromRequest } from "@/lib/server/auth-session"
+import {
+  getPublishedSurveyById,
+  getSurveyById,
+  listSurveys,
+  recordDashboardEvent,
+} from "@/lib/server/survey-store"
+import { getNotificationConfigByUserId } from "@/lib/server/notification-store"
+import { findUserById } from "@/lib/server/auth-store"
+import { sendEmail } from "@/lib/server/email-sender"
+import { applyRateLimit, getRequestClientIp } from "@/lib/server/rate-limit"
 
-// In a real application, this would connect to MongoDB or another database
-// For this demo, we'll just simulate storing the data
+const uploadSchema = z.object({
+  questionId: z.string().min(1),
+  surveyId: z.string().min(1).default("audioform-survey"),
+})
+
+const ALLOWED_AUDIO_MIME = new Set([
+  "audio/webm",
+  "audio/webm;codecs=opus",
+  "audio/ogg",
+  "audio/ogg;codecs=opus",
+  "audio/mpeg",
+  "audio/mp3",
+  "audio/wav",
+  "audio/x-wav",
+])
+const MAX_AUDIO_SIZE_BYTES = 8 * 1024 * 1024
+
+const moderationSchema = z.object({
+  id: z.string().min(1),
+  flagged: z.boolean().optional(),
+  highSignal: z.boolean().optional(),
+  bookmarked: z.boolean().optional(),
+})
 
 export async function POST(request: NextRequest) {
   try {
-    // In a real app, we would parse the form data to get the audio file
-    const formData = await request.formData()
-    const audioFile = formData.get("audio") as File
-    const questionId = formData.get("questionId") as string
-    const userId = (formData.get("userId") as string) || "anonymous"
-
-    if (!audioFile || !questionId) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
+    const ip = getRequestClientIp(request.headers)
+    const rate = applyRateLimit({
+      key: `responses:post:${ip}`,
+      windowMs: 60_000,
+      max: 20,
+    })
+    if (!rate.allowed) {
+      return NextResponse.json(
+        { error: "Too many submissions. Please retry shortly." },
+        { status: 429, headers: { "Retry-After": String(rate.retryAfterSeconds) } },
+      )
     }
 
-    // In a real app, we would:
-    // 1. Store the audio file in MongoDB GridFS or S3
-    // 2. Create a record in the database with metadata
-    // 3. Optionally queue the file for transcription
+    const formData = await request.formData()
+    const audioFile = formData.get("audio") as File
+    const parsed = uploadSchema.safeParse({
+      questionId: formData.get("questionId"),
+      surveyId: formData.get("surveyId"),
+    })
 
-    console.log(`Received audio response for question ${questionId} from user ${userId}`)
+    if (!audioFile || !parsed.success) {
+      return NextResponse.json(
+        { error: "Invalid payload", details: parsed.success ? undefined : parsed.error.flatten() },
+        { status: 400 },
+      )
+    }
 
-    // Simulate successful storage
+    if (audioFile.size <= 0 || audioFile.size > MAX_AUDIO_SIZE_BYTES) {
+      return NextResponse.json(
+        { error: `Invalid audio size. Max allowed is ${Math.floor(MAX_AUDIO_SIZE_BYTES / (1024 * 1024))}MB.` },
+        { status: 413 },
+      )
+    }
+
+    const mimeType = (audioFile.type || "").toLowerCase()
+    if (!ALLOWED_AUDIO_MIME.has(mimeType)) {
+      return NextResponse.json({ error: "Unsupported audio format." }, { status: 415 })
+    }
+
+    const publishedSurvey = await getPublishedSurveyById(parsed.data.surveyId)
+    if (!publishedSurvey) {
+      return NextResponse.json({ error: "Survey is unavailable or unpublished." }, { status: 404 })
+    }
+
+    const session = await getSessionFromRequest()
+    const stored = await createStoredResponse({
+      questionId: parsed.data.questionId,
+      surveyId: parsed.data.surveyId,
+      userId: session?.sub || "anonymous",
+      audioFile,
+    })
+
+    try {
+      await recordDashboardEvent({
+        type: "response_recorded",
+        surveyId: stored.surveyId,
+        message: `New response recorded for survey ${stored.surveyId}`,
+        metadata: {
+          questionId: stored.questionId,
+          userId: stored.userId,
+          fileSize: stored.size,
+        },
+      })
+    } catch {
+      // Non-blocking.
+    }
+
+    // Auto-notify survey creator on new responses when their saved rule is enabled.
+    try {
+      const survey = await getSurveyById(stored.surveyId)
+      if (survey) {
+        const owner = await findUserById(survey.createdBy)
+        const config = await getNotificationConfigByUserId(survey.createdBy)
+        if (owner && config.newResponse) {
+          const responseCount = (
+            await listStoredResponses({
+              surveyId: stored.surveyId,
+            })
+          ).length
+          const recipients = config.recipients.length ? config.recipients : [owner.email]
+          const submissionDate = new Date(stored.createdAt).toLocaleString()
+
+          const subject = config.templateSubject
+            .replaceAll("[Questionnaire Name]", survey.title)
+            .replaceAll("[Respondent Name]", stored.userId || "Anonymous responder")
+            .replaceAll("[Submission Date]", submissionDate)
+            .replaceAll("[Response Count]", String(responseCount))
+
+          const text = config.templateBody
+            .replaceAll("[Questionnaire Name]", survey.title)
+            .replaceAll("[Respondent Name]", stored.userId || "Anonymous responder")
+            .replaceAll("[Submission Date]", submissionDate)
+            .replaceAll("[Response Count]", String(responseCount))
+
+          await sendEmail({
+            to: recipients,
+            subject,
+            text,
+            html: `<div style="font-family:sans-serif;max-width:640px;margin:0 auto;">
+              <h1 style="font-size:20px;margin-bottom:12px;">${subject}</h1>
+              <p style="line-height:1.5;white-space:pre-line;">${text}</p>
+            </div>`,
+          })
+
+          await recordDashboardEvent({
+            type: "notification_sent",
+            surveyId: stored.surveyId,
+            message: `New response notification sent to ${recipients.length} recipient${
+              recipients.length === 1 ? "" : "s"
+            }`,
+            metadata: {
+              recipientCount: recipients.length,
+              notificationType: "new_response",
+            },
+          })
+        }
+      }
+    } catch {
+      // Non-blocking notification pipeline.
+    }
+
     return NextResponse.json(
       {
         success: true,
         message: "Audio response saved successfully",
         data: {
-          questionId,
-          userId,
-          fileName: audioFile.name,
-          fileSize: audioFile.size,
-          timestamp: new Date().toISOString(),
+          id: stored.id,
+          questionId: stored.questionId,
+          surveyId: stored.surveyId,
+          userId: stored.userId,
+          fileName: stored.fileName,
+          fileSize: stored.size,
+          mimeType: stored.mimeType,
+          timestamp: stored.createdAt,
         },
       },
       { status: 201 },
@@ -44,36 +189,104 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  // In a real app, this would fetch responses from the database
-  // For this demo, we'll return mock data
+  const session = await getSessionFromRequest()
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
 
   const searchParams = request.nextUrl.searchParams
+  const surveyId = searchParams.get("surveyId") || undefined
+  const questionId = searchParams.get("questionId") || undefined
   const userId = searchParams.get("userId")
+  const limitParam = Number.parseInt(searchParams.get("limit") || "", 10)
+  const limit = Number.isFinite(limitParam) && limitParam > 0 ? Math.min(limitParam, 500) : undefined
 
-  // Mock data
-  const responses = [
-    {
-      id: "resp1",
-      userId: "user123",
-      questionId: "q1",
-      audioUrl: "/api/audio/resp1.webm",
-      duration: 28,
-      transcriptStatus: "pending",
-      timestamp: "2023-04-20T14:30:00Z",
-    },
-    {
-      id: "resp2",
-      userId: "user123",
-      questionId: "q2",
-      audioUrl: "/api/audio/resp2.webm",
-      duration: 45,
-      transcriptStatus: "pending",
-      timestamp: "2023-04-20T14:32:00Z",
-    },
-  ]
+  const ownedSurveys = await listSurveys({ createdBy: session.sub })
+  const ownedSurveyIds = new Set(ownedSurveys.map((survey) => survey.id))
+  if (surveyId && !ownedSurveyIds.has(surveyId)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  }
 
-  // Filter by userId if provided
-  const filteredResponses = userId ? responses.filter((resp) => resp.userId === userId) : responses
+  const responsesRaw = await listStoredResponses({
+    surveyId,
+    questionId,
+    userId: userId || undefined,
+  })
+  const scoped = responsesRaw.filter((item) => ownedSurveyIds.has(item.surveyId))
+  const responses = limit ? scoped.slice(0, limit) : scoped
 
-  return NextResponse.json({ responses: filteredResponses })
+  return NextResponse.json({
+    responses: responses.map((item) => ({
+      id: item.id,
+      surveyId: item.surveyId,
+      questionId: item.questionId,
+      userId: item.userId,
+      fileName: item.fileName,
+      mimeType: item.mimeType,
+      fileSize: item.size,
+      publicUrl: item.publicUrl,
+      playbackUrl: item.publicUrl || `/api/responses/${item.id}/audio`,
+      flagged: item.flagged,
+      highSignal: item.highSignal,
+      bookmarked: item.bookmarked,
+      moderationUpdatedAt: item.moderationUpdatedAt,
+      timestamp: item.createdAt,
+    })),
+  })
+}
+
+export async function PATCH(request: NextRequest) {
+  const session = await getSessionFromRequest()
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  try {
+    const json = await request.json()
+    const parsed = moderationSchema.safeParse(json)
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Invalid moderation payload", details: parsed.error.flatten() }, { status: 400 })
+    }
+
+    const { id, flagged, highSignal, bookmarked } = parsed.data
+    if (flagged === undefined && highSignal === undefined && bookmarked === undefined) {
+      return NextResponse.json({ error: "No moderation fields provided." }, { status: 400 })
+    }
+
+    const existing = await getStoredResponseById(id)
+    if (!existing) {
+      return NextResponse.json({ error: "Response not found." }, { status: 404 })
+    }
+    const owningSurvey = await getSurveyById(existing.surveyId)
+    if (!owningSurvey || owningSurvey.createdBy !== session.sub) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
+
+    const updated = await updateStoredResponse(id, { flagged, highSignal, bookmarked })
+    if (!updated) {
+      return NextResponse.json({ error: "Response not found." }, { status: 404 })
+    }
+
+    return NextResponse.json({
+      success: true,
+      response: {
+        id: updated.id,
+        surveyId: updated.surveyId,
+        questionId: updated.questionId,
+        userId: updated.userId,
+        fileName: updated.fileName,
+        mimeType: updated.mimeType,
+        fileSize: updated.size,
+        publicUrl: updated.publicUrl,
+        flagged: updated.flagged,
+        highSignal: updated.highSignal,
+        bookmarked: updated.bookmarked,
+        moderationUpdatedAt: updated.moderationUpdatedAt,
+        timestamp: updated.createdAt,
+      },
+    })
+  } catch (error) {
+    console.error("Error updating response moderation:", error)
+    return NextResponse.json({ error: "Failed to update response moderation." }, { status: 500 })
+  }
 }

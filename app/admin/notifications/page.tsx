@@ -1,34 +1,36 @@
 "use client"
 
-import { Badge } from "@/components/ui/badge"
-
-import { useState } from "react"
+import Link from "next/link"
+import { useEffect, useState } from "react"
+import { Bricolage_Grotesque, Lora } from "next/font/google"
 import { useRequireAdmin } from "@/lib/auth-context"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
-import { AdminHeader } from "@/components/admin-header"
-import { AdminSidebar } from "@/components/admin-sidebar"
-import { Loader2, Mail, ExternalLink } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
+import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Badge } from "@/components/ui/badge"
+import { ArrowLeft, ExternalLink, Loader2, Mail, Send } from "lucide-react"
+import { cn } from "@/lib/utils"
+import { SurveyLoadingSkeleton } from "@/components/survey-loading-skeleton"
+
+const display = Bricolage_Grotesque({ subsets: ["latin"], weight: ["400", "600", "700"] })
+const body = Lora({ subsets: ["latin"], weight: ["400", "500", "600"] })
 
 export default function NotificationsPage() {
   const { status } = useRequireAdmin()
   const [isLoading, setIsLoading] = useState(false)
+  const [isSavingRules, setIsSavingRules] = useState(false)
+  const [isSavingTemplate, setIsSavingTemplate] = useState(false)
   const [success, setSuccess] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
 
-  // Form state
   const [emailSubject, setEmailSubject] = useState("New response received")
   const [emailBody, setEmailBody] = useState("A new response has been submitted to your questionnaire.")
   const [emailRecipients, setEmailRecipients] = useState("")
 
-  // Notification settings
   const [notificationSettings, setNotificationSettings] = useState({
     newResponse: true,
     completedQuestionnaire: true,
@@ -36,9 +38,53 @@ export default function NotificationsPage() {
     weeklySummary: true,
   })
 
-  // Check if the user is authenticated
+  useEffect(() => {
+    if (status !== "authenticated") return
+
+    const loadConfig = async () => {
+      try {
+        const response = await fetch("/api/notifications", {
+          method: "GET",
+          credentials: "include",
+          cache: "no-store",
+        })
+        if (!response.ok) throw new Error("Failed to load notification settings.")
+        const json = (await response.json()) as {
+          config?: {
+            newResponse: boolean
+            completedQuestionnaire: boolean
+            dailySummary: boolean
+            weeklySummary: boolean
+            templateSubject: string
+            templateBody: string
+            recipients: string[]
+          }
+        }
+
+        if (!json.config) return
+        setNotificationSettings({
+          newResponse: json.config.newResponse,
+          completedQuestionnaire: json.config.completedQuestionnaire,
+          dailySummary: json.config.dailySummary,
+          weeklySummary: json.config.weeklySummary,
+        })
+        setEmailSubject(json.config.templateSubject)
+        setEmailBody(json.config.templateBody)
+        setEmailRecipients((json.config.recipients || []).join(", "))
+      } catch (err: any) {
+        setError(err.message || "Failed to load notification settings.")
+      }
+    }
+
+    loadConfig()
+  }, [status])
+
   if (status === "loading") {
-    return <div>Loading...</div>
+    return <SurveyLoadingSkeleton label="Loading notifications..." />
+  }
+
+  const handleToggle = (setting: keyof typeof notificationSettings) => {
+    setNotificationSettings((prev) => ({ ...prev, [setting]: !prev[setting] }))
   }
 
   const handleSendTestEmail = async () => {
@@ -52,34 +98,21 @@ export default function NotificationsPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          to: emailRecipients.split(",").map((email) => email.trim()),
+          to: emailRecipients.split(",").map((email) => email.trim()).filter(Boolean),
           subject: emailSubject,
           html: `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-            <h1 style="color: #6366f1; margin-bottom: 24px;">${emailSubject}</h1>
+            <h1 style="color: #b85e2d; margin-bottom: 24px;">${emailSubject}</h1>
             <p style="margin-bottom: 16px;">${emailBody}</p>
             <p style="margin-bottom: 16px;">This is a test email sent from AudioForm.</p>
-            <div style="padding: 16px; background-color: #f8fafc; border-radius: 4px; margin-top: 24px;">
-              <p style="margin: 0; color: #64748b; font-size: 14px;">
-                AudioForm - Audio-First Questionnaire Platform
-              </p>
-            </div>
           </div>`,
           text: `${emailSubject}\n\n${emailBody}\n\nThis is a test email sent from AudioForm.`,
         }),
       })
 
       const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to send test email")
-      }
-
-      setSuccess("Test email sent successfully!")
-
-      // If there's a preview URL (for Ethereal Email), show it
-      if (data.previewUrl) {
-        setPreviewUrl(data.previewUrl)
-      }
+      if (!response.ok) throw new Error(data.error || "Failed to send test email")
+      setSuccess("Test email sent successfully.")
+      if (data.previewUrl) setPreviewUrl(data.previewUrl)
     } catch (err: any) {
       setError(err.message || "Failed to send test email. Please try again.")
     } finally {
@@ -87,255 +120,259 @@ export default function NotificationsPage() {
     }
   }
 
-  const handleToggleNotification = (setting: string) => {
-    setNotificationSettings((prev) => ({
-      ...prev,
-      [setting]: !prev[setting as keyof typeof prev],
-    }))
+  const persistConfig = async (message: string) => {
+    const recipients = emailRecipients
+      .split(",")
+      .map((email) => email.trim())
+      .filter(Boolean)
+    const response = await fetch("/api/notifications", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({
+        newResponse: notificationSettings.newResponse,
+        completedQuestionnaire: notificationSettings.completedQuestionnaire,
+        dailySummary: notificationSettings.dailySummary,
+        weeklySummary: notificationSettings.weeklySummary,
+        templateSubject: emailSubject,
+        templateBody: emailBody,
+        recipients,
+      }),
+    })
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      throw new Error((data as { error?: string }).error || "Failed to save notification settings.")
+    }
+    setSuccess(message)
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
-      <AdminSidebar />
-      <div className="flex-1">
-        <AdminHeader title="Email Notifications" />
-        <main className="p-6">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold mb-2">Email Notifications</h1>
-            <p className="text-muted-foreground">Configure and manage email notifications for your questionnaires.</p>
+    <main className={`${display.className} min-h-dvh bg-[#f3ecdf] p-4 sm:p-6`}>
+      <section className="mx-auto max-w-7xl rounded-[2rem] border border-[#dbcdb8] bg-[#f9f4ea] p-4 sm:p-6">
+        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#dbcdb8] pb-4">
+          <div>
+            <p className={`${body.className} text-sm text-[#5c5146] text-pretty`}>Admin Communication Center</p>
+            <h1 className="text-3xl font-semibold text-balance">Email Notifications</h1>
+            <p className={`${body.className} mt-1 text-sm text-[#5c5146] text-pretty`}>
+              Configure response alerts, tune message tone, and test deliverability from one place.
+            </p>
           </div>
+          <Link href="/admin/dashboard/v4">
+            <Button variant="outline" className="border-[#dbcdb8] bg-[#f3ecdf]">
+              <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
+              Back to Dashboard
+            </Button>
+          </Link>
+        </header>
 
-          <Tabs defaultValue="settings">
-            <TabsList className="mb-6">
-              <TabsTrigger value="settings">Notification Settings</TabsTrigger>
-              <TabsTrigger value="templates">Email Templates</TabsTrigger>
-              <TabsTrigger value="test">Send Test Email</TabsTrigger>
-            </TabsList>
+        <section className="mt-6 grid gap-4 lg:grid-cols-[320px_1fr_360px]">
+          <aside className="rounded-2xl border border-[#dbcdb8] bg-[#f3ecdf] p-4">
+            <h2 className="text-xl font-semibold text-balance">Delivery Rules</h2>
+            <p className={`${body.className} mt-1 text-xs text-[#5c5146]`}>
+              Save rules first, then test with a live email before enabling team workflows.
+            </p>
+            <div className="mt-3 space-y-3">
+              <RuleRow
+                id="rule-new-response"
+                title="New response"
+                description="Notify when a respondent submits any response."
+                checked={notificationSettings.newResponse}
+                onCheckedChange={() => handleToggle("newResponse")}
+              />
+              <RuleRow
+                id="rule-completed"
+                title="Completed questionnaire"
+                description="Notify when a full questionnaire session is finished."
+                checked={notificationSettings.completedQuestionnaire}
+                onCheckedChange={() => handleToggle("completedQuestionnaire")}
+              />
+              <RuleRow
+                id="rule-daily"
+                title="Daily summary"
+                description="Receive one daily digest of response activity."
+                checked={notificationSettings.dailySummary}
+                onCheckedChange={() => handleToggle("dailySummary")}
+              />
+              <RuleRow
+                id="rule-weekly"
+                title="Weekly summary"
+                description="Receive a weekly performance overview."
+                checked={notificationSettings.weeklySummary}
+                onCheckedChange={() => handleToggle("weeklySummary")}
+              />
+            </div>
+            <Button
+              className="mt-4 w-full bg-[#b85e2d] text-[#fff6ed] hover:bg-[#a05227]"
+              disabled={isSavingRules}
+              onClick={async () => {
+                setIsSavingRules(true)
+                setSuccess(null)
+                setError(null)
+                try {
+                  await persistConfig("Notification rules saved.")
+                } catch (err: any) {
+                  setError(err.message || "Failed to save notification rules.")
+                } finally {
+                  setIsSavingRules(false)
+                }
+              }}
+            >
+              {isSavingRules ? "Saving..." : "Save rules"}
+            </Button>
+          </aside>
 
-            <TabsContent value="settings">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Notification Preferences</CardTitle>
-                  <CardDescription>Choose when you want to receive email notifications</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label htmlFor="new-response">New Response</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Receive an email when someone submits a new response
-                      </p>
-                    </div>
-                    <Switch
-                      id="new-response"
-                      checked={notificationSettings.newResponse}
-                      onCheckedChange={() => handleToggleNotification("newResponse")}
-                    />
-                  </div>
+          <section className="rounded-2xl border border-[#dbcdb8] bg-[#fff6ed] p-5">
+            <h2 className="text-2xl font-semibold text-balance">Template Editor</h2>
+            <p className={`${body.className} mt-1 text-sm text-[#5c5146] text-pretty`}>
+              Keep one clear message style for all response alerts sent to your team.
+            </p>
 
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label htmlFor="completed-questionnaire">Completed Questionnaire</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Receive an email when a questionnaire is fully completed
-                      </p>
-                    </div>
-                    <Switch
-                      id="completed-questionnaire"
-                      checked={notificationSettings.completedQuestionnaire}
-                      onCheckedChange={() => handleToggleNotification("completedQuestionnaire")}
-                    />
-                  </div>
+            <div className="mt-4 space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="template-subject">Subject</Label>
+                <Input id="template-subject" value={emailSubject} onChange={(e) => setEmailSubject(e.target.value)} />
+              </div>
 
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label htmlFor="daily-summary">Daily Summary</Label>
-                      <p className="text-sm text-muted-foreground">Receive a daily summary of all responses</p>
-                    </div>
-                    <Switch
-                      id="daily-summary"
-                      checked={notificationSettings.dailySummary}
-                      onCheckedChange={() => handleToggleNotification("dailySummary")}
-                    />
-                  </div>
+              <div className="space-y-2">
+                <Label htmlFor="template-body">Body</Label>
+                <Textarea
+                  id="template-body"
+                  className={`${body.className} min-h-[220px] text-pretty`}
+                  value={emailBody}
+                  onChange={(e) => setEmailBody(e.target.value)}
+                />
+              </div>
 
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label htmlFor="weekly-summary">Weekly Summary</Label>
-                      <p className="text-sm text-muted-foreground">Receive a weekly summary of all responses</p>
-                    </div>
-                    <Switch
-                      id="weekly-summary"
-                      checked={notificationSettings.weeklySummary}
-                      onCheckedChange={() => handleToggleNotification("weeklySummary")}
-                    />
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <Button>Save Settings</Button>
-                </CardFooter>
-              </Card>
-            </TabsContent>
+              <div className="rounded-xl border border-[#dbcdb8] bg-[#f9f4ea] p-3">
+                <p className="text-sm font-semibold text-balance">Available variables</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Badge variant="outline">[Questionnaire Name]</Badge>
+                  <Badge variant="outline">[Respondent Name]</Badge>
+                  <Badge variant="outline">[Submission Date]</Badge>
+                  <Badge variant="outline">[Response Count]</Badge>
+                </div>
+              </div>
 
-            <TabsContent value="templates">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Email Templates</CardTitle>
-                  <CardDescription>Customize the content of your notification emails</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Tabs defaultValue="new-response">
-                    <TabsList className="mb-4">
-                      <TabsTrigger value="new-response">New Response</TabsTrigger>
-                      <TabsTrigger value="completed">Completed Questionnaire</TabsTrigger>
-                      <TabsTrigger value="summary">Summary Reports</TabsTrigger>
-                    </TabsList>
+              <Button
+                variant="outline"
+                className="border-[#dbcdb8] bg-[#f9f4ea]"
+                disabled={isSavingTemplate}
+                onClick={async () => {
+                  setIsSavingTemplate(true)
+                  setSuccess(null)
+                  setError(null)
+                  try {
+                    await persistConfig("Template saved.")
+                  } catch (err: any) {
+                    setError(err.message || "Failed to save template.")
+                  } finally {
+                    setIsSavingTemplate(false)
+                  }
+                }}
+              >
+                {isSavingTemplate ? "Saving..." : "Save template"}
+              </Button>
+            </div>
+          </section>
 
-                    <TabsContent value="new-response" className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="subject">Email Subject</Label>
-                        <Input
-                          id="subject"
-                          placeholder="New response received"
-                          defaultValue="New response received for [Questionnaire Name]"
-                        />
-                      </div>
+          <aside className="rounded-2xl border border-[#dbcdb8] bg-[#f3ecdf] p-4">
+            <h2 className="text-xl font-semibold text-balance">Test Console</h2>
+            <p className={`${body.className} mt-1 text-sm text-[#5c5146] text-pretty`}>
+              Send yourself a test alert using the current template before turning rules on.
+            </p>
 
-                      <div className="space-y-2">
-                        <Label htmlFor="body">Email Body</Label>
-                        <Textarea
-                          id="body"
-                          placeholder="Email content"
-                          className="min-h-[200px]"
-                          defaultValue={`Hello,
-
-A new response has been submitted to your questionnaire "[Questionnaire Name]".
-
-Respondent: [Respondent Name]
-Date: [Submission Date]
-
-You can listen to the audio responses and view transcripts in your dashboard.
-
-Thanks,
-AudioForm Team`}
-                        />
-                      </div>
-
-                      <div className="pt-4">
-                        <p className="text-sm text-muted-foreground mb-2">Available Variables:</p>
-                        <div className="flex flex-wrap gap-2">
-                          <Badge variant="outline">[Questionnaire Name]</Badge>
-                          <Badge variant="outline">[Respondent Name]</Badge>
-                          <Badge variant="outline">[Submission Date]</Badge>
-                          <Badge variant="outline">[Response Count]</Badge>
-                        </div>
-                      </div>
-                    </TabsContent>
-
-                    <TabsContent value="completed">
-                      <p className="text-muted-foreground">Completed questionnaire template content will go here.</p>
-                    </TabsContent>
-
-                    <TabsContent value="summary">
-                      <p className="text-muted-foreground">Summary reports template content will go here.</p>
-                    </TabsContent>
-                  </Tabs>
-                </CardContent>
-                <CardFooter>
-                  <Button>Save Templates</Button>
-                </CardFooter>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="test">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Send Test Email</CardTitle>
-                  <CardDescription>Test your email notification setup</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {success && (
-                    <Alert className="mb-4">
-                      <Mail className="h-4 w-4" />
-                      <AlertTitle>Success</AlertTitle>
-                      <AlertDescription>
-                        {success}
-                        {previewUrl && (
-                          <div className="mt-2">
-                            <a
-                              href={previewUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center text-primary hover:underline"
-                            >
-                              View email preview <ExternalLink className="h-3 w-3 ml-1" />
-                            </a>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              (Using Ethereal Email for development - emails are not actually delivered)
-                            </p>
-                          </div>
-                        )}
-                      </AlertDescription>
-                    </Alert>
+            {success && (
+              <Alert className="mt-4 border-[#dbcdb8] bg-[#f9f4ea]">
+                <Mail className="h-4 w-4" />
+                <AlertTitle>Success</AlertTitle>
+                <AlertDescription>
+                  {success}
+                  {previewUrl && (
+                    <a href={previewUrl} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1 text-sm text-[#8a431f] hover:underline">
+                      View email preview
+                      <ExternalLink className="size-3" aria-hidden="true" />
+                    </a>
                   )}
+                </AlertDescription>
+              </Alert>
+            )}
 
-                  {error && (
-                    <Alert variant="destructive" className="mb-4">
-                      <Mail className="h-4 w-4" />
-                      <AlertTitle>Error</AlertTitle>
-                      <AlertDescription>{error}</AlertDescription>
-                    </Alert>
-                  )}
+            {error && (
+              <Alert variant="destructive" className="mt-4" aria-live="assertive">
+                <Mail className="h-4 w-4" />
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>
+                  {error}
+                  <p className={`${body.className} mt-2 text-xs`}>
+                    Check recipient format, then verify SMTP settings in your environment if this continues.
+                  </p>
+                </AlertDescription>
+              </Alert>
+            )}
 
-                  <div className="space-y-2">
-                    <Label htmlFor="recipients">Recipients (comma separated)</Label>
-                    <Input
-                      id="recipients"
-                      placeholder="email@example.com, another@example.com"
-                      value={emailRecipients}
-                      onChange={(e) => setEmailRecipients(e.target.value)}
-                    />
-                  </div>
+            <div className="mt-4 space-y-3">
+              <div className="space-y-2">
+                <Label htmlFor="test-recipients">Recipients</Label>
+                <Input
+                  id="test-recipients"
+                  placeholder="name@example.com, team@example.com"
+                  value={emailRecipients}
+                  onChange={(e) => setEmailRecipients(e.target.value)}
+                  aria-invalid={!!error}
+                />
+                <p className={`${body.className} text-xs text-[#5c5146]`}>Comma-separate multiple recipients.</p>
+              </div>
+              <button
+                type="button"
+                onClick={handleSendTestEmail}
+                disabled={isLoading || !emailRecipients.trim()}
+                className={cn(
+                  "inline-flex w-full items-center justify-center rounded-md px-4 py-2 text-sm font-medium",
+                  "bg-[#b85e2d] text-[#fff6ed] hover:bg-[#a05227] disabled:opacity-50",
+                )}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 size-4 animate-spin" aria-hidden="true" />
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <Send className="mr-2 size-4" aria-hidden="true" />
+                    Send Test Email
+                  </>
+                )}
+              </button>
+            </div>
+          </aside>
+        </section>
+      </section>
+    </main>
+  )
+}
 
-                  <div className="space-y-2">
-                    <Label htmlFor="test-subject">Subject</Label>
-                    <Input
-                      id="test-subject"
-                      placeholder="Email subject"
-                      value={emailSubject}
-                      onChange={(e) => setEmailSubject(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="test-body">Body</Label>
-                    <Textarea
-                      id="test-body"
-                      placeholder="Email content"
-                      className="min-h-[150px]"
-                      value={emailBody}
-                      onChange={(e) => setEmailBody(e.target.value)}
-                    />
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <Button onClick={handleSendTestEmail} disabled={isLoading || !emailRecipients}>
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending...
-                      </>
-                    ) : (
-                      <>
-                        <Mail className="mr-2 h-4 w-4" /> Send Test Email
-                      </>
-                    )}
-                  </Button>
-                </CardFooter>
-              </Card>
-            </TabsContent>
-          </Tabs>
-        </main>
+function RuleRow({
+  id,
+  title,
+  description,
+  checked,
+  onCheckedChange,
+}: {
+  id: string
+  title: string
+  description: string
+  checked: boolean
+  onCheckedChange: () => void
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-[#dbcdb8] bg-[#f9f4ea] p-3">
+      <div>
+        <Label htmlFor={id} className="text-sm font-semibold">
+          {title}
+        </Label>
+        <p className="mt-1 text-sm text-[#5c5146] text-pretty">{description}</p>
       </div>
+      <Switch id={id} checked={checked} onCheckedChange={onCheckedChange} />
     </div>
   )
 }
