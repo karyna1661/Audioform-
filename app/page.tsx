@@ -16,6 +16,10 @@ export default function Home() {
   const { status } = useAuth()
   const prefersReducedMotion = useReducedMotion()
   const [isHydrated, setIsHydrated] = useState(false)
+  const lineOne = "Builders don't struggle with feedback. They struggle with judgment."
+  const lineTwo = "We're building Audioform to help you decide faster in the right direction."
+  const [typedLineOne, setTypedLineOne] = useState(prefersReducedMotion ? lineOne : "")
+  const [typedLineTwo, setTypedLineTwo] = useState(prefersReducedMotion ? lineTwo : "")
   const signalLoopHref = status === "authenticated" ? "/admin/dashboard/v4" : "/signup"
   const activeSurveyId = status === "authenticated" ? getActiveSurveyId() : null
   const questionnaireHref = activeSurveyId ? `/questionnaire/v1?surveyId=${encodeURIComponent(activeSurveyId)}` : "/questionnaire/v1"
@@ -25,6 +29,45 @@ export default function Home() {
     trackEvent("decision_intent_prompt_viewed")
     setIsHydrated(true)
   }, [])
+
+  useEffect(() => {
+    if (prefersReducedMotion) {
+      setTypedLineOne(lineOne)
+      setTypedLineTwo(lineTwo)
+      return
+    }
+
+    setTypedLineOne("")
+    setTypedLineTwo("")
+
+    let lineOneIndex = 0
+    let lineTwoIndex = 0
+    let lineTwoTimer: number | null = null
+
+    const lineOneTimer = window.setInterval(() => {
+      lineOneIndex += 1
+      setTypedLineOne(lineOne.slice(0, lineOneIndex))
+      if (lineOneIndex >= lineOne.length) {
+        window.clearInterval(lineOneTimer)
+        lineTwoTimer = window.setInterval(() => {
+          lineTwoIndex += 1
+          setTypedLineTwo(lineTwo.slice(0, lineTwoIndex))
+          if (lineTwoIndex >= lineTwo.length) {
+            if (lineTwoTimer) {
+              window.clearInterval(lineTwoTimer)
+            }
+          }
+        }, 18)
+      }
+    }, 18)
+
+    return () => {
+      window.clearInterval(lineOneTimer)
+      if (lineTwoTimer) {
+        window.clearInterval(lineTwoTimer)
+      }
+    }
+  }, [lineOne, lineTwo, prefersReducedMotion])
 
   if (!isHydrated) {
     return (
@@ -107,7 +150,7 @@ export default function Home() {
               animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
               transition={{ duration: 0.24, ease: "easeOut", delay: 0.36 }}
             >
-              Builders don&apos;t struggle with feedback. They struggle with judgment.
+              {typedLineOne}
             </motion.p>
             <motion.p
               className="mt-1"
@@ -115,7 +158,7 @@ export default function Home() {
               animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
               transition={{ duration: 0.24, ease: "easeOut", delay: 0.44 }}
             >
-              We&apos;re building Audioform to help you decide faster in the right direction.
+              {typedLineTwo}
             </motion.p>
           </div>
 
