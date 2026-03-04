@@ -8,6 +8,7 @@ import {
 } from "@/lib/server/response-store"
 import { getSessionFromRequest } from "@/lib/server/auth-session"
 import {
+  getLatestPublishedSurveyQuestions,
   getPublishedSurveyById,
   getSurveyById,
   listSurveys,
@@ -86,6 +87,16 @@ export async function POST(request: NextRequest) {
     const publishedSurvey = await getPublishedSurveyById(parsed.data.surveyId)
     if (!publishedSurvey) {
       return NextResponse.json({ error: "Survey is unavailable or unpublished." }, { status: 404 })
+    }
+    const publishedQuestions = await getLatestPublishedSurveyQuestions(parsed.data.surveyId)
+    const allowedQuestionIds = new Set(
+      publishedQuestions.map((_, index) => `q${index + 1}`),
+    )
+    if (!allowedQuestionIds.has(parsed.data.questionId)) {
+      return NextResponse.json(
+        { error: "Question does not belong to this published survey." },
+        { status: 400 },
+      )
     }
 
     const session = await getSessionFromRequest()
