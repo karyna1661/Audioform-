@@ -55,15 +55,18 @@ const templatePackMeta: Record<string, { label: string; description: string }> =
   },
 }
 
-function toSurveyId(title: string, creatorId: string): string {
+function createSurveyId(title: string, creatorId: string): string {
   const creatorPrefix = creatorId.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 12) || "creator"
-  return (
-    `${creatorPrefix}-${title
+  const titlePrefix =
+    title
       .toLowerCase()
       .trim()
       .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")}` || "audioform-survey"
-  )
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 24) || "survey"
+  const timestamp = Date.now().toString(36)
+  const entropy = Math.random().toString(36).slice(2, 7)
+  return `${creatorPrefix}-${titlePrefix}-${timestamp}-${entropy}`
 }
 
 export default function QuestionnairesV1Page() {
@@ -74,13 +77,17 @@ export default function QuestionnairesV1Page() {
   const [decisionFocus, setDecisionFocus] = useState("Should we simplify onboarding before adding new features?")
   const [intent, setIntent] = useState("critique")
   const [templatePack, setTemplatePack] = useState("confusion")
+  const [draftSurveyId, setDraftSurveyId] = useState("")
   const [draftMessage, setDraftMessage] = useState<string | null>(null)
   const [isSavingDraft, setIsSavingDraft] = useState(false)
   const [isPublishing, setIsPublishing] = useState(false)
   const [publishedSurveyId, setPublishedSurveyId] = useState<string | null>(null)
 
   const saveSurvey = async (nextStatus: "draft" | "published") => {
-    const surveyId = toSurveyId(title, user?.id || "creator")
+    const surveyId = draftSurveyId || createSurveyId(title, user?.id || "creator")
+    if (!draftSurveyId) {
+      setDraftSurveyId(surveyId)
+    }
     const normalizedQuestions = questions.map((q) => q.trim()).filter((q) => q.length > 0)
     const payload = {
       id: surveyId,
@@ -114,6 +121,7 @@ export default function QuestionnairesV1Page() {
 
     try {
       const parsed = JSON.parse(rawDraft) as {
+        surveyId?: string
         title?: string
         decisionFocus?: string
         intent?: string
@@ -122,6 +130,7 @@ export default function QuestionnairesV1Page() {
         savedAt?: string
       }
       if (parsed.title) setTitle(parsed.title)
+      if (parsed.surveyId) setDraftSurveyId(parsed.surveyId)
       if (parsed.decisionFocus) setDecisionFocus(parsed.decisionFocus)
       if (parsed.intent) setIntent(parsed.intent)
       if (parsed.templatePack) setTemplatePack(parsed.templatePack)
@@ -136,6 +145,11 @@ export default function QuestionnairesV1Page() {
       setDraftMessage("Found a corrupted local draft. Save again to overwrite it.")
     }
   }, [])
+
+  useEffect(() => {
+    if (status === "loading" || draftSurveyId) return
+    setDraftSurveyId(createSurveyId(title, user?.id || "creator"))
+  }, [status, draftSurveyId, title, user?.id])
 
   if (status === "loading") return <main className="min-h-dvh bg-[#f3ecdf] p-6">Loading...</main>
 
@@ -202,6 +216,7 @@ export default function QuestionnairesV1Page() {
                 window.localStorage.setItem(
                   "audioform_survey_draft_v1",
                   JSON.stringify({
+                    surveyId: draftSurveyId || createSurveyId(title, user?.id || "creator"),
                     title,
                     decisionFocus,
                     intent,
