@@ -16,8 +16,8 @@ export default function Home() {
   const { status } = useAuth()
   const prefersReducedMotion = useReducedMotion()
   const [isHydrated, setIsHydrated] = useState(false)
-  const lineOne = "Builders don't struggle with feedback. They struggle with judgment."
-  const lineTwo = "We're building Audioform to help you decide faster in the right direction."
+  const lineOne = "Builders don't lack feedback. They lack decision-ready signal."
+  const lineTwo = "Audioform helps you hear conviction and decide what to ship next."
   const [typedLineOne, setTypedLineOne] = useState(prefersReducedMotion ? lineOne : "")
   const [typedLineTwo, setTypedLineTwo] = useState(prefersReducedMotion ? lineTwo : "")
   const signalLoopHref = status === "authenticated" ? "/admin/dashboard/v4" : "/signup"
@@ -133,7 +133,7 @@ export default function Home() {
         </header>
 
         <section className="mt-8 rounded-[1.75rem] border border-[#dbcdb8] bg-[#f9f4ea] p-5 sm:mt-10 sm:rounded-[2.5rem] sm:p-12">
-          <p className={`${body.className} text-sm uppercase text-[#5c5146] text-balance`}>High-signal feedback for builders</p>
+          <p className={`${body.className} text-sm uppercase text-[#5c5146] text-balance`}>Decision-ready voice signal for builders</p>
           <motion.div className="mt-4 max-w-3xl overflow-hidden sm:mt-5">
             <motion.h1
               className={`${display.className} text-3xl font-bold leading-tight text-balance sm:text-6xl`}
@@ -141,7 +141,7 @@ export default function Home() {
               animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0, scale: 1 }}
               transition={{ duration: 0.5, ease: "easeOut" }}
             >
-              Feedback is everywhere. Insight is nowhere.
+              Ask one focused question. Hear conviction. Decide your next move.
             </motion.h1>
           </motion.div>
           <div className={`${body.className} mt-5 max-w-2xl text-pretty text-base leading-relaxed text-[#5c5146] sm:text-lg`}>
@@ -164,9 +164,9 @@ export default function Home() {
 
           <div className="mt-5 grid gap-2 sm:grid-cols-3">
             {[
-              "What are you trying to decide this week?",
-              "What signal would give you conviction?",
-              "What's missing from the feedback you get today?",
+              "What decision are you trying to make this week?",
+              "What signal would change your mind?",
+              "What response would make your next step obvious?",
             ].map((line) => (
               <div
                 key={line}
@@ -183,14 +183,14 @@ export default function Home() {
               onClick={() => trackEvent("creator_clicked_start", { entry_point: "home_open_dashboard" })}
               className="w-full rounded-full bg-[#b85e2d] px-5 py-3 text-center text-sm font-medium text-[#fff6ed] hover:bg-[#a85327] sm:w-auto"
             >
-              Start your signal loop
+              Create your survey
             </Link>
             <Link
               href={questionnaireHref}
               onClick={() => trackEvent("creator_clicked_start", { entry_point: "home_try_voice_survey" })}
               className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[#dbcdb8] bg-[#fff6ed] px-5 py-3 text-center text-sm font-medium text-[#1f1b17] hover:bg-[#f5ebdd] sm:w-auto sm:justify-start"
             >
-              Help us decide what to build next - leave a 30s voice take
+              Leave a 30s voice take
               <ChevronRight className="size-4" aria-hidden="true" />
             </Link>
           </div>
@@ -200,18 +200,18 @@ export default function Home() {
           {[
             {
               icon: <Mic className="size-5" aria-hidden="true" />,
-              title: "Ask better prompts",
-              text: "Lead with one decision-focused prompt and collect clearer, higher-conviction responses.",
+              title: "Frame one decision",
+              text: "Start with one product decision and ask prompts that reveal real tension, not polite noise.",
             },
             {
               icon: <AudioWaveform className="size-5" aria-hidden="true" />,
-              title: "Capture conviction",
-              text: "Hear confidence, hesitation, and uncertainty that text feedback often flattens.",
+              title: "Capture conviction in voice",
+              text: "Hear confidence, hesitation, and friction that text comments usually hide.",
             },
             {
               icon: <Sparkles className="size-5" aria-hidden="true" />,
-              title: "Ship faster with better signal",
-              text: "Run a weekly loop: ship update, collect voice takes, decide next move.",
+              title: "Decide what to ship next",
+              text: "Replay strongest responses, identify the blocking tension, and commit to the next action.",
             },
           ].map((item) => (
             <article key={item.title} className="rounded-3xl border border-[#dbcdb8] bg-[#faf6ee] p-6">

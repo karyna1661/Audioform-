@@ -53,21 +53,6 @@ const intentOptions = [
   { id: "emotion", label: "Capture Emotion" },
 ]
 
-const templatePackMeta: Record<string, { label: string; description: string }> = {
-  confusion: {
-    label: "Confusion",
-    description: "Uncover hesitation, friction, and unclear moments.",
-  },
-  risk: {
-    label: "Risk",
-    description: "Expose blockers that prevent real-world adoption.",
-  },
-  value: {
-    label: "Value",
-    description: "Surface what feels useful enough to repeat.",
-  },
-}
-
 function toLower(value: string): string {
   return value.trim().toLowerCase()
 }
@@ -153,7 +138,6 @@ export default function QuestionnairesV1Page() {
   const [desiredOutcome, setDesiredOutcome] = useState("Conversion")
   const [decisionDetail, setDecisionDetail] = useState("")
   const [intent, setIntent] = useState("critique")
-  const [templatePack, setTemplatePack] = useState("confusion")
   const [draftSurveyId, setDraftSurveyId] = useState("")
   const [draftMessage, setDraftMessage] = useState<string | null>(null)
   const [isSavingDraft, setIsSavingDraft] = useState(false)
@@ -177,7 +161,7 @@ export default function QuestionnairesV1Page() {
       title: title.trim(),
       decisionFocus: decisionFocus.trim(),
       intent,
-      templatePack,
+      templatePack: intent,
       questions: normalizedQuestions,
       questionCount: normalizedQuestions.length,
       status: nextStatus,
@@ -212,7 +196,6 @@ export default function QuestionnairesV1Page() {
         desiredOutcome?: string
         decisionDetail?: string
         intent?: string
-        templatePack?: string
         questions?: string[]
         savedAt?: string
       }
@@ -224,7 +207,6 @@ export default function QuestionnairesV1Page() {
       if (parsed.decisionDetail) setDecisionDetail(parsed.decisionDetail)
       if (!parsed.decisionDetail && parsed.decisionFocus) setDecisionDetail(parsed.decisionFocus)
       if (parsed.intent) setIntent(parsed.intent)
-      if (parsed.templatePack) setTemplatePack(parsed.templatePack)
       if (Array.isArray(parsed.questions) && parsed.questions.length > 0) {
         setQuestions(parsed.questions)
         setSelectedIndex(0)
@@ -257,7 +239,6 @@ export default function QuestionnairesV1Page() {
     outcome: desiredOutcome,
     intent,
   })
-  const selectedPack = templatePackMeta[templatePack]
   const readyChecks = {
     hasTitle: title.trim().length > 0,
     hasDecisionTarget: decisionTarget.trim().length > 0,
@@ -305,7 +286,7 @@ export default function QuestionnairesV1Page() {
             <p className={`${body.className} text-sm text-[#665746] text-pretty`}>Build-in-public signal composer</p>
             <h1 className="text-3xl font-semibold text-balance sm:text-4xl">Design the feedback loop, not just the form</h1>
             <p className={`${body.className} mt-1 max-w-2xl text-sm text-[#665746] text-pretty`}>
-              Define one product decision, shape prompts for depth, and launch a voice survey that gives decision-ready signal.
+              Build one decision-focused survey in three steps: define the decision, pick the truth lens, and ship prompts that create clear next actions.
             </p>
           </div>
           <div className="flex gap-2">
@@ -334,7 +315,6 @@ export default function QuestionnairesV1Page() {
                     desiredOutcome,
                     decisionDetail,
                     intent,
-                    templatePack,
                     questions,
                     savedAt,
                   }),
@@ -489,7 +469,7 @@ export default function QuestionnairesV1Page() {
                   ))}
                 </div>
                 <p className={`${body.className} mt-2 text-xs text-[#665746]`}>
-                  Intent mode now applies a lens to your exact decision anchor so prompt suggestions stay contextual.
+                  Intent mode is your truth lens. It changes prompt suggestions based on the decision you are evaluating.
                 </p>
               </div>
             </section>
@@ -499,23 +479,10 @@ export default function QuestionnairesV1Page() {
                 <p className="text-sm font-semibold uppercase tracking-wide text-[#7a6146]">Action: Prompt Flow</p>
               </div>
               <div className="grid gap-4 p-5">
-                <div className="grid gap-3 sm:grid-cols-3">
-                  {Object.entries(templatePackMeta).map(([key, meta]) => (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => {
-                        setTemplatePack(key)
-                        trackEvent("prompt_template_selected", { template_pack: key })
-                      }}
-                      className={`rounded-2xl border px-3 py-3 text-left ${
-                        templatePack === key ? "border-[#b85e2d] bg-[#f1ceb9]" : "border-[#cfbea4] bg-[#fffdf8]"
-                      }`}
-                    >
-                      <p className="text-sm font-semibold">{meta.label}</p>
-                      <p className={`${body.className} mt-1 text-xs text-[#665746]`}>{meta.description}</p>
-                    </button>
-                  ))}
+                <div className={`${body.className} rounded-2xl border border-[#cfbea4] bg-[#fffdf8] px-3 py-2 text-sm text-[#665746]`}>
+                  Prompt suggestions are generated from: <span className="font-semibold">{decisionTarget}</span> +{" "}
+                  <span className="font-semibold">{changeType}</span> + <span className="font-semibold">{desiredOutcome}</span> +{" "}
+                  <span className="font-semibold">{intentOptions.find((item) => item.id === intent)?.label ?? "Intent"}</span>.
                 </div>
 
                 <div className="rounded-2xl border border-[#cfbea4] bg-[#fffdf8] p-4">
@@ -579,7 +546,7 @@ export default function QuestionnairesV1Page() {
                             next[selectedIndex] = template
                             setQuestions(next)
                             trackEvent("prompt_template_applied", {
-                              template_pack: templatePack,
+                              template_pack: intent,
                               question_index: selectedIndex + 1,
                             })
                           }}
@@ -697,7 +664,7 @@ export default function QuestionnairesV1Page() {
                     trackEvent("survey_published", {
                       survey_id: surveyId,
                       intent_type: intent,
-                      template_pack: templatePack,
+                      template_pack: intent,
                       question_count: questions.length,
                       decision_focus_present: decisionFocus.trim().length > 0,
                       change_target: decisionTarget,
