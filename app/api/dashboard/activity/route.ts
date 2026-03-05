@@ -18,7 +18,7 @@ export async function GET() {
       .filter((event) => event.surveyId && ownedSurveyIds.has(event.surveyId))
       .slice(0, 20)
     return NextResponse.json({ events: scopedEvents })
-  } catch (error: any) {
-    return NextResponse.json({ error: error?.message || "Failed to load dashboard activity." }, { status: 500 })
+  } catch {
+    return NextResponse.json({ error: "Failed to load dashboard activity." }, { status: 500 })
   }
 }

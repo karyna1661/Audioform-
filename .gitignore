@@ -19,6 +19,14 @@ yarn-error.log*
 # env files
 .env*
 
+# local runtime artifacts
+*.log
+*.out.log
+*.err.log
+tmp-e2e-*
+uploads/
+data/
+
 # vercel
 .vercel
 

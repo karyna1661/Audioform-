@@ -36,8 +36,7 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
 function resolveSupabaseConfig(): { url: string; key: string } {
   const key =
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.SUPABASE_API ||
-    process.env.SUPABASE_ANON_KEY ||
+    process.env.SUPABASE_SERVICE_ROLE ||
     ""
 
   const explicitUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || ""
@@ -55,7 +54,7 @@ function resolveSupabaseConfig(): { url: string; key: string } {
   }
 
   throw new Error(
-    "Missing Supabase configuration. Set SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY (preferred), or SUPABASE_API with a token containing `ref`.",
+    "Missing Supabase configuration. Set SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY.",
   )
 }
 

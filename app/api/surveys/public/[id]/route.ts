@@ -24,10 +24,7 @@ export async function GET(
         questions,
       },
     })
-  } catch (error: any) {
-    return NextResponse.json(
-      { error: error?.message || "Failed to load survey." },
-      { status: 500 },
-    )
+  } catch {
+    return NextResponse.json({ error: "Failed to load survey." }, { status: 500 })
   }
 }

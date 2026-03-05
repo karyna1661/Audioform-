@@ -1,12 +1,44 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
+import { getSessionFromRequest } from "@/lib/server/auth-session"
+import { applyRateLimit, getRequestClientIp } from "@/lib/server/rate-limit"
 
 const requestSchema = z.object({
   questionId: z.string().min(1),
 })
 
+const ALLOWED_AUDIO_MIME = new Set([
+  "audio/webm",
+  "audio/webm;codecs=opus",
+  "audio/ogg",
+  "audio/ogg;codecs=opus",
+  "audio/mpeg",
+  "audio/mp3",
+  "audio/wav",
+  "audio/x-wav",
+])
+const MAX_AUDIO_SIZE_BYTES = 8 * 1024 * 1024
+
 export async function POST(request: NextRequest) {
   try {
+    const session = await getSessionFromRequest()
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const ip = getRequestClientIp(request.headers)
+    const rate = applyRateLimit({
+      key: `transcribe:post:${ip}`,
+      windowMs: 60_000,
+      max: 10,
+    })
+    if (!rate.allowed) {
+      return NextResponse.json(
+        { error: "Too many transcription requests. Please retry shortly." },
+        { status: 429, headers: { "Retry-After": String(rate.retryAfterSeconds) } },
+      )
+    }
+
     const formData = await request.formData()
     const audioFile = formData.get("audio") as File
     const parsed = requestSchema.safeParse({
@@ -21,6 +53,18 @@ export async function POST(request: NextRequest) {
         },
         { status: 400 },
       )
+    }
+
+    if (audioFile.size <= 0 || audioFile.size > MAX_AUDIO_SIZE_BYTES) {
+      return NextResponse.json(
+        { error: `Invalid audio size. Max allowed is ${Math.floor(MAX_AUDIO_SIZE_BYTES / (1024 * 1024))}MB.` },
+        { status: 413 },
+      )
+    }
+
+    const mimeType = (audioFile.type || "").toLowerCase()
+    if (!ALLOWED_AUDIO_MIME.has(mimeType)) {
+      return NextResponse.json({ error: "Unsupported audio format." }, { status: 415 })
     }
 
     // Check if OpenAI API key is available
@@ -53,9 +97,9 @@ export async function POST(request: NextRequest) {
     })
 
     if (!response.ok) {
-      const errorText = await response.text()
+      await response.text()
       return NextResponse.json(
-        { error: "Transcription provider request failed", details: errorText },
+        { error: "Transcription provider request failed" },
         { status: 502 },
       )
     }
@@ -72,7 +116,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error: "Failed to transcribe audio",
-        details: error.message,
       },
       { status: 500 },
     )

@@ -83,8 +83,8 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ success: true, survey })
-  } catch (error: any) {
-    return NextResponse.json({ error: error?.message || "Failed to save survey." }, { status: 500 })
+  } catch {
+    return NextResponse.json({ error: "Failed to save survey." }, { status: 500 })
   }
 }
 

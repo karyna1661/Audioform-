@@ -63,6 +63,7 @@ export default function AdminDashboardV4Page() {
   const [surveys, setSurveys] = useState<SurveyItem[]>([])
   const [responses, setResponses] = useState<ResponseItem[]>([])
   const [timeline, setTimeline] = useState<DashboardEventItem[]>([])
+  const [bootLoading, setBootLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [deletingSurveyId, setDeletingSurveyId] = useState<string | null>(null)
   const [surveyDeleteDialogId, setSurveyDeleteDialogId] = useState<string | null>(null)
@@ -113,8 +114,13 @@ export default function AdminDashboardV4Page() {
       }
     }
 
-    void loadData()
-    void loadResponses()
+    const loadBoot = async () => {
+      setBootLoading(true)
+      await Promise.allSettled([loadData(), loadResponses()])
+      setBootLoading(false)
+    }
+
+    void loadBoot()
     router.prefetch("/admin/questionnaires/v1")
     router.prefetch("/admin/responses")
     router.prefetch("/admin/notifications")
@@ -195,7 +201,7 @@ export default function AdminDashboardV4Page() {
     }
   }
 
-  if (status === "loading") {
+  if (status === "loading" || (status === "authenticated" && bootLoading)) {
     return <SurveyLoadingSkeleton label="Loading signal inbox..." />
   }
 

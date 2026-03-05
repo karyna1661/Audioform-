@@ -25,11 +25,8 @@ export async function GET() {
   try {
     const config = await getNotificationConfigByUserId(session.sub)
     return NextResponse.json({ config })
-  } catch (error: any) {
-    return NextResponse.json(
-      { error: error?.message || "Failed to load notification settings." },
-      { status: 500 },
-    )
+  } catch {
+    return NextResponse.json({ error: "Failed to load notification settings." }, { status: 500 })
   }
 }
 
@@ -55,10 +52,7 @@ export async function PUT(request: NextRequest) {
     })
 
     return NextResponse.json({ success: true, config })
-  } catch (error: any) {
-    return NextResponse.json(
-      { error: error?.message || "Failed to save notification settings." },
-      { status: 500 },
-    )
+  } catch {
+    return NextResponse.json({ error: "Failed to save notification settings." }, { status: 500 })
   }
 }

@@ -3,13 +3,14 @@
 import Link from "next/link"
 import { useRequireAdmin } from "@/lib/auth-context"
 import { AdminMobileNav } from "@/components/admin-mobile-nav"
+import { SurveyLoadingSkeleton } from "@/components/survey-loading-skeleton"
 
 
 export default function DashboardComparePage() {
   const { status } = useRequireAdmin()
 
   if (status === "loading") {
-    return <main className="min-h-dvh bg-[#f3ecdf] p-6">Loading options...</main>
+    return <SurveyLoadingSkeleton label="Loading dashboard options..." />
   }
 
   return (

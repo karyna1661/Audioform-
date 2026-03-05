@@ -9,6 +9,7 @@ import { ArrowLeft, CheckCircle2, Copy, GripVertical, Plus, Rocket, Sparkles, Ta
 import { trackEvent } from "@/lib/analytics"
 import { recordSurveyPublished } from "@/lib/behavior-metrics"
 import { AdminMobileNav } from "@/components/admin-mobile-nav"
+import { SurveyLoadingSkeleton } from "@/components/survey-loading-skeleton"
 
 
 const initialQuestions = [
@@ -221,6 +222,7 @@ export default function QuestionnairesV1Page() {
   const [isSavingDraft, setIsSavingDraft] = useState(false)
   const [isPublishing, setIsPublishing] = useState(false)
   const [publishedSurveyId, setPublishedSurveyId] = useState<string | null>(null)
+  const [draftLoading, setDraftLoading] = useState(false)
 
   const commitQuestionChange = useCallback(
     (nextQuestions: string[], nextSelectedIndex: number) => {
@@ -354,6 +356,7 @@ export default function QuestionnairesV1Page() {
     let canceled = false
 
     const loadDraftById = async () => {
+      setDraftLoading(true)
       try {
         const response = await fetch(`/api/surveys?id=${encodeURIComponent(requestedSurveyId)}`, {
           credentials: "include",
@@ -390,6 +393,8 @@ export default function QuestionnairesV1Page() {
         if (!canceled) {
           setDraftMessage(error instanceof Error ? error.message : "Failed to load draft.")
         }
+      } finally {
+        if (!canceled) setDraftLoading(false)
       }
     }
 
@@ -399,7 +404,7 @@ export default function QuestionnairesV1Page() {
     }
   }, [status, requestedSurveyId])
 
-  if (status === "loading") return <main className="min-h-dvh bg-[#f3ecdf] p-6">Loading...</main>
+  if (status === "loading" || draftLoading) return <SurveyLoadingSkeleton label="Loading survey builder..." />
 
   const selected = questions[selectedIndex] || ""
   const decisionFocus = composeDecisionSentence({

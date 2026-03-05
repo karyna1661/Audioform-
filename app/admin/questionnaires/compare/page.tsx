@@ -3,12 +3,13 @@
 import Link from "next/link"
 import { useRequireAdmin } from "@/lib/auth-context"
 import { AdminMobileNav } from "@/components/admin-mobile-nav"
+import { SurveyLoadingSkeleton } from "@/components/survey-loading-skeleton"
 
 
 export default function QuestionnairesComparePage() {
   const { status } = useRequireAdmin()
 
-  if (status === "loading") return <main className="min-h-dvh bg-[#f3ecdf] p-6">Loading...</main>
+  if (status === "loading") return <SurveyLoadingSkeleton label="Loading questionnaire options..." />
 
   return (
     <main className={`min-h-dvh bg-[#f3ecdf] p-4 pb-28 sm:p-6 sm:pb-6`}>

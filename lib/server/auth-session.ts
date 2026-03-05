@@ -14,9 +14,6 @@ type SessionPayload = {
 
 function requireSecret(): string {
   const secret = process.env.AUTH_SESSION_SECRET
-  if (!secret && process.env.NODE_ENV !== "production") {
-    return "dev-insecure-secret-change-me"
-  }
   if (!secret) {
     throw new Error("Missing AUTH_SESSION_SECRET. Set it in environment variables.")
   }
