@@ -1,12 +1,9 @@
 "use client"
 
 import Link from "next/link"
-import { Bricolage_Grotesque, Lora } from "next/font/google"
 import { useRequireAdmin } from "@/lib/auth-context"
 import { AdminMobileNav } from "@/components/admin-mobile-nav"
 
-const display = Bricolage_Grotesque({ subsets: ["latin"], weight: ["400", "600", "700"] })
-const body = Lora({ subsets: ["latin"], weight: ["400", "500", "600"] })
 
 export default function DashboardComparePage() {
   const { status } = useRequireAdmin()
@@ -16,11 +13,11 @@ export default function DashboardComparePage() {
   }
 
   return (
-    <main className={`${display.className} min-h-dvh bg-[#f3ecdf] p-4 pb-28 sm:p-6 sm:pb-6`}>
+    <main className={`min-h-dvh bg-[#f3ecdf] p-4 pb-28 sm:p-6 sm:pb-6`}>
       <section className="mx-auto max-w-5xl rounded-[2rem] border border-[#dbcdb8] bg-[#f9f4ea] p-6">
-        <p className={`${body.className} text-sm text-[#5c5146]`}>Admin Dashboard Lab</p>
+        <p className={`font-body text-sm text-[#5c5146]`}>Admin Dashboard Lab</p>
         <h1 className="mt-1 text-4xl font-semibold text-balance">Pick One Dashboard Direction</h1>
-        <p className={`${body.className} mt-3 max-w-2xl text-pretty text-[#5c5146]`}>
+        <p className={`font-body mt-3 max-w-2xl text-pretty text-[#5c5146]`}>
           Version 4 is selected as the final direction. The older alternatives were removed.
         </p>
 
@@ -43,3 +40,4 @@ function CardLink({ href, title, description }: { href: string; title: string; d
     </Link>
   )
 }
+

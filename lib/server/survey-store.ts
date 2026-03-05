@@ -230,6 +230,18 @@ export async function getLatestPublishedSurveyQuestions(surveyId: string): Promi
   return questions.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
 }
 
+export async function getLatestSurveyQuestions(surveyId: string): Promise<string[]> {
+  const rows = await supabaseRequest<DashboardEventRow[]>(
+    `/rest/v1/dashboard_events?select=id,type,survey_id,message,metadata,created_at&survey_id=eq.${encodeURIComponent(
+      surveyId,
+    )}&type=in.(survey_draft_saved,survey_published)&order=created_at.desc&limit=1`,
+  )
+  const latest = rows[0]
+  const questions = latest?.metadata?.questions
+  if (!Array.isArray(questions)) return []
+  return questions.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+}
+
 export async function deleteSurveyById(id: string): Promise<void> {
   // Delete response rows first to avoid FK violations in stricter schemas.
   await supabaseRequest<unknown>(`/rest/v1/response_records?survey_id=eq.${encodeURIComponent(id)}`, {

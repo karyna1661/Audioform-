@@ -3,10 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --webpack",
     "build": "next build --webpack",
     "start": "next start",
     "lint": "next lint",
+    "regen:guard": "node regen-engine/checks/runtime-guard.mjs",
+    "verify": "npm run -s regen:guard && npx tsc --noEmit",
     "gtm:pipeline": "node tasks/gtm-apify-pipeline.mjs",
     "gtm:pipeline:daily": "node tasks/gtm-apify-pipeline.mjs",
     "gtm:reddit": "node tasks/gtm-reddit-pipeline.mjs",

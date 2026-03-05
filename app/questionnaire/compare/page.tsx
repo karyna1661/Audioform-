@@ -1,18 +1,15 @@
 "use client"
 
 import Link from "next/link"
-import { Bricolage_Grotesque, Lora } from "next/font/google"
 
-const display = Bricolage_Grotesque({ subsets: ["latin"], weight: ["400", "600", "700"] })
-const body = Lora({ subsets: ["latin"], weight: ["400", "500", "600"] })
 
 export default function QuestionnaireComparePage() {
   return (
-    <main className={`${display.className} min-h-dvh bg-[#f3ecdf] p-4 sm:p-6`}>
+    <main className={`min-h-dvh bg-[#f3ecdf] p-4 sm:p-6`}>
       <section className="mx-auto max-w-5xl rounded-[2rem] border border-[#dbcdb8] bg-[#f9f4ea] p-6">
-        <p className={`${body.className} text-sm text-[#5c5146]`}>Respondent Questionnaire</p>
+        <p className={`font-body text-sm text-[#5c5146]`}>Respondent Questionnaire</p>
         <h1 className="mt-1 text-4xl font-semibold text-balance">Selection Complete</h1>
-        <p className={`${body.className} mt-3 text-pretty text-[#5c5146]`}>
+        <p className={`font-body mt-3 text-pretty text-[#5c5146]`}>
           Version 1 is selected and active as the default respondent questionnaire.
         </p>
         <div className="mt-6 grid gap-4 md:grid-cols-2">
@@ -33,3 +30,4 @@ function OptionCard({ href, title, description }: { href: string; title: string;
     </Link>
   )
 }
+

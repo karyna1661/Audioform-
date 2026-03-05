@@ -7,6 +7,7 @@ export type AudioformEventName =
   | "decision_intent_selected"
   | "prompt_template_selected"
   | "prompt_template_applied"
+  | "starter_pack_applied"
   | "survey_draft_saved"
   | "survey_published"
   | "share_link_copied"

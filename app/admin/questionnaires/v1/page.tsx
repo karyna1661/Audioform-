@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import { useRequireAdmin } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, CheckCircle2, Copy, GripVertical, Plus, Rocket, Sparkles, Target, Trash2, Undo2 } from "lucide-react"
@@ -51,6 +52,36 @@ const intentOptions = [
   { id: "emotion", label: "Capture Emotion" },
 ]
 
+const audienceOptions = [
+  { id: "builders", label: "Builders" },
+  { id: "community", label: "Community users" },
+  { id: "customers", label: "Paying customers" },
+]
+
+const starterPackOptions = [
+  {
+    id: "community-feedback",
+    label: "Community feedback pack",
+    description: "For open users and community members sharing broad product sentiment.",
+    intent: "confusion",
+    audience: "community",
+  },
+  {
+    id: "beta-testers",
+    label: "Beta tester pack",
+    description: "For early testers validating direction before wider release.",
+    intent: "critique",
+    audience: "builders",
+  },
+  {
+    id: "power-users",
+    label: "Power user pack",
+    description: "For experienced users who can spot depth issues and advanced friction.",
+    intent: "validation",
+    audience: "customers",
+  },
+]
+
 function toLower(value: string): string {
   return value.trim().toLowerCase()
 }
@@ -75,40 +106,69 @@ function buildIntentAlignedPrompts(input: {
   changeType: string
   outcome: string
   intent: string
+  audience: string
 }): string[] {
   const target = toLower(input.target)
-  const changeType = toLower(input.changeType)
   const outcome = toLower(input.outcome)
-  const changePhrase = `${changeType} ${target}`.trim()
+  const audienceLead =
+    input.audience === "community"
+      ? "From your community perspective,"
+      : input.audience === "customers"
+        ? "As a paying customer,"
+        : "As a builder,"
 
   if (input.intent === "confusion") {
     return [
-      `Describe the exact moment ${target} felt unclear or harder than expected.`,
-      `Where did you hesitate while trying to complete the flow toward ${outcome}?`,
-      `If we ${changePhrase}, what confusion would disappear first?`,
+      `${audienceLead} describe the exact moment the ${target} felt unclear or harder than expected.`,
+      `Where did you hesitate while trying to achieve better ${outcome}?`,
+      `What one change to the ${target} would remove confusion first?`,
     ]
   }
 
   if (input.intent === "critique") {
     return [
-      `What is the strongest reason not to ${changePhrase} right now?`,
-      `What risk would this change introduce in real usage?`,
+      `${audienceLead} what is the strongest reason this change to the ${target} could fail right now?`,
+      `What risk might this introduce in real usage?`,
       `What must we resolve before this feels safe to ship for better ${outcome}?`,
     ]
   }
 
   if (input.intent === "emotion") {
     return [
-      `When you think about this ${target}, what do you feel first?`,
+      `${audienceLead} when you think about the ${target}, what do you feel first?`,
       `What part of this direction increases or reduces your confidence?`,
-      `What single improvement would make this feel clearly better for ${outcome}?`,
+      `What one improvement would make this feel clearly better for ${outcome}?`,
     ]
   }
 
   return [
-    `Would ${changePhrase} move us in the right direction for ${outcome}? Why?`,
-    `What signal would increase your conviction that this is the right move?`,
+    `${audienceLead} would this change to the ${target} move us in the right direction for ${outcome}? Why or why not?`,
+    `What signal would increase your confidence that this is the right move?`,
     `What would make you change your mind about this direction?`,
+  ]
+}
+
+function buildStarterDecisionReframes(input: { audience: string; target: string; outcome: string }): string[] {
+  const target = toLower(input.target)
+  const outcome = toLower(input.outcome)
+  if (input.audience === "community") {
+    return [
+      `What are community members most likely to misunderstand about this ${target} change?`,
+      `What feedback pattern from the community would make this decision obvious?`,
+      `What would make this change feel like a clear win for the community and for ${outcome}?`,
+    ]
+  }
+  if (input.audience === "customers") {
+    return [
+      `What would a paying customer need to see before trusting this ${target} change?`,
+      `Which customer risk should we prevent before shipping this decision?`,
+      `What one improvement would make this change clearly better for ${outcome}?`,
+    ]
+  }
+  return [
+    "What user signal would most change your mind about this decision?",
+    "Which friction point must we fix before the next release?",
+    `What one improvement to the ${target} would clearly improve ${outcome}?`,
   ]
 }
 
@@ -142,6 +202,8 @@ function remapSelectedIndexForReorder(currentSelected: number, fromIndex: number
 
 export default function QuestionnairesV1Page() {
   const { status, user } = useRequireAdmin()
+  const searchParams = useSearchParams()
+  const requestedSurveyId = searchParams.get("surveyId")
   const [questions, setQuestions] = useState(initialQuestions)
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [questionHistory, setQuestionHistory] = useState<Array<{ questions: string[]; selectedIndex: number }>>([])
@@ -153,6 +215,7 @@ export default function QuestionnairesV1Page() {
   const [desiredOutcome, setDesiredOutcome] = useState("Conversion")
   const [decisionDetail, setDecisionDetail] = useState("")
   const [intent, setIntent] = useState("critique")
+  const [audience, setAudience] = useState("builders")
   const [draftSurveyId, setDraftSurveyId] = useState("")
   const [draftMessage, setDraftMessage] = useState<string | null>(null)
   const [isSavingDraft, setIsSavingDraft] = useState(false)
@@ -256,6 +319,7 @@ export default function QuestionnairesV1Page() {
         desiredOutcome?: string
         decisionDetail?: string
         intent?: string
+        audience?: string
         questions?: string[]
         savedAt?: string
       }
@@ -267,6 +331,7 @@ export default function QuestionnairesV1Page() {
       if (parsed.decisionDetail) setDecisionDetail(parsed.decisionDetail)
       if (!parsed.decisionDetail && parsed.decisionFocus) setDecisionDetail(parsed.decisionFocus)
       if (parsed.intent) setIntent(parsed.intent)
+      if (parsed.audience) setAudience(parsed.audience)
       if (Array.isArray(parsed.questions) && parsed.questions.length > 0) {
         setQuestions(parsed.questions)
         setSelectedIndex(0)
@@ -284,6 +349,56 @@ export default function QuestionnairesV1Page() {
     setDraftSurveyId(createSurveyId(title, user?.id || "creator"))
   }, [status, draftSurveyId, title, user?.id])
 
+  useEffect(() => {
+    if (status !== "authenticated" || !requestedSurveyId) return
+    let canceled = false
+
+    const loadDraftById = async () => {
+      try {
+        const response = await fetch(`/api/surveys?id=${encodeURIComponent(requestedSurveyId)}`, {
+          credentials: "include",
+          cache: "no-store",
+        })
+        if (!response.ok) throw new Error("Failed to load draft.")
+        const json = (await response.json()) as {
+          survey?: {
+            id: string
+            title: string
+            decisionFocus?: string | null
+            intent?: string | null
+            status?: "draft" | "published"
+            questions?: string[]
+          }
+        }
+        const survey = json.survey
+        if (!survey || canceled) return
+
+        setDraftSurveyId(survey.id)
+        setTitle(survey.title || "Activation Decision Pulse")
+        setIntent(survey.intent || "critique")
+        setDecisionDetail(survey.decisionFocus || "")
+        if (Array.isArray(survey.questions) && survey.questions.length > 0) {
+          setQuestions(survey.questions)
+          setSelectedIndex(0)
+        }
+        setDraftMessage(
+          survey.status === "published"
+            ? "Loaded published survey. You can update and republish."
+            : "Draft loaded. Continue editing and publish when ready.",
+        )
+      } catch (error) {
+        if (!canceled) {
+          setDraftMessage(error instanceof Error ? error.message : "Failed to load draft.")
+        }
+      }
+    }
+
+    void loadDraftById()
+    return () => {
+      canceled = true
+    }
+  }, [status, requestedSurveyId])
+
   if (status === "loading") return <main className="min-h-dvh bg-[#f3ecdf] p-6">Loading...</main>
 
   const selected = questions[selectedIndex] || ""
@@ -298,7 +413,31 @@ export default function QuestionnairesV1Page() {
     changeType,
     outcome: desiredOutcome,
     intent,
+    audience,
   })
+  const starterDecisionReframes = buildStarterDecisionReframes({
+    audience,
+    target: decisionTarget,
+    outcome: desiredOutcome,
+  })
+  const applyStarterPack = (pack: { id: string; label: string; intent: string; audience: string }) => {
+    setIntent(pack.intent)
+    setAudience(pack.audience)
+    const nextPrompts = buildIntentAlignedPrompts({
+      target: decisionTarget,
+      changeType,
+      outcome: desiredOutcome,
+      intent: pack.intent,
+      audience: pack.audience,
+    })
+    commitQuestionChange(nextPrompts, 0)
+    setDraftMessage(`${pack.label} applied. Run an internal test by recording 3 quick voice answers.`)
+    trackEvent("starter_pack_applied", {
+      starter_pack: pack.id,
+      intent_type: pack.intent,
+      audience_type: pack.audience,
+    })
+  }
   const readyChecks = {
     hasTitle: title.trim().length > 0,
     hasDecisionTarget: decisionTarget.trim().length > 0,
@@ -375,6 +514,7 @@ export default function QuestionnairesV1Page() {
                     desiredOutcome,
                     decisionDetail,
                     intent,
+                    audience,
                     questions,
                     savedAt,
                   }),
@@ -490,11 +630,7 @@ export default function QuestionnairesV1Page() {
                   </p>
                   <p className="mt-4 text-sm font-semibold">Starter decision reframes</p>
                   <div className="mt-3 grid gap-2">
-                    {[
-                      "What user signal would change your mind about this decision?",
-                      "What friction must we fix before the next release?",
-                      "What would make this feel clearly better for users?",
-                    ].map((reframe) => (
+                    {starterDecisionReframes.map((reframe) => (
                       <button
                         key={reframe}
                         type="button"
@@ -531,6 +667,26 @@ export default function QuestionnairesV1Page() {
                 <p className={`font-body mt-2 text-xs text-[#665746]`}>
                   Intent mode is your truth lens. It changes prompt suggestions based on the decision you are evaluating.
                 </p>
+                <p className="mt-4 text-sm font-semibold">Audience mode</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {audienceOptions.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setAudience(item.id)}
+                      className={`rounded-full border px-3 py-1.5 text-sm ${
+                        audience === item.id
+                          ? "border-[#b85e2d] bg-[#f1ceb9] text-[#6e3316]"
+                          : "border-[#cfbea4] bg-[#fffdf8] text-[#665746]"
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+                <p className={`font-body mt-2 text-xs text-[#665746]`}>
+                  Audience mode adapts prompts to who you are asking so responses are clearer and easier to act on.
+                </p>
               </div>
             </section>
 
@@ -542,7 +698,28 @@ export default function QuestionnairesV1Page() {
                 <div className={`font-body rounded-2xl border border-[#cfbea4] bg-[#fffdf8] px-3 py-2 text-sm text-[#665746]`}>
                   Prompt suggestions are generated from: <span className="font-semibold">{decisionTarget}</span> +{" "}
                   <span className="font-semibold">{changeType}</span> + <span className="font-semibold">{desiredOutcome}</span> +{" "}
-                  <span className="font-semibold">{intentOptions.find((item) => item.id === intent)?.label ?? "Intent"}</span>.
+                  <span className="font-semibold">{intentOptions.find((item) => item.id === intent)?.label ?? "Intent"}</span> +{" "}
+                  <span className="font-semibold">{audienceOptions.find((item) => item.id === audience)?.label ?? "Audience"}</span>.
+                </div>
+
+                <div className="rounded-2xl border border-[#cfbea4] bg-[#fffdf8] p-4">
+                  <p className="text-sm font-semibold">One-click packs</p>
+                  <p className={`font-body mt-1 text-xs text-[#665746]`}>
+                    Apply an audience-aware starter pack, then test it internally with 3 short voice answers.
+                  </p>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                    {starterPackOptions.map((pack) => (
+                      <button
+                        key={pack.id}
+                        type="button"
+                        onClick={() => applyStarterPack(pack)}
+                        className="rounded-xl border border-[#cfbea4] bg-[#fff7ee] px-3 py-3 text-left hover:bg-[#fffdf8]"
+                      >
+                        <p className="text-sm font-semibold text-[#6e3316]">{pack.label}</p>
+                        <p className={`font-body mt-1 text-xs text-[#665746]`}>{pack.description}</p>
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="rounded-2xl border border-[#cfbea4] bg-[#fffdf8] p-4">
@@ -660,7 +837,7 @@ export default function QuestionnairesV1Page() {
                       className="mt-3 w-full border-[#cfbea4] bg-[#fff7ee]"
                       onClick={() => {
                         commitQuestionChange(intentAlignedPrompts, 0)
-                        setDraftMessage("Starter prompts generated from decision context + intent mode.")
+                        setDraftMessage("Starter prompts generated from decision context, intent mode, and audience mode.")
                       }}
                     >
                       Apply decision-aligned starter flow
@@ -782,6 +959,27 @@ export default function QuestionnairesV1Page() {
                 {isPublishing ? "Publishing..." : "Publish survey"}
               </Button>
             </div>
+
+            {draftSurveyId ? (
+              <div className="mt-4 rounded-2xl border border-[#cfbea4] bg-[#fff7ee] p-3">
+                <p className="text-sm font-semibold">Draft collaboration</p>
+                <p className={`font-body mt-1 text-xs text-[#665746]`}>
+                  Share this link to reopen and keep editing this draft later.
+                </p>
+                <Button
+                  variant="outline"
+                  className="mt-2 w-full border-[#cfbea4] bg-[#fff7ee]"
+                  onClick={async () => {
+                    const draftLink = `${window.location.origin}/admin/questionnaires/v1?surveyId=${encodeURIComponent(draftSurveyId)}`
+                    await navigator.clipboard.writeText(draftLink)
+                    setDraftMessage("Draft link copied.")
+                  }}
+                >
+                  <Copy className="mr-2 size-4" aria-hidden="true" />
+                  Copy draft link
+                </Button>
+              </div>
+            ) : null}
 
             {publishedSurveyId ? (
               <div className="mt-4 rounded-2xl border border-[#cfbea4] bg-[#fff7ee] p-3">

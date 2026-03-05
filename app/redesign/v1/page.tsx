@@ -1,14 +1,11 @@
 import Link from "next/link"
-import { Bricolage_Grotesque, Lora } from "next/font/google"
 import { Mic, Sparkles, AudioWaveform, ChevronRight } from "lucide-react"
 
-const display = Bricolage_Grotesque({ subsets: ["latin"], weight: ["400", "600", "700"] })
-const body = Lora({ subsets: ["latin"], weight: ["400", "500", "600"] })
 
 export default function RedesignV1Page() {
   return (
     <main
-      className={`${display.className} min-h-screen bg-[#f3ecdf] text-[#1f1b17]`}
+      className={`min-h-screen bg-[#f3ecdf] text-[#1f1b17]`}
       style={
         {
           "--paper": "#f3ecdf",
@@ -40,7 +37,7 @@ export default function RedesignV1Page() {
           <h1 className="mt-5 max-w-3xl text-4xl leading-tight sm:text-6xl">
             Collect answers people can actually feel.
           </h1>
-          <p className={`${body.className} mt-5 max-w-2xl text-base leading-relaxed text-[color:var(--muted)] sm:text-lg`}>
+          <p className={`font-body mt-5 max-w-2xl text-base leading-relaxed text-[color:var(--muted)] sm:text-lg`}>
             AudioForm turns surveys into conversations. Ask better questions, receive voice responses, and find the
             signal in tone, confidence, and emotion.
           </p>
@@ -80,7 +77,7 @@ export default function RedesignV1Page() {
             <article key={item.title} className="rounded-3xl border border-[color:var(--line)] bg-[#faf6ee] p-6">
               <div className="inline-flex rounded-full border border-[color:var(--line)] p-2 text-[color:var(--accent)]">{item.icon}</div>
               <h2 className="mt-4 text-xl font-semibold">{item.title}</h2>
-              <p className={`${body.className} mt-2 text-sm leading-relaxed text-[color:var(--muted)]`}>{item.text}</p>
+              <p className={`font-body mt-2 text-sm leading-relaxed text-[color:var(--muted)]`}>{item.text}</p>
             </article>
           ))}
         </section>
@@ -88,3 +85,4 @@ export default function RedesignV1Page() {
     </main>
   )
 }
+

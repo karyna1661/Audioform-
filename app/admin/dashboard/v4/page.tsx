@@ -10,6 +10,16 @@ import { ArrowLeft, ArrowUpRight, Bell, Calendar, Mic, Target, Trash2 } from "lu
 import { trackEvent } from "@/lib/analytics"
 import { SurveyLoadingSkeleton } from "@/components/survey-loading-skeleton"
 import { AdminMobileNav } from "@/components/admin-mobile-nav"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 
 type SurveyItem = {
@@ -34,6 +44,18 @@ type DashboardEventItem = {
   surveyId?: string | null
 }
 
+function humanizeDashboardEventMessage(
+  event: DashboardEventItem,
+  surveyTitleById: Map<string, string>,
+): string {
+  if (!event.message) return "New activity"
+  const bySurveyId = event.surveyId ? surveyTitleById.get(event.surveyId) : null
+  if (bySurveyId) {
+    return event.message.replace(/for survey [a-z0-9-]+/i, `for ${bySurveyId}`)
+  }
+  return event.message
+}
+
 export default function AdminDashboardV4Page() {
   const router = useRouter()
   const { user, status } = useRequireAdmin()
@@ -43,6 +65,8 @@ export default function AdminDashboardV4Page() {
   const [timeline, setTimeline] = useState<DashboardEventItem[]>([])
   const [loadError, setLoadError] = useState<string | null>(null)
   const [deletingSurveyId, setDeletingSurveyId] = useState<string | null>(null)
+  const [surveyDeleteDialogId, setSurveyDeleteDialogId] = useState<string | null>(null)
+  const [uiMessage, setUiMessage] = useState<string | null>(null)
 
   useEffect(() => {
     if (status !== "authenticated") return
@@ -138,6 +162,7 @@ export default function AdminDashboardV4Page() {
     () => surveys.filter((survey) => survey.status === "published"),
     [surveys],
   )
+  const surveyTitleById = useMemo(() => new Map(surveys.map((survey) => [survey.id, survey.title])), [surveys])
 
   const ttfrLabel = useMemo(() => {
     if (ttfrSeconds == null) return "Pending"
@@ -151,11 +176,6 @@ export default function AdminDashboardV4Page() {
   }, [ttfrSeconds])
 
   const handleDeleteSurvey = async (surveyId: string) => {
-    const confirmed = window.confirm(
-      "Delete this survey and its responses permanently? This cannot be undone.",
-    )
-    if (!confirmed) return
-
     setDeletingSurveyId(surveyId)
     setLoadError(null)
     try {
@@ -167,6 +187,7 @@ export default function AdminDashboardV4Page() {
       setSurveys((prev) => prev.filter((survey) => survey.id !== surveyId))
       setResponses((prev) => prev.filter((item) => item.surveyId !== surveyId))
       setTimeline((prev) => prev.filter((event) => event.surveyId !== surveyId))
+      setSurveyDeleteDialogId(null)
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : "Failed to delete survey.")
     } finally {
@@ -186,6 +207,7 @@ export default function AdminDashboardV4Page() {
             <p className={`font-body text-sm text-[#5c5146] text-pretty`}>Builder workspace</p>
             <h1 className="text-3xl font-semibold text-balance">Signal Inbox</h1>
             <p className={`font-body mt-1 text-sm text-[#5c5146] text-pretty`}>Hi {user?.name}, hear clear signal and decide your next product move faster.</p>
+            {uiMessage ? <p className={`font-body mt-1 text-sm text-[#5c5146]`}>{uiMessage}</p> : null}
             {loadError ? <p className={`font-body mt-1 text-sm text-[#8a3d2b]`}>{loadError}</p> : null}
           </div>
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
@@ -294,24 +316,43 @@ export default function AdminDashboardV4Page() {
                       variant="outline"
                       className="w-full border-[#dbcdb8] bg-[#fff6ed] sm:w-auto"
                       onClick={() => {
+                        if (survey.status === "draft") {
+                          router.push(`/admin/questionnaires/v1?surveyId=${encodeURIComponent(survey.id)}`)
+                          return
+                        }
                         trackEvent("response_replayed", { survey_id: survey.id, source: "survey_stack_top_signal" })
                         router.push(`/admin/responses?surveyId=${survey.id}&focus=top-signal`)
                       }}
                     >
-                      Open top signal
+                      {survey.status === "draft" ? "Edit draft" : "Open top signal"}
                     </Button>
-                    <Button
-                      variant="outline"
-                      className="w-full border-[#dbcdb8] bg-[#fff6ed] sm:w-auto"
-                      onClick={() => trackEvent("response_bookmarked", { survey_id: survey.id, bookmark_action: true })}
-                    >
-                      Save to clip bin
-                    </Button>
+                    {survey.status !== "draft" ? (
+                      <Button
+                        variant="outline"
+                        className="w-full border-[#dbcdb8] bg-[#fff6ed] sm:w-auto"
+                        onClick={() => trackEvent("response_bookmarked", { survey_id: survey.id, bookmark_action: true })}
+                      >
+                        Save to clip bin
+                      </Button>
+                    ) : null}
+                    {survey.status === "draft" ? (
+                      <Button
+                        variant="outline"
+                        className="w-full border-[#dbcdb8] bg-[#fff6ed] sm:w-auto"
+                        onClick={async () => {
+                          const draftLink = `${window.location.origin}/admin/questionnaires/v1?surveyId=${encodeURIComponent(survey.id)}`
+                          await navigator.clipboard.writeText(draftLink)
+                          setUiMessage(`Draft link copied for "${survey.title}".`)
+                        }}
+                      >
+                        Copy draft link
+                      </Button>
+                    ) : null}
                     <Button
                       variant="outline"
                       className="w-full border-[#e3c3b5] bg-[#fff0e9] text-[#8a3d2b] hover:bg-[#f7e2d8] sm:w-auto"
                       disabled={deletingSurveyId === survey.id}
-                      onClick={() => void handleDeleteSurvey(survey.id)}
+                      onClick={() => setSurveyDeleteDialogId(survey.id)}
                     >
                       <Trash2 className="mr-2 size-4" aria-hidden="true" />
                       {deletingSurveyId === survey.id ? "Deleting..." : "Delete survey"}
@@ -336,7 +377,7 @@ export default function AdminDashboardV4Page() {
                 {timeline.length ? (
                   timeline.map((event) => (
                     <li key={event.id} className="rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] p-3">
-                      {event.message}
+                      {humanizeDashboardEventMessage(event, surveyTitleById)}
                     </li>
                   ))
                 ) : (
@@ -364,6 +405,30 @@ export default function AdminDashboardV4Page() {
           </aside>
         </section>
       </div>
+
+      <AlertDialog open={!!surveyDeleteDialogId} onOpenChange={(open) => !open && setSurveyDeleteDialogId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete survey?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Delete this survey and its responses permanently? This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={!!deletingSurveyId}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-[#8a3d2b] text-[#fff6ed] hover:bg-[#6f2f21]"
+              disabled={!surveyDeleteDialogId || !!deletingSurveyId}
+              onClick={() => {
+                if (!surveyDeleteDialogId) return
+                void handleDeleteSurvey(surveyDeleteDialogId)
+              }}
+            >
+              {deletingSurveyId ? "Deleting..." : "Delete permanently"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AdminMobileNav />
     </main>

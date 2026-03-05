@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { getSessionFromRequest } from "@/lib/server/auth-session"
-import { deleteSurveyById, getSurveyById, listSurveys, recordDashboardEvent, upsertSurvey } from "@/lib/server/survey-store"
+import {
+  deleteSurveyById,
+  getLatestSurveyQuestions,
+  getSurveyById,
+  listSurveys,
+  recordDashboardEvent,
+  upsertSurvey,
+} from "@/lib/server/survey-store"
 
 const surveySchema = z.object({
   id: z.string().min(1),
@@ -18,6 +25,19 @@ export async function GET(request: NextRequest) {
   const session = await getSessionFromRequest()
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  const id = request.nextUrl.searchParams.get("id")
+  if (id) {
+    const survey = await getSurveyById(id)
+    if (!survey) {
+      return NextResponse.json({ error: "Survey not found." }, { status: 404 })
+    }
+    if (survey.createdBy !== session.sub) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
+    const questions = await getLatestSurveyQuestions(survey.id)
+    return NextResponse.json({ survey: { ...survey, questions } })
   }
 
   const statusParam = request.nextUrl.searchParams.get("status")

@@ -14,6 +14,7 @@ import { AdminMobileNav } from "@/components/admin-mobile-nav"
 type ResponseItem = {
   id: string
   surveyId: string
+  surveyTitle?: string
   questionId: string
   userId: string
   fileSize: number
@@ -31,15 +32,18 @@ export default function AdminResponsesPage() {
   const surveyId = searchParams.get("surveyId")
   const focus = searchParams.get("focus")
   const [queue, setQueue] = useState<ResponseItem[]>([])
+  const [queueLoading, setQueueLoading] = useState(true)
   const [playingId, setPlayingId] = useState<string | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [savingId, setSavingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
 
   useEffect(() => {
     if (status !== "authenticated") return
 
     const loadQueue = async () => {
+      setQueueLoading(true)
       try {
         const query = surveyId ? `?surveyId=${encodeURIComponent(surveyId)}` : ""
         const response = await fetch(`/api/responses${query}`, {
@@ -56,6 +60,8 @@ export default function AdminResponsesPage() {
         setQueue(sorted)
       } catch (error) {
         setLoadError(error instanceof Error ? error.message : "Failed to load moderation queue.")
+      } finally {
+        setQueueLoading(false)
       }
     }
 
@@ -66,9 +72,14 @@ export default function AdminResponsesPage() {
     return queue.map((item) => ({
       ...item,
       duration: `${Math.max(1, Math.round(item.fileSize / 32000))}s est`,
-      reason: `Question ${item.questionId} | ${new Date(item.timestamp).toLocaleString()}`,
+      reason: `Prompt ${item.questionId.replace(/^q/i, "") || "1"} | ${new Date(item.timestamp).toLocaleString()}`,
     }))
   }, [queue])
+
+  const focusedSurveyTitle = useMemo(() => {
+    if (!surveyId) return null
+    return queue.find((item) => item.surveyId === surveyId)?.surveyTitle || "Selected survey"
+  }, [queue, surveyId])
 
   const updateModeration = async (
     item: ResponseItem,
@@ -95,7 +106,7 @@ export default function AdminResponsesPage() {
   }
 
   const handleExportClip = async (item: (typeof queueView)[number]) => {
-    const clipNote = `${item.surveyId} | ${item.duration} | ${item.reason}`
+    const clipNote = `${item.surveyTitle || "Survey"} | ${item.duration} | ${item.reason}`
     try {
       await navigator.clipboard.writeText(clipNote)
       trackEvent("response_bookmarked", {
@@ -114,9 +125,6 @@ export default function AdminResponsesPage() {
   }
 
   const handleDeleteResponse = async (id: string) => {
-    const confirmed = window.confirm("Delete this response permanently? This cannot be undone.")
-    if (!confirmed) return
-
     setDeletingId(id)
     setLoadError(null)
     try {
@@ -127,6 +135,7 @@ export default function AdminResponsesPage() {
       if (!response.ok) throw new Error("Failed to delete response.")
       setQueue((prev) => prev.filter((item) => item.id !== id))
       if (playingId === id) setPlayingId(null)
+      setPendingDeleteId(null)
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : "Failed to delete response.")
     } finally {
@@ -135,6 +144,10 @@ export default function AdminResponsesPage() {
   }
 
   if (status === "loading") {
+    return <SurveyLoadingSkeleton label="Loading moderation queue..." />
+  }
+
+  if (queueLoading && queue.length === 0) {
     return <SurveyLoadingSkeleton label="Loading moderation queue..." />
   }
 
@@ -151,7 +164,7 @@ export default function AdminResponsesPage() {
             {loadError ? <p className={`font-body mt-1 text-sm text-[#8a3d2b]`}>{loadError}</p> : null}
             {surveyId ? (
               <p className={`font-body mt-1 text-xs text-[#5c5146]`}>
-                Focused from Survey Stack: survey {surveyId} {focus ? `(${focus})` : ""}.
+                Focused from Survey Stack: {focusedSurveyTitle} {focus ? `(${focus})` : ""}.
               </p>
             ) : null}
           </div>
@@ -189,7 +202,7 @@ export default function AdminResponsesPage() {
             queueView.map((item) => (
               <article key={item.id} className="rounded-xl border border-[#dbcdb8] bg-[#fff6ed] p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="font-semibold text-balance">{item.surveyId}</p>
+                  <p className="font-semibold text-balance">{item.surveyTitle || "Untitled survey"}</p>
                   <p className={`font-body text-sm text-[#5c5146]`}>{item.duration}</p>
                 </div>
                 <p className={`font-body mt-2 text-sm text-[#5c5146]`}>{item.reason}</p>
@@ -233,7 +246,7 @@ export default function AdminResponsesPage() {
                     variant="outline"
                     className="border-[#e3c3b5] bg-[#fff0e9] text-[#8a3d2b] hover:bg-[#f7e2d8]"
                     disabled={deletingId === item.id}
-                    onClick={() => handleDeleteResponse(item.id)}
+                    onClick={() => setPendingDeleteId(item.id)}
                   >
                     <Trash2 className="mr-2 size-4" aria-hidden="true" />
                     {deletingId === item.id ? "Deleting..." : "Delete response"}
@@ -256,6 +269,28 @@ export default function AdminResponsesPage() {
           )}
         </div>
       </section>
+      {pendingDeleteId ? (
+        <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/30 p-4 sm:items-center">
+          <div className="w-full max-w-md rounded-2xl border border-[#dbcdb8] bg-[#fff6ed] p-4 shadow-xl">
+            <h2 className="text-lg font-semibold">Delete response?</h2>
+            <p className="font-body mt-2 text-sm text-[#5c5146]">
+              Delete this response permanently? This cannot be undone.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="outline" className="border-[#dbcdb8] bg-[#f9f4ea]" onClick={() => setPendingDeleteId(null)} disabled={!!deletingId}>
+                Cancel
+              </Button>
+              <Button
+                className="bg-[#8a3d2b] text-[#fff6ed] hover:bg-[#6f2f21]"
+                disabled={!!deletingId}
+                onClick={() => void handleDeleteResponse(pendingDeleteId)}
+              >
+                {deletingId ? "Deleting..." : "Delete permanently"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       <AdminMobileNav />
     </main>
   )

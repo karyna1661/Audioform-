@@ -15,9 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Bell, Settings, HelpCircle, LogOut } from "lucide-react"
-import { Bricolage_Grotesque } from "next/font/google"
 
-const display = Bricolage_Grotesque({ subsets: ["latin"], weight: ["400", "600", "700"] })
 
 interface AdminHeaderProps {
   title: string
@@ -42,7 +40,7 @@ export function AdminHeader({ title }: AdminHeaderProps) {
   }
 
   return (
-    <header className={`${display.className} flex h-16 items-center justify-between border-b border-[#dbcdb8] bg-[#f9f4ea] px-6`}>
+    <header className={`flex h-16 items-center justify-between border-b border-[#dbcdb8] bg-[#f9f4ea] px-6`}>
       <h1 className="text-xl font-semibold">{title}</h1>
 
       <div className="flex items-center gap-4">
@@ -110,3 +108,4 @@ export function AdminHeader({ title }: AdminHeaderProps) {
     </header>
   )
 }
+

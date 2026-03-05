@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
       await recordDashboardEvent({
         type: "response_recorded",
         surveyId: stored.surveyId,
-        message: `New response recorded for survey ${stored.surveyId}`,
+        message: `New response recorded for ${publishedSurvey.title}`,
         metadata: {
           questionId: stored.questionId,
           userId: stored.userId,
@@ -215,6 +215,7 @@ export async function GET(request: NextRequest) {
 
   const ownedSurveys = await listSurveys({ createdBy: session.sub })
   const ownedSurveyIds = new Set(ownedSurveys.map((survey) => survey.id))
+  const surveyTitleById = new Map(ownedSurveys.map((survey) => [survey.id, survey.title]))
   if (surveyId && !ownedSurveyIds.has(surveyId)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
@@ -231,6 +232,7 @@ export async function GET(request: NextRequest) {
     responses: responses.map((item) => ({
       id: item.id,
       surveyId: item.surveyId,
+      surveyTitle: surveyTitleById.get(item.surveyId) || "Untitled survey",
       questionId: item.questionId,
       userId: item.userId,
       fileName: item.fileName,
