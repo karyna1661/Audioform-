@@ -290,10 +290,10 @@ export default function QuestionnairesV1Page() {
             </p>
           </div>
           <div className="flex gap-2">
-            <Link href="/admin/questionnaires">
+            <Link href="/admin/dashboard/v4">
               <Button variant="outline" className="border-[#cfbea4] bg-[#efe3cf]">
                 <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
-                Back to surveys
+                Back to dashboard
               </Button>
             </Link>
             <Button

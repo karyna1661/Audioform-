@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises"
+import { mkdir, unlink, writeFile } from "node:fs/promises"
 import path from "node:path"
 import { randomUUID } from "node:crypto"
 import { isB2Configured, uploadToB2 } from "@/lib/server/b2-storage"
@@ -230,4 +230,26 @@ export async function updateStoredResponse(
   )
   if (!rows.length) return null
   return mapRow(rows[0])
+}
+
+export async function deleteStoredResponse(id: string): Promise<StoredResponse | null> {
+  const existing = await getStoredResponseById(id)
+  if (!existing) return null
+
+  await supabaseRequest<unknown>(`/rest/v1/response_records?id=eq.${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: { Prefer: "return=minimal" },
+  })
+
+  // Best-effort local cleanup. B2 object cleanup is intentionally skipped for now
+  // because file IDs are not stored with the record metadata.
+  if (!existing.storagePath.startsWith("b2://")) {
+    try {
+      await unlink(existing.storagePath)
+    } catch {
+      // Non-blocking cleanup.
+    }
+  }
+
+  return existing
 }

@@ -52,6 +52,16 @@ async function b2Authorize(): Promise<B2Auth> {
   return json
 }
 
+function parseB2StoragePath(storagePath: string): { bucketName: string; fileName: string } | null {
+  if (!storagePath.startsWith("b2://")) return null
+  const withoutScheme = storagePath.slice("b2://".length)
+  const slashIndex = withoutScheme.indexOf("/")
+  if (slashIndex <= 0 || slashIndex === withoutScheme.length - 1) return null
+  const bucketName = withoutScheme.slice(0, slashIndex)
+  const fileName = withoutScheme.slice(slashIndex + 1)
+  return { bucketName, fileName }
+}
+
 async function resolveBucket(auth: B2Auth): Promise<{ bucketId: string; bucketName: string }> {
   const config = requireB2Config()
   if (config.bucketId && config.bucketName) {
@@ -144,6 +154,27 @@ export async function uploadToB2(input: {
   const storagePath = `b2://${bucket.bucketName}/${objectKey}`
   const publicUrl = `${auth.downloadUrl}/file/${bucket.bucketName}/${objectKey}`
   return { storagePath, publicUrl }
+}
+
+export async function downloadFromB2StoragePath(storagePath: string): Promise<Buffer | null> {
+  const parsed = parseB2StoragePath(storagePath)
+  if (!parsed) return null
+
+  const auth = await b2Authorize()
+  const downloadUrl = `${auth.downloadUrl}/file/${parsed.bucketName}/${parsed.fileName}`
+  const response = await fetch(downloadUrl, {
+    headers: {
+      Authorization: auth.authorizationToken,
+    },
+    cache: "no-store",
+  })
+  if (!response.ok) {
+    const text = await response.text().catch(() => "")
+    throw new Error(`B2 download failed (${response.status}): ${text.slice(0, 220)}`)
+  }
+
+  const arrayBuffer = await response.arrayBuffer()
+  return Buffer.from(arrayBuffer)
 }
 
 export function isB2Configured(): boolean {

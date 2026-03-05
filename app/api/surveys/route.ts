@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { getSessionFromRequest } from "@/lib/server/auth-session"
-import { listSurveys, recordDashboardEvent, upsertSurvey } from "@/lib/server/survey-store"
+import { deleteSurveyById, getSurveyById, listSurveys, recordDashboardEvent, upsertSurvey } from "@/lib/server/survey-store"
 
 const surveySchema = z.object({
   id: z.string().min(1),
@@ -66,4 +66,27 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     return NextResponse.json({ error: error?.message || "Failed to save survey." }, { status: 500 })
   }
+}
+
+export async function DELETE(request: NextRequest) {
+  const session = await getSessionFromRequest()
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  const id = request.nextUrl.searchParams.get("id")
+  if (!id) {
+    return NextResponse.json({ error: "Missing survey id." }, { status: 400 })
+  }
+
+  const survey = await getSurveyById(id)
+  if (!survey) {
+    return NextResponse.json({ error: "Survey not found." }, { status: 404 })
+  }
+  if (survey.createdBy !== session.sub) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  }
+
+  await deleteSurveyById(id)
+  return NextResponse.json({ success: true })
 }

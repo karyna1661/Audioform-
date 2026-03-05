@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import {
   createStoredResponse,
+  deleteStoredResponse,
   getStoredResponseById,
   listStoredResponses,
   updateStoredResponse,
@@ -236,7 +237,7 @@ export async function GET(request: NextRequest) {
       mimeType: item.mimeType,
       fileSize: item.size,
       publicUrl: item.publicUrl,
-      playbackUrl: item.publicUrl || `/api/responses/${item.id}/audio`,
+      playbackUrl: `/api/responses/${item.id}/audio`,
       flagged: item.flagged,
       highSignal: item.highSignal,
       bookmarked: item.bookmarked,
@@ -300,4 +301,30 @@ export async function PATCH(request: NextRequest) {
     console.error("Error updating response moderation:", error)
     return NextResponse.json({ error: "Failed to update response moderation." }, { status: 500 })
   }
+}
+
+export async function DELETE(request: NextRequest) {
+  const session = await getSessionFromRequest()
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  const searchParams = request.nextUrl.searchParams
+  const id = searchParams.get("id")
+  if (!id) {
+    return NextResponse.json({ error: "Missing response id." }, { status: 400 })
+  }
+
+  const existing = await getStoredResponseById(id)
+  if (!existing) {
+    return NextResponse.json({ error: "Response not found." }, { status: 404 })
+  }
+
+  const owningSurvey = await getSurveyById(existing.surveyId)
+  if (!owningSurvey || owningSurvey.createdBy !== session.sub) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  }
+
+  await deleteStoredResponse(id)
+  return NextResponse.json({ success: true })
 }

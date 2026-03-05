@@ -7,7 +7,7 @@ import { Bricolage_Grotesque, Lora } from "next/font/google"
 import { useAuth } from "@/lib/auth-context"
 import { useRequireAdmin } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, ArrowUpRight, Bell, Calendar, Mic, Target, Layers, ClipboardList } from "lucide-react"
+import { ArrowLeft, ArrowUpRight, Bell, Calendar, Mic, Target, Layers, ClipboardList, Trash2 } from "lucide-react"
 import { trackEvent } from "@/lib/analytics"
 import { SurveyLoadingSkeleton } from "@/components/survey-loading-skeleton"
 
@@ -33,6 +33,7 @@ type ResponseItem = {
 type DashboardEventItem = {
   id: string
   message: string
+  surveyId?: string | null
 }
 
 export default function AdminDashboardV4Page() {
@@ -43,6 +44,7 @@ export default function AdminDashboardV4Page() {
   const [responses, setResponses] = useState<ResponseItem[]>([])
   const [timeline, setTimeline] = useState<DashboardEventItem[]>([])
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [deletingSurveyId, setDeletingSurveyId] = useState<string | null>(null)
 
   useEffect(() => {
     if (status !== "authenticated") return
@@ -50,7 +52,7 @@ export default function AdminDashboardV4Page() {
     const loadData = async () => {
       try {
         const [surveyRes, activityRes] = await Promise.all([
-          fetch("/api/surveys?status=published", { credentials: "include", cache: "no-store" }),
+          fetch("/api/surveys", { credentials: "include", cache: "no-store" }),
           fetch("/api/dashboard/activity", { credentials: "include", cache: "no-store" }),
         ])
 
@@ -61,13 +63,14 @@ export default function AdminDashboardV4Page() {
         const surveyJson = (await surveyRes.json()) as { surveys?: SurveyItem[] }
         const activityJson = (await activityRes.json()) as { events?: DashboardEventItem[] }
 
-        const publishedSurveys = surveyJson.surveys ?? []
-        setSurveys(publishedSurveys)
+        const loadedSurveys = surveyJson.surveys ?? []
+        setSurveys(loadedSurveys)
         setTimeline(activityJson.events ?? [])
 
         trackEvent("response_inbox_opened")
-        if (publishedSurveys[0]?.id) {
-          trackEvent("first_response_viewed", { survey_id: publishedSurveys[0].id })
+        const firstPublished = loadedSurveys.find((survey) => survey.status === "published")
+        if (firstPublished?.id) {
+          trackEvent("first_response_viewed", { survey_id: firstPublished.id })
         }
       } catch (error) {
         setLoadError(error instanceof Error ? error.message : "Failed to load dashboard.")
@@ -133,6 +136,11 @@ export default function AdminDashboardV4Page() {
     return Math.min(...candidates)
   }, [surveys, firstResponseBySurvey])
 
+  const publishedSurveys = useMemo(
+    () => surveys.filter((survey) => survey.status === "published"),
+    [surveys],
+  )
+
   const ttfrLabel = useMemo(() => {
     if (ttfrSeconds == null) return "Pending"
     if (ttfrSeconds < 60) return `${ttfrSeconds}s`
@@ -143,6 +151,30 @@ export default function AdminDashboardV4Page() {
     if (ttfrSeconds == null) return "Awaiting first response"
     return "Based on first response timestamp"
   }, [ttfrSeconds])
+
+  const handleDeleteSurvey = async (surveyId: string) => {
+    const confirmed = window.confirm(
+      "Delete this survey and its responses permanently? This cannot be undone.",
+    )
+    if (!confirmed) return
+
+    setDeletingSurveyId(surveyId)
+    setLoadError(null)
+    try {
+      const response = await fetch(`/api/surveys?id=${encodeURIComponent(surveyId)}`, {
+        method: "DELETE",
+        credentials: "include",
+      })
+      if (!response.ok) throw new Error("Failed to delete survey.")
+      setSurveys((prev) => prev.filter((survey) => survey.id !== surveyId))
+      setResponses((prev) => prev.filter((item) => item.surveyId !== surveyId))
+      setTimeline((prev) => prev.filter((event) => event.surveyId !== surveyId))
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "Failed to delete survey.")
+    } finally {
+      setDeletingSurveyId(null)
+    }
+  }
 
   if (status === "loading") {
     return <SurveyLoadingSkeleton label="Loading signal inbox..." />
@@ -210,12 +242,12 @@ export default function AdminDashboardV4Page() {
                 variant="outline"
                 className="mt-3 border-[#dbcdb8] bg-[#fff6ed]"
                 onClick={() => {
-                  const surveyId = surveys[0]?.id
+                  const surveyId = publishedSurveys[0]?.id
                   if (!surveyId) return
                   trackEvent("response_replayed", { survey_id: surveyId, source: "first_response_spotlight" })
                   router.push(`/admin/responses?surveyId=${encodeURIComponent(surveyId)}&focus=first-response`)
                 }}
-                disabled={!surveys[0]?.id}
+                disabled={!publishedSurveys[0]?.id}
               >
                 Replay first response
               </Button>
@@ -223,9 +255,9 @@ export default function AdminDashboardV4Page() {
             <div className="mt-4 space-y-3">
                 {surveys.length === 0 ? (
                 <article className="rounded-xl border border-[#dbcdb8] bg-[#f9f4ea] p-4">
-                  <p className="text-sm font-semibold text-balance">No live surveys yet</p>
+                  <p className="text-sm font-semibold text-balance">No surveys yet</p>
                   <p className={`${body.className} mt-1 text-sm text-[#5c5146]`}>
-                    Create your first survey to start collecting voice signal from users.
+                    Create your first survey, save draft, then publish when ready.
                   </p>
                   <Link href="/admin/questionnaires" className="mt-3 inline-flex rounded-lg border border-[#dbcdb8] bg-[#fff6ed] px-3 py-2 text-sm hover:bg-[#efe4d3]">
                     Create first survey
@@ -266,6 +298,15 @@ export default function AdminDashboardV4Page() {
                       onClick={() => trackEvent("response_bookmarked", { survey_id: survey.id, bookmark_action: true })}
                     >
                       Save to clip bin
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full border-[#e3c3b5] bg-[#fff0e9] text-[#8a3d2b] hover:bg-[#f7e2d8] sm:w-auto"
+                      disabled={deletingSurveyId === survey.id}
+                      onClick={() => void handleDeleteSurvey(survey.id)}
+                    >
+                      <Trash2 className="mr-2 size-4" aria-hidden="true" />
+                      {deletingSurveyId === survey.id ? "Deleting..." : "Delete survey"}
                     </Button>
                   </div>
                   <p className={`${body.className} mt-2 text-xs text-[#5c5146]`}>

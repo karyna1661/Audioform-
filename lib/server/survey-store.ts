@@ -229,3 +229,21 @@ export async function getLatestPublishedSurveyQuestions(surveyId: string): Promi
   if (!Array.isArray(questions)) return []
   return questions.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
 }
+
+export async function deleteSurveyById(id: string): Promise<void> {
+  // Delete response rows first to avoid FK violations in stricter schemas.
+  await supabaseRequest<unknown>(`/rest/v1/response_records?survey_id=eq.${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: { Prefer: "return=minimal" },
+  })
+
+  await supabaseRequest<unknown>(`/rest/v1/dashboard_events?survey_id=eq.${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: { Prefer: "return=minimal" },
+  })
+
+  await supabaseRequest<unknown>(`/rest/v1/surveys?id=eq.${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: { Prefer: "return=minimal" },
+  })
+}

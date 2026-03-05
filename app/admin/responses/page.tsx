@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
 import { Bricolage_Grotesque, Lora } from "next/font/google"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Flag, Mic, Play } from "lucide-react"
+import { ArrowLeft, Flag, Mic, Play, Trash2 } from "lucide-react"
 import { trackEvent } from "@/lib/analytics"
 import { useRequireAdmin } from "@/lib/auth-context"
 import { SurveyLoadingSkeleton } from "@/components/survey-loading-skeleton"
@@ -36,6 +36,7 @@ export default function AdminResponsesPage() {
   const [playingId, setPlayingId] = useState<string | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [savingId, setSavingId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   useEffect(() => {
     if (status !== "authenticated") return
@@ -111,6 +112,27 @@ export default function AdminResponsesPage() {
         bookmark_action: false,
         source: "moderation_clip_export_failed",
       })
+    }
+  }
+
+  const handleDeleteResponse = async (id: string) => {
+    const confirmed = window.confirm("Delete this response permanently? This cannot be undone.")
+    if (!confirmed) return
+
+    setDeletingId(id)
+    setLoadError(null)
+    try {
+      const response = await fetch(`/api/responses?id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+        credentials: "include",
+      })
+      if (!response.ok) throw new Error("Failed to delete response.")
+      setQueue((prev) => prev.filter((item) => item.id !== id))
+      if (playingId === id) setPlayingId(null)
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "Failed to delete response.")
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -208,6 +230,15 @@ export default function AdminResponsesPage() {
                     onClick={() => handleExportClip(item)}
                   >
                     Export share clip note
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="border-[#e3c3b5] bg-[#fff0e9] text-[#8a3d2b] hover:bg-[#f7e2d8]"
+                    disabled={deletingId === item.id}
+                    onClick={() => handleDeleteResponse(item.id)}
+                  >
+                    <Trash2 className="mr-2 size-4" aria-hidden="true" />
+                    {deletingId === item.id ? "Deleting..." : "Delete response"}
                   </Button>
                 </div>
                 {playingId === item.id && item.playbackUrl ? (

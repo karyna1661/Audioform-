@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises"
 import { getSessionFromRequest } from "@/lib/server/auth-session"
 import { getStoredResponseById } from "@/lib/server/response-store"
 import { getSurveyById } from "@/lib/server/survey-store"
+import { downloadFromB2StoragePath } from "@/lib/server/b2-storage"
 
 export async function GET(
   _request: NextRequest,
@@ -23,12 +24,14 @@ export async function GET(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 
-  if (response.publicUrl) {
-    return NextResponse.redirect(response.publicUrl)
-  }
-
   try {
-    const buffer = await readFile(response.storagePath)
+    const buffer =
+      (response.storagePath.startsWith("b2://")
+        ? await downloadFromB2StoragePath(response.storagePath)
+        : await readFile(response.storagePath)) ?? null
+    if (!buffer) {
+      return NextResponse.json({ error: "Audio file is unavailable." }, { status: 404 })
+    }
     return new NextResponse(buffer, {
       status: 200,
       headers: {
