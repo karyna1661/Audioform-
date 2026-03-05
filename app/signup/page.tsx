@@ -5,15 +5,11 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { AlertCircle, CheckCircle2, Eye, EyeOff, Loader2, Mic, Users } from "lucide-react"
-import { Bricolage_Grotesque, Lora } from "next/font/google"
 import { useAuth } from "@/lib/auth-context"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-
-const display = Bricolage_Grotesque({ subsets: ["latin"], weight: ["400", "600", "700"] })
-const body = Lora({ subsets: ["latin"], weight: ["400", "500", "600"] })
 
 export default function SignupPage() {
   const router = useRouter()
@@ -52,7 +48,7 @@ export default function SignupPage() {
   }
 
   return (
-    <main className={`${display.className} min-h-dvh bg-[#f3ecdf] p-4 sm:p-6`}>
+    <main className="min-h-dvh bg-[#f3ecdf] p-4 sm:p-6">
       <section className="mx-auto grid max-w-6xl overflow-hidden rounded-[2rem] border border-[#dbcdb8] bg-[#f9f4ea] lg:grid-cols-[1.15fr_1fr]">
         <aside className="border-b border-[#dbcdb8] bg-[#fff6ed] p-6 sm:p-8 lg:border-b-0 lg:border-r">
           <Link
@@ -61,11 +57,11 @@ export default function SignupPage() {
           >
             Home
           </Link>
-          <p className={`${body.className} mt-4 text-sm text-[#5c5146] text-pretty`}>AudioForm Access</p>
+          <p className="font-body mt-4 text-sm text-[#5c5146] text-pretty">AudioForm Access</p>
           <h1 className="mt-2 max-w-3xl text-4xl font-semibold leading-tight text-balance sm:text-6xl">
             Start your <span className="whitespace-nowrap">high-signal</span> feedback loop
           </h1>
-          <p className={`${body.className} mt-4 text-base text-[#5c5146] text-pretty`}>
+          <p className="font-body mt-4 text-base text-[#5c5146] text-pretty">
             Create a workspace to ask better prompts, collect 30-second voice takes, and make faster product decisions.
           </p>
 
@@ -79,7 +75,7 @@ export default function SignupPage() {
         <section className="p-6 sm:p-8">
           <div className="max-w-md">
             <h2 className="text-3xl font-semibold text-balance">Create your creator account</h2>
-            <p className={`${body.className} mt-2 text-[#5c5146] text-pretty`}>Create your account and launch your first signal survey.</p>
+            <p className="font-body mt-2 text-[#5c5146] text-pretty">Create your account and launch your first signal survey.</p>
 
             {error && (
               <Alert variant="destructive" className="mt-4" aria-live="assertive" id={errorId}>
@@ -136,7 +132,7 @@ export default function SignupPage() {
                     {showPassword ? <EyeOff className="size-4" aria-hidden="true" /> : <Eye className="size-4" aria-hidden="true" />}
                   </button>
                 </div>
-                <p className={`${body.className} text-xs text-[#5c5146] text-pretty`}>Use at least 8 characters.</p>
+                <p className="font-body text-xs text-[#5c5146] text-pretty">Use at least 8 characters.</p>
               </div>
 
               <Button type="submit" className="w-full bg-[#b85e2d] text-[#fff6ed] hover:bg-[#a05227]" disabled={isLoading}>
@@ -150,7 +146,7 @@ export default function SignupPage() {
               </Button>
             </form>
 
-            <p className={`${body.className} mt-6 text-sm text-[#5c5146] text-pretty`}>
+            <p className="font-body mt-6 text-sm text-[#5c5146] text-pretty">
               Already have an account?{" "}
               <Link href="/login" className="font-semibold text-[#8a431f] hover:underline">
                 Log in

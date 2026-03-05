@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { Bricolage_Grotesque, Lora } from "next/font/google"
 import { Button } from "@/components/ui/button"
+import { AdminMobileNav } from "@/components/admin-mobile-nav"
 import { ArrowLeft, UserCircle2 } from "lucide-react"
 
 const display = Bricolage_Grotesque({ subsets: ["latin"], weight: ["400", "600", "700"] })
@@ -8,7 +9,7 @@ const body = Lora({ subsets: ["latin"], weight: ["400", "500", "600"] })
 
 export default function AdminProfilePage() {
   return (
-    <main className={`${display.className} min-h-dvh bg-[#f3ecdf] p-4 sm:p-6`}>
+    <main className={`${display.className} min-h-dvh bg-[#f3ecdf] p-4 pb-28 sm:p-6 sm:pb-6`}>
       <section className="mx-auto max-w-3xl rounded-[2rem] border border-[#dbcdb8] bg-[#f9f4ea] p-6">
         <p className={`${body.className} text-sm text-[#5c5146]`}>Admin</p>
         <h1 className="mt-1 text-3xl font-semibold text-balance">Profile</h1>
@@ -25,6 +26,7 @@ export default function AdminProfilePage() {
           </Button>
         </Link>
       </section>
+      <AdminMobileNav />
     </main>
   )
 }

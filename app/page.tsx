@@ -2,15 +2,11 @@
 
 import Link from "next/link"
 import { useEffect, useState } from "react"
-import { Bricolage_Grotesque, Lora } from "next/font/google"
 import { Mic, Sparkles, AudioWaveform, ChevronRight } from "lucide-react"
 import { motion, useReducedMotion } from "motion/react"
 import { trackEvent } from "@/lib/analytics"
 import { useAuth } from "@/lib/auth-context"
 import { getActiveSurveyId } from "@/lib/behavior-metrics"
-
-const display = Bricolage_Grotesque({ subsets: ["latin"], weight: ["400", "600", "700"] })
-const body = Lora({ subsets: ["latin"], weight: ["400", "500", "600"] })
 
 export default function Home() {
   const { status } = useAuth()
@@ -71,7 +67,7 @@ export default function Home() {
 
   if (!isHydrated) {
     return (
-      <main className={`${display.className} min-h-dvh bg-[#f3ecdf] text-[#1f1b17]`}>
+      <main className="min-h-dvh bg-[#f3ecdf] text-[#1f1b17]">
         <div className="mx-auto max-w-6xl animate-pulse px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-8">
           <header className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#dbcdb8] bg-[#f7efe2] px-4 py-3 sm:rounded-full sm:px-5">
             <div className="h-6 w-36 rounded bg-[#e9decd]" />
@@ -110,7 +106,7 @@ export default function Home() {
   }
 
   return (
-    <main className={`${display.className} min-h-dvh bg-[#f3ecdf] text-[#1f1b17]`}>
+    <main className="min-h-dvh bg-[#f3ecdf] text-[#1f1b17]">
       <div className="mx-auto max-w-6xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-8">
         <header className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#dbcdb8] bg-[#f7efe2] px-4 py-3 sm:rounded-full sm:px-5">
           <p className="text-sm font-medium uppercase text-balance">AudioForm</p>
@@ -133,10 +129,10 @@ export default function Home() {
         </header>
 
         <section className="mt-8 rounded-[1.75rem] border border-[#dbcdb8] bg-[#f9f4ea] p-5 sm:mt-10 sm:rounded-[2.5rem] sm:p-12">
-          <p className={`${body.className} text-sm uppercase text-[#5c5146] text-balance`}>Decision-ready voice signal for builders</p>
+          <p className="font-body text-sm uppercase text-[#5c5146] text-balance">Decision-ready voice signal for builders</p>
           <motion.div className="mt-4 max-w-3xl overflow-hidden sm:mt-5">
             <motion.h1
-              className={`${display.className} text-3xl font-bold leading-tight text-balance sm:text-6xl`}
+              className="font-display text-3xl font-bold leading-tight text-balance sm:text-6xl"
               initial={prefersReducedMotion ? undefined : { opacity: 0, y: 26, scale: 0.985 }}
               animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0, scale: 1 }}
               transition={{ duration: 0.5, ease: "easeOut" }}
@@ -144,7 +140,7 @@ export default function Home() {
               Ask one focused question. Hear conviction. Decide your next move.
             </motion.h1>
           </motion.div>
-          <div className={`${body.className} mt-5 max-w-2xl text-pretty text-base leading-relaxed text-[#5c5146] sm:text-lg`}>
+          <div className="font-body mt-5 max-w-2xl text-pretty text-base leading-relaxed text-[#5c5146] sm:text-lg">
             <motion.p
               initial={prefersReducedMotion ? undefined : { opacity: 0, y: 16 }}
               animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
@@ -170,7 +166,7 @@ export default function Home() {
             ].map((line) => (
               <div
                 key={line}
-                className={`${body.className} flex min-h-20 items-center justify-center rounded-xl border border-[#dbcdb8] bg-[#fff6ed] px-3 py-3 text-center text-sm font-medium leading-snug text-[#5c5146]`}
+                className="font-body flex min-h-20 items-center justify-center rounded-xl border border-[#dbcdb8] bg-[#fff6ed] px-3 py-3 text-center text-sm font-medium leading-snug text-[#5c5146]"
               >
                 {line}
               </div>

@@ -3,16 +3,14 @@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
-import { Bricolage_Grotesque, Lora } from "next/font/google"
 import { useAuth } from "@/lib/auth-context"
 import { useRequireAdmin } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, ArrowUpRight, Bell, Calendar, Mic, Target, Layers, ClipboardList, Trash2 } from "lucide-react"
+import { ArrowLeft, ArrowUpRight, Bell, Calendar, Mic, Target, Trash2 } from "lucide-react"
 import { trackEvent } from "@/lib/analytics"
 import { SurveyLoadingSkeleton } from "@/components/survey-loading-skeleton"
+import { AdminMobileNav } from "@/components/admin-mobile-nav"
 
-const display = Bricolage_Grotesque({ subsets: ["latin"], weight: ["400", "600", "700"] })
-const body = Lora({ subsets: ["latin"], weight: ["400", "500", "600"] })
 
 type SurveyItem = {
   id: string
@@ -181,14 +179,14 @@ export default function AdminDashboardV4Page() {
   }
 
   return (
-    <main className={`${display.className} min-h-dvh bg-[#f3ecdf] p-4 sm:p-6`}>
+    <main className={`min-h-dvh bg-[#f3ecdf] p-4 pb-28 sm:p-6 sm:pb-6`}>
       <div className="mx-auto max-w-7xl rounded-[1.5rem] border border-[#dbcdb8] bg-[#f9f4ea] p-4 sm:rounded-[2rem] sm:p-6">
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#dbcdb8] pb-4">
           <div>
-            <p className={`${body.className} text-sm text-[#5c5146] text-pretty`}>Builder workspace</p>
+            <p className={`font-body text-sm text-[#5c5146] text-pretty`}>Builder workspace</p>
             <h1 className="text-3xl font-semibold text-balance">Signal Inbox</h1>
-            <p className={`${body.className} mt-1 text-sm text-[#5c5146] text-pretty`}>Hi {user?.name}, hear clear signal and decide your next product move faster.</p>
-            {loadError ? <p className={`${body.className} mt-1 text-sm text-[#8a3d2b]`}>{loadError}</p> : null}
+            <p className={`font-body mt-1 text-sm text-[#5c5146] text-pretty`}>Hi {user?.name}, hear clear signal and decide your next product move faster.</p>
+            {loadError ? <p className={`font-body mt-1 text-sm text-[#8a3d2b]`}>{loadError}</p> : null}
           </div>
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
             <Link href="/admin/notifications" aria-label="Open notifications" className="inline-flex sm:hidden">
@@ -228,12 +226,12 @@ export default function AdminDashboardV4Page() {
 
           <section className="rounded-2xl border border-[#dbcdb8] bg-[#fff6ed] p-5">
             <h2 className="text-2xl font-semibold text-balance">Survey Stack</h2>
-            <p className={`${body.className} mt-1 text-sm text-[#5c5146] text-pretty`}>
+            <p className={`font-body mt-1 text-sm text-[#5c5146] text-pretty`}>
               One row per survey. Open a survey to review responses and decide your next change.
             </p>
             <article className="mt-4 rounded-xl border border-[#dbcdb8] bg-[#f3ecdf] p-4">
               <p className="text-sm font-semibold text-balance">First Response Spotlight</p>
-              <p className={`${body.className} mt-1 text-sm text-[#5c5146] text-pretty`}>
+              <p className={`font-body mt-1 text-sm text-[#5c5146] text-pretty`}>
                 {ttfrSeconds == null
                   ? "No first response yet. Share your survey link to get first signal."
                   : `First response arrived in ${ttfrLabel}.`}
@@ -256,12 +254,22 @@ export default function AdminDashboardV4Page() {
                 {surveys.length === 0 ? (
                 <article className="rounded-xl border border-[#dbcdb8] bg-[#f9f4ea] p-4">
                   <p className="text-sm font-semibold text-balance">No surveys yet</p>
-                  <p className={`${body.className} mt-1 text-sm text-[#5c5146]`}>
-                    Create your first survey, save draft, then publish when ready.
+                  <p className={`font-body mt-1 text-sm text-[#5c5146]`}>
+                    Start in under 60 seconds: define one decision, pick an intent mode, publish three prompts.
                   </p>
-                  <Link href="/admin/questionnaires" className="mt-3 inline-flex rounded-lg border border-[#dbcdb8] bg-[#fff6ed] px-3 py-2 text-sm hover:bg-[#efe4d3]">
-                    Create first survey
-                  </Link>
+                  <ol className={`font-body mt-3 space-y-1 text-sm text-[#5c5146]`}>
+                    <li>1. Define one decision you need to make this week.</li>
+                    <li>2. Pick a truth lens: validation, critique, confusion, or emotion.</li>
+                    <li>3. Publish and collect your first 5 voice responses.</li>
+                  </ol>
+                  <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                    <Link href="/admin/questionnaires" className="inline-flex items-center justify-center rounded-lg bg-[#b85e2d] px-3 py-2 text-sm text-[#fff6ed] hover:bg-[#a05227]">
+                      Create first survey
+                    </Link>
+                    <Link href="/questionnaire/v1" className="inline-flex items-center justify-center rounded-lg border border-[#dbcdb8] bg-[#fff6ed] px-3 py-2 text-sm hover:bg-[#efe4d3]">
+                      Preview respondent flow
+                    </Link>
+                  </div>
                 </article>
               ) : (
                 surveys.map((survey) => (
@@ -270,7 +278,7 @@ export default function AdminDashboardV4Page() {
                     <h3 className="text-lg font-semibold text-balance">{survey.title}</h3>
                     <span className="rounded-full bg-[#e6f0df] px-2 py-1 text-xs text-[#2d5a17]">{survey.status}</span>
                   </div>
-                  <div className={`${body.className} mt-3 grid gap-2 sm:grid-cols-3 text-sm text-[#5c5146]`}>
+                  <div className={`font-body mt-3 grid gap-2 sm:grid-cols-3 text-sm text-[#5c5146]`}>
                     <p className="inline-flex items-center gap-2">
                       <Target className="size-4" aria-hidden="true" />
                       {survey.questionCount} prompts
@@ -309,7 +317,7 @@ export default function AdminDashboardV4Page() {
                       {deletingSurveyId === survey.id ? "Deleting..." : "Delete survey"}
                     </Button>
                   </div>
-                  <p className={`${body.className} mt-2 text-xs text-[#5c5146]`}>
+                  <p className={`font-body mt-2 text-xs text-[#5c5146]`}>
                     Clip export/share lives in Moderation Queue after opening the top signal.
                   </p>
                 </article>
@@ -321,10 +329,10 @@ export default function AdminDashboardV4Page() {
           <aside className="space-y-4">
             <article className="rounded-2xl border border-[#dbcdb8] bg-[#f3ecdf] p-4">
               <h2 className="text-lg font-semibold text-balance">Today</h2>
-              <p className={`${body.className} mt-1 text-xs text-[#5c5146]`}>
+              <p className={`font-body mt-1 text-xs text-[#5c5146]`}>
                 Real-time activity feed from survey, response, and reminder events.
               </p>
-              <ul className={`${body.className} mt-3 space-y-2 text-sm text-[#5c5146]`}>
+              <ul className={`font-body mt-3 space-y-2 text-sm text-[#5c5146]`}>
                 {timeline.length ? (
                   timeline.map((event) => (
                     <li key={event.id} className="rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] p-3">
@@ -357,26 +365,7 @@ export default function AdminDashboardV4Page() {
         </section>
       </div>
 
-      <nav className="fixed inset-x-4 bottom-4 z-30 rounded-2xl border border-[#dbcdb8] bg-[#f9f4ea]/95 p-2 shadow-[0_12px_30px_rgba(78,53,20,0.15)] backdrop-blur sm:hidden">
-        <div className="grid grid-cols-4 gap-2">
-          <Link href="/admin/questionnaires/v1" className="flex flex-col items-center justify-center rounded-xl bg-[#fff6ed] py-2 text-[11px] text-[#5c5146]">
-            <Mic className="mb-1 size-4" aria-hidden="true" />
-            Create
-          </Link>
-          <Link href="/admin/responses" className="flex flex-col items-center justify-center rounded-xl bg-[#fff6ed] py-2 text-[11px] text-[#5c5146]">
-            <ClipboardList className="mb-1 size-4" aria-hidden="true" />
-            Queue
-          </Link>
-          <Link href="/admin/notifications" className="flex flex-col items-center justify-center rounded-xl bg-[#fff6ed] py-2 text-[11px] text-[#5c5146]">
-            <Bell className="mb-1 size-4" aria-hidden="true" />
-            Notify
-          </Link>
-          <Link href="/questionnaire/v1" className="flex flex-col items-center justify-center rounded-xl bg-[#fff6ed] py-2 text-[11px] text-[#5c5146]">
-            <Layers className="mb-1 size-4" aria-hidden="true" />
-            Preview
-          </Link>
-        </div>
-      </nav>
+      <AdminMobileNav />
     </main>
   )
 }
@@ -390,3 +379,4 @@ function Metric({ label, value, helper }: { label: string; value: string; helper
     </div>
   )
 }
+

@@ -5,15 +5,11 @@ import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useEffect, useState } from "react"
 import { AlertCircle, Eye, EyeOff, Headphones, Loader2, ShieldCheck, Sparkles } from "lucide-react"
-import { Bricolage_Grotesque, Lora } from "next/font/google"
 import { useAuth } from "@/lib/auth-context"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-
-const display = Bricolage_Grotesque({ subsets: ["latin"], weight: ["400", "600", "700"] })
-const body = Lora({ subsets: ["latin"], weight: ["400", "500", "600"] })
 
 export default function LoginPage() {
   const router = useRouter()
@@ -62,7 +58,7 @@ export default function LoginPage() {
   }
 
   return (
-    <main className={`${display.className} min-h-dvh bg-[#f3ecdf] p-4 sm:p-6`}>
+    <main className="min-h-dvh bg-[#f3ecdf] p-4 sm:p-6">
       <section className="mx-auto grid max-w-6xl overflow-hidden rounded-[2rem] border border-[#dbcdb8] bg-[#f9f4ea] lg:grid-cols-[1.15fr_1fr]">
         <aside className="border-b border-[#dbcdb8] bg-[#fff6ed] p-6 sm:p-8 lg:border-b-0 lg:border-r">
           <Link
@@ -71,9 +67,9 @@ export default function LoginPage() {
           >
             Home
           </Link>
-          <p className={`${body.className} mt-4 text-sm text-[#5c5146] text-pretty`}>AudioForm Access</p>
+          <p className="font-body mt-4 text-sm text-[#5c5146] text-pretty">AudioForm Access</p>
           <h1 className="mt-2 text-4xl font-semibold text-balance">Sign in to your signal inbox</h1>
-          <p className={`${body.className} mt-4 text-base text-[#5c5146] text-pretty`}>
+          <p className="font-body mt-4 text-base text-[#5c5146] text-pretty">
             Continue your build-in-public loop: review voice feedback, find conviction, and decide what to ship next.
           </p>
 
@@ -85,7 +81,7 @@ export default function LoginPage() {
 
           <div className="mt-8 rounded-xl border border-[#dbcdb8] bg-[#f9f4ea] p-4">
             <p className="text-sm font-semibold">Need access?</p>
-            <p className={`${body.className} mt-1 text-sm text-[#5c5146] text-pretty`}>
+            <p className="font-body mt-1 text-sm text-[#5c5146] text-pretty">
               Create an account to start running voice surveys and reviewing high-signal responses.
             </p>
           </div>
@@ -94,7 +90,7 @@ export default function LoginPage() {
         <section className="p-6 sm:p-8">
           <div className="max-w-md">
             <h2 className="text-3xl font-semibold text-balance">Welcome back</h2>
-            <p className={`${body.className} mt-2 text-[#5c5146] text-pretty`}>Enter your details to reopen your signal loop.</p>
+            <p className="font-body mt-2 text-[#5c5146] text-pretty">Enter your details to reopen your signal loop.</p>
 
             {error && (
               <Alert variant="destructive" className="mt-4" aria-live="assertive" id={errorId}>
@@ -121,7 +117,7 @@ export default function LoginPage() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="password">Password</Label>
-                  <Link href="/forgot-password" className={`${body.className} text-sm text-[#8a431f] hover:underline`}>
+                  <Link href="/forgot-password" className="font-body text-sm text-[#8a431f] hover:underline">
                     Forgot password?
                   </Link>
                 </div>
@@ -158,7 +154,7 @@ export default function LoginPage() {
               </Button>
             </form>
 
-            <p className={`${body.className} mt-6 text-sm text-[#5c5146]`}>
+            <p className="font-body mt-6 text-sm text-[#5c5146]">
               Don&apos;t have an account?{" "}
               <Link href="/signup" className="font-semibold text-[#8a431f] hover:underline">
                 Create one

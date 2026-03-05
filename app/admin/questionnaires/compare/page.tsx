@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { Bricolage_Grotesque, Lora } from "next/font/google"
 import { useRequireAdmin } from "@/lib/auth-context"
+import { AdminMobileNav } from "@/components/admin-mobile-nav"
 
 const display = Bricolage_Grotesque({ subsets: ["latin"], weight: ["400", "600", "700"] })
 const body = Lora({ subsets: ["latin"], weight: ["400", "500", "600"] })
@@ -13,7 +14,7 @@ export default function QuestionnairesComparePage() {
   if (status === "loading") return <main className="min-h-dvh bg-[#f3ecdf] p-6">Loading...</main>
 
   return (
-    <main className={`${display.className} min-h-dvh bg-[#f3ecdf] p-4 sm:p-6`}>
+    <main className={`${display.className} min-h-dvh bg-[#f3ecdf] p-4 pb-28 sm:p-6 sm:pb-6`}>
       <section className="mx-auto max-w-5xl rounded-[2rem] border border-[#dbcdb8] bg-[#f9f4ea] p-6">
         <p className={`${body.className} text-sm text-[#5c5146]`}>Survey Creation Tool</p>
         <h1 className="mt-1 text-4xl font-semibold text-balance">Selection Complete</h1>
@@ -25,6 +26,7 @@ export default function QuestionnairesComparePage() {
           <OptionCard href="/admin/questionnaires/v1" title="Version 1" description="Question rail + canvas + respondent preview panel." />
         </div>
       </section>
+      <AdminMobileNav />
     </main>
   )
 }
@@ -38,4 +40,3 @@ function OptionCard({ href, title, description }: { href: string; title: string;
     </Link>
   )
 }
-

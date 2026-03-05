@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Bricolage_Grotesque, Lora } from "next/font/google"
 import { AlertCircle, CheckCircle2 } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AudioRecorder } from "@/components/audio-recorder"
@@ -14,8 +13,6 @@ import { getActiveSurveyId, recordFirstResponseForActiveSurvey } from "@/lib/beh
 import { useAuth } from "@/lib/auth-context"
 import { SurveyLoadingSkeleton } from "@/components/survey-loading-skeleton"
 
-const display = Bricolage_Grotesque({ subsets: ["latin"], weight: ["400", "600", "700"] })
-const body = Lora({ subsets: ["latin"], weight: ["400", "500", "600"] })
 
 type PublicSurvey = {
   id: string
@@ -186,11 +183,14 @@ export default function QuestionnaireV1Page() {
   useEffect(() => {
     if (!complete) return
     const timeout = window.setTimeout(() => {
-      router.push("/questionnaire/thank-you")
+      const target = resolvedSurveyId
+        ? `/questionnaire/thank-you?surveyId=${encodeURIComponent(resolvedSurveyId)}`
+        : "/questionnaire/thank-you"
+      router.push(target)
     }, 150)
 
     return () => window.clearTimeout(timeout)
-  }, [complete, router])
+  }, [complete, resolvedSurveyId, router])
 
   const retryFailedUploads = async () => {
     const queued = [...failedQueue]
@@ -203,10 +203,10 @@ export default function QuestionnaireV1Page() {
 
   if (surveyError || questionList.length === 0) {
     return (
-      <main className={`${display.className} min-h-dvh bg-[#f3ecdf] p-4 sm:p-6`}>
+      <main className={`min-h-dvh bg-[#f3ecdf] p-4 sm:p-6`}>
         <section className="mx-auto max-w-3xl rounded-[1.5rem] border border-[#dbcdb8] bg-[#f9f4ea] p-4 sm:rounded-[2rem] sm:p-6">
           <h1 className="text-2xl font-semibold text-balance">Survey unavailable</h1>
-          <p className={`${body.className} mt-2 text-sm text-[#5c5146] text-pretty`}>
+          <p className={`font-body mt-2 text-sm text-[#5c5146] text-pretty`}>
             {surveyError || "This survey cannot be loaded."}
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
@@ -226,12 +226,12 @@ export default function QuestionnaireV1Page() {
 
   if (permissionGranted === false) {
     return (
-      <main className={`${display.className} min-h-dvh bg-[#f3ecdf] p-4 sm:p-6`}>
+      <main className={`min-h-dvh bg-[#f3ecdf] p-4 sm:p-6`}>
         <div className="mx-auto max-w-md">
           <Alert variant="destructive" aria-live="assertive">
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Microphone Access Required</AlertTitle>
-            <AlertDescription className={`${body.className} text-pretty`}>
+            <AlertDescription className={`font-body text-pretty`}>
               We could not access your microphone. Enable mic permission in browser settings, then reload this page to continue.
             </AlertDescription>
           </Alert>
@@ -244,23 +244,23 @@ export default function QuestionnaireV1Page() {
   }
 
   return (
-    <main className={`${display.className} min-h-dvh bg-[#f3ecdf] p-4 sm:p-6`}>
+    <main className={`min-h-dvh bg-[#f3ecdf] p-4 sm:p-6`}>
       <section className="mx-auto max-w-3xl rounded-[1.5rem] border border-[#dbcdb8] bg-[#f9f4ea] p-4 sm:rounded-[2rem] sm:p-6">
         {authStatus === "authenticated" && user?.role === "admin" ? (
           <div className="mb-4">
-            <Link href="/admin/dashboard/v4" className={`${body.className} text-sm text-[#8a431f] underline`}>
+            <Link href="/admin/dashboard/v4" className={`font-body text-sm text-[#8a431f] underline`}>
               Back to dashboard
             </Link>
           </div>
         ) : null}
-          <p className={`${body.className} text-sm text-[#5c5146] text-pretty`}>
+          <p className={`font-body text-sm text-[#5c5146] text-pretty`}>
             We are deciding what to build next. Your 30-second voice take directly shapes our roadmap.
           </p>
         <div className="mt-3 flex items-center justify-between">
-          <p className={`${body.className} text-sm text-[#5c5146]`}>
+          <p className={`font-body text-sm text-[#5c5146]`}>
             Question {Math.min(index + 1, questionList.length)} of {questionList.length}
           </p>
-          <p className={`${body.className} text-sm tabular-nums text-[#5c5146]`}>{Math.round((Object.keys(answers).length / questionList.length) * 100)}%</p>
+          <p className={`font-body text-sm tabular-nums text-[#5c5146]`}>{Math.round((Object.keys(answers).length / questionList.length) * 100)}%</p>
         </div>
 
         <div className="mt-2 h-2 rounded-full bg-[#e8dcc9]">
@@ -271,14 +271,14 @@ export default function QuestionnaireV1Page() {
           <div className="mt-10 text-center">
             <CheckCircle2 className="mx-auto size-16 text-[#2d5a17]" aria-hidden="true" />
             <h1 className="mt-4 text-3xl font-semibold text-balance">You just helped shape our roadmap.</h1>
-            <p className={`${body.className} mt-2 text-[#5c5146] text-pretty`}>
+            <p className={`font-body mt-2 text-[#5c5146] text-pretty`}>
               Want to collect voice feedback like this on your own site? Redirecting now.
             </p>
           </div>
         ) : (
           <div className="mt-8">
             <h1 className="text-2xl font-semibold text-balance sm:text-3xl">{current.text}</h1>
-            <p className={`${body.className} mt-2 text-sm text-[#5c5146] text-pretty`}>
+            <p className={`font-body mt-2 text-sm text-[#5c5146] text-pretty`}>
               Give your honest take as if the builder will hear this directly. 20-45 seconds is ideal.
             </p>
             <div className="mt-6 rounded-2xl border border-[#dbcdb8] bg-[#fff6ed] p-4">
@@ -305,7 +305,7 @@ export default function QuestionnaireV1Page() {
               />
             </div>
             {uploadError ? (
-              <div className={`${body.className} mt-3 rounded-lg border border-[#e0b8ad] bg-[#f9e6e0] px-3 py-2 text-sm text-[#8a3d2b]`}>
+              <div className={`font-body mt-3 rounded-lg border border-[#e0b8ad] bg-[#f9e6e0] px-3 py-2 text-sm text-[#8a3d2b]`}>
                 <p>{uploadError}</p>
                 {failedQueue.length > 0 ? (
                   <Button
@@ -319,12 +319,12 @@ export default function QuestionnaireV1Page() {
               </div>
             ) : null}
             {lastDurationSeconds !== null && lastDurationSeconds < 10 ? (
-              <p className={`${body.className} mt-3 rounded-lg border border-[#dbcdb8] bg-[#f3ecdf] px-3 py-2 text-sm text-[#5c5146]`}>
+              <p className={`font-body mt-3 rounded-lg border border-[#dbcdb8] bg-[#f3ecdf] px-3 py-2 text-sm text-[#5c5146]`}>
                 Add one concrete example before submitting. High-signal answers are usually 20+ seconds.
               </p>
             ) : null}
             {pendingUploads > 0 ? (
-              <p className={`${body.className} mt-3 rounded-lg border border-[#dbcdb8] bg-[#f3ecdf] px-3 py-2 text-sm text-[#5c5146]`}>
+              <p className={`font-body mt-3 rounded-lg border border-[#dbcdb8] bg-[#f3ecdf] px-3 py-2 text-sm text-[#5c5146]`}>
                 Syncing {pendingUploads} response{pendingUploads === 1 ? "" : "s"} in the background...
               </p>
             ) : null}
@@ -332,7 +332,7 @@ export default function QuestionnaireV1Page() {
               <Button variant="outline" className="w-full border-[#dbcdb8] bg-[#f3ecdf] sm:w-auto" onClick={() => setIndex((prev) => Math.max(0, prev - 1))} disabled={index === 0}>
                 Previous
               </Button>
-              <p className={`${body.className} text-center text-sm text-[#5c5146] sm:text-left`}>{Object.keys(answers).length} answered</p>
+              <p className={`font-body text-center text-sm text-[#5c5146] sm:text-left`}>{Object.keys(answers).length} answered</p>
             </div>
           </div>
         )}
@@ -340,5 +340,6 @@ export default function QuestionnaireV1Page() {
     </main>
   )
 }
+
 
 

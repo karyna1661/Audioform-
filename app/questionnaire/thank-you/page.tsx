@@ -3,15 +3,17 @@
 import Link from "next/link"
 import { useEffect } from "react"
 import type { ReactNode } from "react"
-import { Bricolage_Grotesque, Lora } from "next/font/google"
+import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { CheckCircle2, Home, Mic, MessagesSquare } from "lucide-react"
 import { trackEvent } from "@/lib/analytics"
 
-const display = Bricolage_Grotesque({ subsets: ["latin"], weight: ["400", "600", "700"] })
-const body = Lora({ subsets: ["latin"], weight: ["400", "500", "600"] })
 
 export default function ThankYouPage() {
+  const searchParams = useSearchParams()
+  const surveyId = searchParams.get("surveyId")
+  const backToSurveyHref = surveyId ? `/questionnaire?surveyId=${encodeURIComponent(surveyId)}` : "/questionnaire"
+
   useEffect(() => {
     trackEvent("respondent_thank_you_viewed")
   }, [])
@@ -24,13 +26,13 @@ export default function ThankYouPage() {
   }
 
   return (
-    <main className={`${display.className} min-h-dvh bg-[#f3ecdf] p-4 sm:p-6`}>
+    <main className={`min-h-dvh bg-[#f3ecdf] p-4 sm:p-6`}>
       <section className="mx-auto max-w-4xl rounded-[1.5rem] border border-[#dbcdb8] bg-[#f9f4ea] p-5 sm:rounded-[2rem] sm:p-8">
         <div className="text-center">
           <CheckCircle2 className="mx-auto size-16 text-[#2d5a17]" aria-hidden="true" />
-          <p className={`${body.className} mt-3 text-sm text-[#5c5146] text-pretty`}>Response Session Complete</p>
+          <p className={`font-body mt-3 text-sm text-[#5c5146] text-pretty`}>Response Session Complete</p>
           <h1 className="mt-1 text-3xl font-semibold text-balance sm:text-4xl">You just helped shape our roadmap.</h1>
-          <p className={`${body.className} mx-auto mt-3 max-w-2xl text-[#5c5146] text-pretty`}>
+          <p className={`font-body mx-auto mt-3 max-w-2xl text-[#5c5146] text-pretty`}>
             Want to collect voice feedback like this on your own site?
           </p>
         </div>
@@ -62,14 +64,14 @@ export default function ThankYouPage() {
           <Link href="/signup" onClick={() => handleFollowUpAction("create_survey")}>
             <Button className="w-full bg-[#b85e2d] text-[#fff6ed] hover:bg-[#a05227] sm:w-auto">Create Your Own Survey</Button>
           </Link>
-          <Link href="/questionnaire" onClick={() => handleFollowUpAction("answer_another")}>
+          <Link href={backToSurveyHref} onClick={() => handleFollowUpAction("answer_another")}>
             <Button variant="outline" className="w-full border-[#dbcdb8] bg-[#f3ecdf] sm:w-auto">
-              Answer Another Survey
+              Back to Survey
             </Button>
           </Link>
         </div>
 
-        <p className={`${body.className} mt-6 text-center text-sm text-[#5c5146] text-pretty`}>
+        <p className={`font-body mt-6 text-center text-sm text-[#5c5146] text-pretty`}>
           Questions? Contact <span className="font-semibold">support@audioform.example.com</span>
         </p>
       </section>
@@ -88,3 +90,4 @@ function InfoCard({ icon, title, text }: { icon: ReactNode; title: string; text:
     </article>
   )
 }
+

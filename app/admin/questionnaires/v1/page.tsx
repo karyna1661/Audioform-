@@ -1,16 +1,14 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
-import { Bricolage_Grotesque, Lora } from "next/font/google"
 import { useRequireAdmin } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, CheckCircle2, Copy, Plus, Rocket, Sparkles, Target, Trash2 } from "lucide-react"
+import { ArrowLeft, CheckCircle2, Copy, GripVertical, Plus, Rocket, Sparkles, Target, Trash2, Undo2 } from "lucide-react"
 import { trackEvent } from "@/lib/analytics"
 import { recordSurveyPublished } from "@/lib/behavior-metrics"
+import { AdminMobileNav } from "@/components/admin-mobile-nav"
 
-const display = Bricolage_Grotesque({ subsets: ["latin"], weight: ["400", "600", "700"] })
-const body = Lora({ subsets: ["latin"], weight: ["400", "500", "600"] })
 
 const initialQuestions = [
   "What part of this product helped you most this week?",
@@ -128,10 +126,27 @@ function createSurveyId(title: string, creatorId: string): string {
   return `${creatorPrefix}-${titlePrefix}-${timestamp}-${entropy}`
 }
 
+function reorderQuestionList(questions: string[], fromIndex: number, toIndex: number): string[] {
+  const next = [...questions]
+  const [moved] = next.splice(fromIndex, 1)
+  next.splice(toIndex, 0, moved)
+  return next
+}
+
+function remapSelectedIndexForReorder(currentSelected: number, fromIndex: number, toIndex: number): number {
+  if (currentSelected === fromIndex) return toIndex
+  if (fromIndex < currentSelected && currentSelected <= toIndex) return currentSelected - 1
+  if (toIndex <= currentSelected && currentSelected < fromIndex) return currentSelected + 1
+  return currentSelected
+}
+
 export default function QuestionnairesV1Page() {
   const { status, user } = useRequireAdmin()
   const [questions, setQuestions] = useState(initialQuestions)
   const [selectedIndex, setSelectedIndex] = useState(0)
+  const [questionHistory, setQuestionHistory] = useState<Array<{ questions: string[]; selectedIndex: number }>>([])
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
   const [title, setTitle] = useState("Activation Decision Pulse")
   const [decisionTarget, setDecisionTarget] = useState("Onboarding flow")
   const [changeType, setChangeType] = useState("Simplify")
@@ -143,6 +158,51 @@ export default function QuestionnairesV1Page() {
   const [isSavingDraft, setIsSavingDraft] = useState(false)
   const [isPublishing, setIsPublishing] = useState(false)
   const [publishedSurveyId, setPublishedSurveyId] = useState<string | null>(null)
+
+  const commitQuestionChange = useCallback(
+    (nextQuestions: string[], nextSelectedIndex: number) => {
+      const safeSelected = Math.min(Math.max(nextSelectedIndex, 0), Math.max(nextQuestions.length - 1, 0))
+      if (
+        nextQuestions.length === questions.length &&
+        nextQuestions.every((question, index) => question === questions[index]) &&
+        safeSelected === selectedIndex
+      ) {
+        return
+      }
+      setQuestionHistory((prev) => [...prev.slice(-79), { questions: [...questions], selectedIndex }])
+      setQuestions(nextQuestions)
+      setSelectedIndex(safeSelected)
+    },
+    [questions, selectedIndex],
+  )
+
+  const undoQuestionChange = useCallback(() => {
+    let restored = false
+    setQuestionHistory((prev) => {
+      const snapshot = prev[prev.length - 1]
+      if (!snapshot) return prev
+      restored = true
+      setQuestions(snapshot.questions)
+      setSelectedIndex(Math.min(snapshot.selectedIndex, Math.max(snapshot.questions.length - 1, 0)))
+      return prev.slice(0, -1)
+    })
+    if (!restored) {
+      setDraftMessage("Nothing to undo yet.")
+    } else {
+      setDraftMessage("Last question change undone.")
+    }
+  }, [])
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && !event.shiftKey && event.key.toLowerCase() === "z") {
+        event.preventDefault()
+        undoQuestionChange()
+      }
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [undoQuestionChange])
 
   const saveSurvey = async (nextStatus: "draft" | "published") => {
     const surveyId = draftSurveyId || createSurveyId(title, user?.id || "creator")
@@ -279,13 +339,13 @@ export default function QuestionnairesV1Page() {
     : ""
 
   return (
-    <main className={`${display.className} min-h-dvh bg-[#f1e7d7] p-4 sm:p-6`}>
+    <main className={`min-h-dvh bg-[#f1e7d7] p-4 pb-28 sm:p-6 sm:pb-6`}>
       <div className="mx-auto max-w-7xl rounded-[2.2rem] border border-[#cfbea4] bg-[linear-gradient(160deg,#fbf6ec_0%,#f4ead9_55%,#efe2ca_100%)] p-4 shadow-[0_20px_80px_rgba(78,53,20,0.08)] sm:p-6">
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#cfbea4] pb-5">
           <div>
-            <p className={`${body.className} text-sm text-[#665746] text-pretty`}>Build-in-public signal composer</p>
+            <p className={`font-body text-sm text-[#665746] text-pretty`}>Build-in-public signal composer</p>
             <h1 className="text-3xl font-semibold text-balance sm:text-4xl">Design the feedback loop, not just the form</h1>
-            <p className={`${body.className} mt-1 max-w-2xl text-sm text-[#665746] text-pretty`}>
+            <p className={`font-body mt-1 max-w-2xl text-sm text-[#665746] text-pretty`}>
               Build one decision-focused survey in three steps: define the decision, pick the truth lens, and ship prompts that create clear next actions.
             </p>
           </div>
@@ -343,7 +403,7 @@ export default function QuestionnairesV1Page() {
           </div>
         </header>
         {draftMessage ? (
-          <p className={`${body.className} mt-3 text-sm text-[#665746]`}>{draftMessage}</p>
+          <p className={`font-body mt-3 text-sm text-[#665746]`}>{draftMessage}</p>
         ) : null}
 
         <section className="mt-6 grid gap-5 lg:grid-cols-[1fr_340px]">
@@ -417,7 +477,7 @@ export default function QuestionnairesV1Page() {
                   </label>
                   <textarea
                     id="decision-detail"
-                    className={`${body.className} mt-2 min-h-20 w-full rounded-2xl border border-[#cfbea4] bg-[#fffdf8] px-3 py-2 text-sm text-pretty`}
+                    className={`font-body mt-2 min-h-20 w-full rounded-2xl border border-[#cfbea4] bg-[#fffdf8] px-3 py-2 text-sm text-pretty`}
                     value={decisionDetail}
                     onChange={(e) => setDecisionDetail(e.target.value)}
                     placeholder="Example: Should we remove onboarding step 2 to increase completion?"
@@ -425,7 +485,7 @@ export default function QuestionnairesV1Page() {
                 </div>
                 <div className="rounded-2xl border border-[#cfbea4] bg-[#f6ead8] p-4">
                   <p className="text-sm font-semibold">Decision anchor preview</p>
-                  <p className={`${body.className} mt-2 rounded-xl border border-[#cfbea4] bg-[#fff7ee] px-3 py-2 text-sm text-[#665746]`}>
+                  <p className={`font-body mt-2 rounded-xl border border-[#cfbea4] bg-[#fff7ee] px-3 py-2 text-sm text-[#665746]`}>
                     {decisionFocus}
                   </p>
                   <p className="mt-4 text-sm font-semibold">Starter decision reframes</p>
@@ -439,7 +499,7 @@ export default function QuestionnairesV1Page() {
                         key={reframe}
                         type="button"
                         onClick={() => setDecisionDetail(reframe)}
-                        className={`${body.className} rounded-xl border border-[#cfbea4] bg-[#fff7ee] px-3 py-2 text-left text-sm text-[#665746] hover:bg-[#fffdf8]`}
+                        className={`font-body rounded-xl border border-[#cfbea4] bg-[#fff7ee] px-3 py-2 text-left text-sm text-[#665746] hover:bg-[#fffdf8]`}
                       >
                         {reframe}
                       </button>
@@ -468,7 +528,7 @@ export default function QuestionnairesV1Page() {
                     </button>
                   ))}
                 </div>
-                <p className={`${body.className} mt-2 text-xs text-[#665746]`}>
+                <p className={`font-body mt-2 text-xs text-[#665746]`}>
                   Intent mode is your truth lens. It changes prompt suggestions based on the decision you are evaluating.
                 </p>
               </div>
@@ -479,7 +539,7 @@ export default function QuestionnairesV1Page() {
                 <p className="text-sm font-semibold uppercase tracking-wide text-[#7a6146]">Action: Prompt Flow</p>
               </div>
               <div className="grid gap-4 p-5">
-                <div className={`${body.className} rounded-2xl border border-[#cfbea4] bg-[#fffdf8] px-3 py-2 text-sm text-[#665746]`}>
+                <div className={`font-body rounded-2xl border border-[#cfbea4] bg-[#fffdf8] px-3 py-2 text-sm text-[#665746]`}>
                   Prompt suggestions are generated from: <span className="font-semibold">{decisionTarget}</span> +{" "}
                   <span className="font-semibold">{changeType}</span> + <span className="font-semibold">{desiredOutcome}</span> +{" "}
                   <span className="font-semibold">{intentOptions.find((item) => item.id === intent)?.label ?? "Intent"}</span>.
@@ -487,28 +547,58 @@ export default function QuestionnairesV1Page() {
 
                 <div className="rounded-2xl border border-[#cfbea4] bg-[#fffdf8] p-4">
                   <p className="text-sm font-semibold">Question sequence (signal path)</p>
+                  <p className={`font-body mt-1 text-xs text-[#665746]`}>Drag question cards to reorder. Use Undo or Ctrl/Cmd+Z to reverse changes.</p>
                   <div className="mt-3 grid gap-2 sm:grid-cols-2">
                     {questions.map((q, i) => (
                       <button
                         key={`${q}-${i}`}
                         type="button"
+                        draggable
+                        onDragStart={(event) => {
+                          setDraggedIndex(i)
+                          event.dataTransfer.effectAllowed = "move"
+                        }}
+                        onDragOver={(event) => {
+                          event.preventDefault()
+                          if (dragOverIndex !== i) setDragOverIndex(i)
+                          event.dataTransfer.dropEffect = "move"
+                        }}
+                        onDragLeave={() => {
+                          if (dragOverIndex === i) setDragOverIndex(null)
+                        }}
+                        onDrop={(event) => {
+                          event.preventDefault()
+                          if (draggedIndex === null || draggedIndex === i) return
+                          const nextQuestions = reorderQuestionList(questions, draggedIndex, i)
+                          const nextSelected = remapSelectedIndexForReorder(selectedIndex, draggedIndex, i)
+                          commitQuestionChange(nextQuestions, nextSelected)
+                          setDragOverIndex(null)
+                          setDraggedIndex(null)
+                        }}
+                        onDragEnd={() => {
+                          setDragOverIndex(null)
+                          setDraggedIndex(null)
+                        }}
                         onClick={() => setSelectedIndex(i)}
                         className={`rounded-xl border px-3 py-3 text-left ${
                           i === selectedIndex
                             ? "border-[#b85e2d] bg-[#fff7ee]"
                             : "border-[#cfbea4] bg-[#f8efdf]"
-                        }`}
+                        } ${dragOverIndex === i ? "ring-2 ring-[#b85e2d]/40" : ""}`}
                         aria-label={`Edit question ${i + 1}`}
                       >
-                        <p className="text-xs uppercase tracking-wide text-[#7a6146]">Question {i + 1}</p>
-                        <p className={`${body.className} mt-1 line-clamp-2 text-sm text-[#665746]`}>{q}</p>
+                        <p className="flex items-center gap-1 text-xs uppercase tracking-wide text-[#7a6146]">
+                          <GripVertical className="size-3.5" aria-hidden="true" />
+                          Question {i + 1}
+                        </p>
+                        <p className={`font-body mt-1 line-clamp-2 text-sm text-[#665746]`}>{q}</p>
                       </button>
                     ))}
                     <button
                       type="button"
                       onClick={() => {
-                        setQuestions((prev) => [...prev, "New question prompt"])
-                        setSelectedIndex(questions.length)
+                        const nextQuestions = [...questions, "New question prompt"]
+                        commitQuestionChange(nextQuestions, questions.length)
                       }}
                       className="inline-flex min-h-20 items-center justify-center gap-2 rounded-xl border border-dashed border-[#c5b296] bg-[#f8efdf] text-sm text-[#665746]"
                     >
@@ -525,12 +615,12 @@ export default function QuestionnairesV1Page() {
                     </label>
                     <textarea
                       id="question-editor"
-                      className={`${body.className} mt-2 min-h-36 w-full rounded-2xl border border-[#cfbea4] bg-[#fffdf8] px-3 py-2 text-sm text-pretty`}
+                      className={`font-body mt-2 min-h-36 w-full rounded-2xl border border-[#cfbea4] bg-[#fffdf8] px-3 py-2 text-sm text-pretty`}
                       value={selected}
                       onChange={(e) => {
                         const next = [...questions]
                         next[selectedIndex] = e.target.value
-                        setQuestions(next)
+                        commitQuestionChange(next, selectedIndex)
                       }}
                     />
                   </div>
@@ -544,13 +634,13 @@ export default function QuestionnairesV1Page() {
                           onClick={() => {
                             const next = [...questions]
                             next[selectedIndex] = template
-                            setQuestions(next)
+                            commitQuestionChange(next, selectedIndex)
                             trackEvent("prompt_template_applied", {
                               template_pack: intent,
                               question_index: selectedIndex + 1,
                             })
                           }}
-                          className={`${body.className} rounded-xl border border-[#cfbea4] bg-[#fff7ee] px-3 py-2 text-left text-sm text-[#665746] hover:bg-[#fffdf8]`}
+                          className={`font-body rounded-xl border border-[#cfbea4] bg-[#fff7ee] px-3 py-2 text-left text-sm text-[#665746] hover:bg-[#fffdf8]`}
                         >
                           {template}
                         </button>
@@ -559,9 +649,17 @@ export default function QuestionnairesV1Page() {
                     <Button
                       variant="outline"
                       className="mt-3 w-full border-[#cfbea4] bg-[#fff7ee]"
+                      onClick={undoQuestionChange}
+                      disabled={questionHistory.length === 0}
+                    >
+                      <Undo2 className="mr-2 size-4" aria-hidden="true" />
+                      Undo last change
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="mt-3 w-full border-[#cfbea4] bg-[#fff7ee]"
                       onClick={() => {
-                        setQuestions(intentAlignedPrompts)
-                        setSelectedIndex(0)
+                        commitQuestionChange(intentAlignedPrompts, 0)
                         setDraftMessage("Starter prompts generated from decision context + intent mode.")
                       }}
                     >
@@ -573,8 +671,7 @@ export default function QuestionnairesV1Page() {
                       onClick={() => {
                         if (questions.length <= 1) return
                         const next = questions.filter((_, i) => i !== selectedIndex)
-                        setQuestions(next)
-                        setSelectedIndex(Math.max(0, selectedIndex - 1))
+                        commitQuestionChange(next, Math.max(0, selectedIndex - 1))
                       }}
                     >
                       <Trash2 className="mr-2 size-4" aria-hidden="true" />
@@ -591,17 +688,17 @@ export default function QuestionnairesV1Page() {
               </div>
               <div className="grid gap-4 p-5 sm:grid-cols-[1.4fr_1fr]">
                 <article className="rounded-2xl border border-[#cfbea4] bg-[#fffdf8] p-4">
-                  <p className={`${body.className} text-xs uppercase tracking-wide text-[#7a6146]`}>How builders will hear this signal</p>
+                  <p className={`font-body text-xs uppercase tracking-wide text-[#7a6146]`}>How builders will hear this signal</p>
                   <h3 className="mt-2 text-xl font-semibold text-balance">
                     {selected || "Select a question to preview the respondent experience."}
                   </h3>
-                  <p className={`${body.className} mt-3 text-sm text-[#665746]`}>
+                  <p className={`font-body mt-3 text-sm text-[#665746]`}>
                     Delivery cue: speak as if the builder will hear this directly. High-signal responses are usually 20-45 seconds.
                   </p>
                 </article>
                 <article className="rounded-2xl border border-[#cfbea4] bg-[#f8efdf] p-4">
                   <p className="text-sm font-semibold">Response quality targets</p>
-                  <ul className={`${body.className} mt-2 space-y-2 text-sm text-[#665746]`}>
+                  <ul className={`font-body mt-2 space-y-2 text-sm text-[#665746]`}>
                     <li className="rounded-lg border border-[#cfbea4] bg-[#fff7ee] px-2 py-1.5">1 concrete example</li>
                     <li className="rounded-lg border border-[#cfbea4] bg-[#fff7ee] px-2 py-1.5">1 friction moment</li>
                     <li className="rounded-lg border border-[#cfbea4] bg-[#fff7ee] px-2 py-1.5">1 clear suggestion</li>
@@ -613,7 +710,7 @@ export default function QuestionnairesV1Page() {
 
           <aside className="h-fit rounded-3xl border border-[#cfbea4] bg-[#f7ecdc] p-4 lg:sticky lg:top-6">
             <h2 className="text-xl font-semibold text-balance">Launch Console</h2>
-            <p className={`${body.className} mt-1 text-sm text-[#665746]`}>Release when quality is credible, not just complete.</p>
+            <p className={`font-body mt-1 text-sm text-[#665746]`}>Release when quality is credible, not just complete.</p>
 
             <div className="mt-4 rounded-2xl border border-[#cfbea4] bg-[#fff7ee] p-3">
               <p className="text-sm font-semibold">Readiness index</p>
@@ -643,7 +740,7 @@ export default function QuestionnairesV1Page() {
                 <Target className="size-4 text-[#b85e2d]" aria-hidden="true" />
                 Outcome target
               </p>
-              <p className={`${body.className} mt-1 text-sm text-[#665746]`}>
+              <p className={`font-body mt-1 text-sm text-[#665746]`}>
                 Collect the first 5 voice takes quickly, replay the strongest clips, then decide your next product move.
               </p>
             </div>
@@ -689,7 +786,7 @@ export default function QuestionnairesV1Page() {
             {publishedSurveyId ? (
               <div className="mt-4 rounded-2xl border border-[#cfbea4] bg-[#fff7ee] p-3">
                 <p className="text-sm font-semibold">Share and embed distribution</p>
-                <p className={`${body.className} mt-1 text-xs text-[#665746]`}>
+                <p className={`font-body mt-1 text-xs text-[#665746]`}>
                   Copy the survey link for direct responses, or use embed/iframe for on-site collection.
                 </p>
                 <div className="mt-2 grid gap-2">
@@ -743,7 +840,7 @@ export default function QuestionnairesV1Page() {
               </div>
             ) : null}
 
-            <div className={`${body.className} mt-4 rounded-2xl border border-[#cfbea4] bg-[#fff7ee] p-3 text-xs text-[#665746]`}>
+            <div className={`font-body mt-4 rounded-2xl border border-[#cfbea4] bg-[#fff7ee] p-3 text-xs text-[#665746]`}>
               <p className="inline-flex items-center gap-1 font-semibold">
                 <Sparkles className="size-3.5" aria-hidden="true" />
                 Behavioral cue
@@ -753,6 +850,8 @@ export default function QuestionnairesV1Page() {
           </aside>
         </section>
       </div>
+      <AdminMobileNav />
     </main>
   )
 }
+

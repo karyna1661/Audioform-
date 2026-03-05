@@ -3,13 +3,10 @@
 import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
 import { useParams } from "next/navigation"
-import { Bricolage_Grotesque, Lora } from "next/font/google"
 import { AudioRecorder } from "@/components/audio-recorder"
 import { useMobile } from "@/hooks/use-mobile"
 import { SurveyLoadingSkeleton } from "@/components/survey-loading-skeleton"
 
-const display = Bricolage_Grotesque({ subsets: ["latin"], weight: ["400", "600", "700"] })
-const body = Lora({ subsets: ["latin"], weight: ["400", "500", "600"] })
 
 type PublicSurvey = {
   id: string
@@ -91,13 +88,13 @@ export default function CreatorScopedEmbedPage() {
   }
 
   if (loading) return <SurveyLoadingSkeleton />
-  if (error || !survey) return <main className={`${display.className} min-h-dvh bg-[#f3ecdf] p-4`}>Survey unavailable</main>
+  if (error || !survey) return <main className={`min-h-dvh bg-[#f3ecdf] p-4`}>Survey unavailable</main>
   if (!prompts.length) {
     return (
-      <main className={`${display.className} min-h-dvh bg-[#f3ecdf] p-4`}>
+      <main className={`min-h-dvh bg-[#f3ecdf] p-4`}>
         <section className="mx-auto max-w-2xl rounded-3xl border border-[#dbcdb8] bg-[#f9f4ea] p-6">
           <p className="text-lg font-semibold">Survey unavailable</p>
-          <p className={`${body.className} mt-2 text-sm text-[#5c5146]`}>
+          <p className={`font-body mt-2 text-sm text-[#5c5146]`}>
             This survey has no published prompts yet. Ask the creator to publish it again.
           </p>
         </section>
@@ -106,11 +103,11 @@ export default function CreatorScopedEmbedPage() {
   }
 
   return (
-    <main className={`${display.className} min-h-dvh bg-[#f3ecdf] p-4`}>
+    <main className={`min-h-dvh bg-[#f3ecdf] p-4`}>
       <section className="mx-auto max-w-2xl rounded-3xl border border-[#dbcdb8] bg-[#f9f4ea] p-6">
-        <p className={`${body.className} text-xs uppercase tracking-wide text-[#5c5146]`}>Embedded voice survey</p>
+        <p className={`font-body text-xs uppercase tracking-wide text-[#5c5146]`}>Embedded voice survey</p>
         <h1 className="mt-2 text-3xl font-semibold text-balance">{survey.title}</h1>
-        <p className={`${body.className} mt-2 text-sm text-[#5c5146]`}>
+        <p className={`font-body mt-2 text-sm text-[#5c5146]`}>
           Help us decide what to build next. Leave a 30-second voice take.
         </p>
 
@@ -121,12 +118,12 @@ export default function CreatorScopedEmbedPage() {
         {isDone ? (
           <div className="mt-6 rounded-2xl border border-[#dbcdb8] bg-[#fff6ed] p-5">
             <p className="text-lg font-semibold">Voice take received.</p>
-            <p className={`${body.className} mt-1 text-sm text-[#5c5146]`}>Thanks for helping shape what ships next.</p>
+            <p className={`font-body mt-1 text-sm text-[#5c5146]`}>Thanks for helping shape what ships next.</p>
           </div>
         ) : (
           <>
             <h2 className="mt-6 text-2xl font-semibold text-balance">{currentPrompt?.text}</h2>
-            <p className={`${body.className} mt-2 text-sm text-[#5c5146]`}>
+            <p className={`font-body mt-2 text-sm text-[#5c5146]`}>
               Prompt {index + 1} of {prompts.length}. Keep it concrete and specific.
             </p>
             <div className="mt-4 rounded-2xl border border-[#dbcdb8] bg-[#fff6ed] p-4">
@@ -135,7 +132,7 @@ export default function CreatorScopedEmbedPage() {
           </>
         )}
 
-        <p className={`${body.className} mt-6 text-center text-xs text-[#5c5146]`}>
+        <p className={`font-body mt-6 text-center text-xs text-[#5c5146]`}>
           Powered by{" "}
           <Link href="/" className="font-semibold underline">
             Audioform
@@ -145,3 +142,4 @@ export default function CreatorScopedEmbedPage() {
     </main>
   )
 }
+

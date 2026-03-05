@@ -3,15 +3,13 @@
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
-import { Bricolage_Grotesque, Lora } from "next/font/google"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, Flag, Mic, Play, Trash2 } from "lucide-react"
 import { trackEvent } from "@/lib/analytics"
 import { useRequireAdmin } from "@/lib/auth-context"
 import { SurveyLoadingSkeleton } from "@/components/survey-loading-skeleton"
+import { AdminMobileNav } from "@/components/admin-mobile-nav"
 
-const display = Bricolage_Grotesque({ subsets: ["latin"], weight: ["400", "600", "700"] })
-const body = Lora({ subsets: ["latin"], weight: ["400", "500", "600"] })
 
 type ResponseItem = {
   id: string
@@ -141,18 +139,18 @@ export default function AdminResponsesPage() {
   }
 
   return (
-    <main className={`${display.className} min-h-dvh bg-[#f3ecdf] p-4 sm:p-6`}>
+    <main className={`min-h-dvh bg-[#f3ecdf] p-4 pb-28 sm:p-6 sm:pb-6`}>
       <section className="mx-auto max-w-5xl rounded-[2rem] border border-[#dbcdb8] bg-[#f9f4ea] p-5 sm:p-6">
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#dbcdb8] pb-4">
           <div>
-            <p className={`${body.className} text-sm text-[#5c5146]`}>Moderation Queue</p>
+            <p className={`font-body text-sm text-[#5c5146]`}>Moderation Queue</p>
             <h1 className="text-3xl font-semibold text-balance">Review Voice Responses</h1>
-            <p className={`${body.className} mt-1 text-sm text-[#5c5146]`}>
+            <p className={`font-body mt-1 text-sm text-[#5c5146]`}>
               Response-level queue for triage and review. Survey Stack in dashboard stays survey-level.
             </p>
-            {loadError ? <p className={`${body.className} mt-1 text-sm text-[#8a3d2b]`}>{loadError}</p> : null}
+            {loadError ? <p className={`font-body mt-1 text-sm text-[#8a3d2b]`}>{loadError}</p> : null}
             {surveyId ? (
-              <p className={`${body.className} mt-1 text-xs text-[#5c5146]`}>
+              <p className={`font-body mt-1 text-xs text-[#5c5146]`}>
                 Focused from Survey Stack: survey {surveyId} {focus ? `(${focus})` : ""}.
               </p>
             ) : null}
@@ -169,7 +167,7 @@ export default function AdminResponsesPage() {
           {queue.length === 0 ? (
             <article className="rounded-xl border border-[#dbcdb8] bg-[#fff6ed] p-4">
               <p className="text-sm font-semibold text-balance">Queue is clear</p>
-              <p className={`${body.className} mt-1 text-sm text-[#5c5146]`}>
+              <p className={`font-body mt-1 text-sm text-[#5c5146]`}>
                 No responses need triage right now. Share your survey to collect more signal.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
@@ -192,9 +190,9 @@ export default function AdminResponsesPage() {
               <article key={item.id} className="rounded-xl border border-[#dbcdb8] bg-[#fff6ed] p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="font-semibold text-balance">{item.surveyId}</p>
-                  <p className={`${body.className} text-sm text-[#5c5146]`}>{item.duration}</p>
+                  <p className={`font-body text-sm text-[#5c5146]`}>{item.duration}</p>
                 </div>
-                <p className={`${body.className} mt-2 text-sm text-[#5c5146]`}>{item.reason}</p>
+                <p className={`font-body mt-2 text-sm text-[#5c5146]`}>{item.reason}</p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Button
                     variant="outline"
@@ -249,7 +247,7 @@ export default function AdminResponsesPage() {
                     src={item.playbackUrl}
                   />
                 ) : null}
-                <p className={`${body.className} mt-2 text-xs text-[#5c5146]`}>
+                <p className={`font-body mt-2 text-xs text-[#5c5146]`}>
                   Status: {item.flagged ? "Flagged" : "Clear"} | {item.highSignal ? "High signal" : "Normal"} |{" "}
                   {item.bookmarked ? "Bookmarked" : "Not bookmarked"}
                 </p>
@@ -258,6 +256,8 @@ export default function AdminResponsesPage() {
           )}
         </div>
       </section>
+      <AdminMobileNav />
     </main>
   )
 }
+

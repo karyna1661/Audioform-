@@ -2,7 +2,6 @@
 
 import Link from "next/link"
 import { useEffect, useState } from "react"
-import { Bricolage_Grotesque, Lora } from "next/font/google"
 import { useRequireAdmin } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -14,9 +13,8 @@ import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, ExternalLink, Loader2, Mail, Send } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { SurveyLoadingSkeleton } from "@/components/survey-loading-skeleton"
+import { AdminMobileNav } from "@/components/admin-mobile-nav"
 
-const display = Bricolage_Grotesque({ subsets: ["latin"], weight: ["400", "600", "700"] })
-const body = Lora({ subsets: ["latin"], weight: ["400", "500", "600"] })
 
 export default function NotificationsPage() {
   const { status } = useRequireAdmin()
@@ -147,13 +145,13 @@ export default function NotificationsPage() {
   }
 
   return (
-    <main className={`${display.className} min-h-dvh bg-[#f3ecdf] p-4 sm:p-6`}>
+    <main className={`min-h-dvh bg-[#f3ecdf] p-4 pb-28 sm:p-6 sm:pb-6`}>
       <section className="mx-auto max-w-7xl rounded-[2rem] border border-[#dbcdb8] bg-[#f9f4ea] p-4 sm:p-6">
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#dbcdb8] pb-4">
           <div>
-            <p className={`${body.className} text-sm text-[#5c5146] text-pretty`}>Admin Communication Center</p>
+            <p className={`font-body text-sm text-[#5c5146] text-pretty`}>Admin Communication Center</p>
             <h1 className="text-3xl font-semibold text-balance">Email Notifications</h1>
-            <p className={`${body.className} mt-1 text-sm text-[#5c5146] text-pretty`}>
+            <p className={`font-body mt-1 text-sm text-[#5c5146] text-pretty`}>
               Configure response alerts, tune message tone, and test deliverability from one place.
             </p>
           </div>
@@ -168,7 +166,7 @@ export default function NotificationsPage() {
         <section className="mt-6 grid gap-4 lg:grid-cols-[320px_1fr_360px]">
           <aside className="rounded-2xl border border-[#dbcdb8] bg-[#f3ecdf] p-4">
             <h2 className="text-xl font-semibold text-balance">Delivery Rules</h2>
-            <p className={`${body.className} mt-1 text-xs text-[#5c5146]`}>
+            <p className={`font-body mt-1 text-xs text-[#5c5146]`}>
               Save rules first, then test with a live email before enabling team workflows.
             </p>
             <div className="mt-3 space-y-3">
@@ -223,7 +221,7 @@ export default function NotificationsPage() {
 
           <section className="rounded-2xl border border-[#dbcdb8] bg-[#fff6ed] p-5">
             <h2 className="text-2xl font-semibold text-balance">Template Editor</h2>
-            <p className={`${body.className} mt-1 text-sm text-[#5c5146] text-pretty`}>
+            <p className={`font-body mt-1 text-sm text-[#5c5146] text-pretty`}>
               Keep one clear message style for all response alerts sent to your team.
             </p>
 
@@ -237,7 +235,7 @@ export default function NotificationsPage() {
                 <Label htmlFor="template-body">Body</Label>
                 <Textarea
                   id="template-body"
-                  className={`${body.className} min-h-[220px] text-pretty`}
+                  className={`font-body min-h-[220px] text-pretty`}
                   value={emailBody}
                   onChange={(e) => setEmailBody(e.target.value)}
                 />
@@ -277,7 +275,7 @@ export default function NotificationsPage() {
 
           <aside className="rounded-2xl border border-[#dbcdb8] bg-[#f3ecdf] p-4">
             <h2 className="text-xl font-semibold text-balance">Test Console</h2>
-            <p className={`${body.className} mt-1 text-sm text-[#5c5146] text-pretty`}>
+            <p className={`font-body mt-1 text-sm text-[#5c5146] text-pretty`}>
               Send yourself a test alert using the current template before turning rules on.
             </p>
 
@@ -303,7 +301,7 @@ export default function NotificationsPage() {
                 <AlertTitle>Error</AlertTitle>
                 <AlertDescription>
                   {error}
-                  <p className={`${body.className} mt-2 text-xs`}>
+                  <p className={`font-body mt-2 text-xs`}>
                     Check recipient format, then verify SMTP settings in your environment if this continues.
                   </p>
                 </AlertDescription>
@@ -320,7 +318,7 @@ export default function NotificationsPage() {
                   onChange={(e) => setEmailRecipients(e.target.value)}
                   aria-invalid={!!error}
                 />
-                <p className={`${body.className} text-xs text-[#5c5146]`}>Comma-separate multiple recipients.</p>
+                <p className={`font-body text-xs text-[#5c5146]`}>Comma-separate multiple recipients.</p>
               </div>
               <button
                 type="button"
@@ -347,6 +345,7 @@ export default function NotificationsPage() {
           </aside>
         </section>
       </section>
+      <AdminMobileNav />
     </main>
   )
 }
@@ -376,3 +375,4 @@ function RuleRow({
     </div>
   )
 }
+
