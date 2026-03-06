@@ -150,6 +150,9 @@ export async function createStoredResponse(input: {
     storagePath = uploaded.storagePath
     publicUrl = uploaded.publicUrl
   } else {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("B2 storage is not configured in production.")
+    }
     const fullPath = path.join(UPLOAD_DIR, fileName)
     await writeFile(fullPath, buffer)
     storagePath = fullPath

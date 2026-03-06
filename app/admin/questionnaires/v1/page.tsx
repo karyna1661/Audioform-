@@ -17,6 +17,12 @@ const initialQuestions = [
   "Where did you hesitate before completing your task?",
   "What would you change first to make this easier to use?",
 ]
+const DEFAULT_SURVEY_TITLE = "Activation Decision Pulse"
+const DEFAULT_DECISION_TARGET = "Onboarding flow"
+const DEFAULT_CHANGE_TYPE = "Simplify"
+const DEFAULT_DESIRED_OUTCOME = "Conversion"
+const DEFAULT_INTENT = "critique"
+const DEFAULT_AUDIENCE = "builders"
 
 const decisionTargetOptions = [
   "Onboarding flow",
@@ -210,13 +216,13 @@ export default function QuestionnairesV1Page() {
   const [questionHistory, setQuestionHistory] = useState<Array<{ questions: string[]; selectedIndex: number }>>([])
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
-  const [title, setTitle] = useState("Activation Decision Pulse")
-  const [decisionTarget, setDecisionTarget] = useState("Onboarding flow")
-  const [changeType, setChangeType] = useState("Simplify")
-  const [desiredOutcome, setDesiredOutcome] = useState("Conversion")
+  const [title, setTitle] = useState(DEFAULT_SURVEY_TITLE)
+  const [decisionTarget, setDecisionTarget] = useState(DEFAULT_DECISION_TARGET)
+  const [changeType, setChangeType] = useState(DEFAULT_CHANGE_TYPE)
+  const [desiredOutcome, setDesiredOutcome] = useState(DEFAULT_DESIRED_OUTCOME)
   const [decisionDetail, setDecisionDetail] = useState("")
-  const [intent, setIntent] = useState("critique")
-  const [audience, setAudience] = useState("builders")
+  const [intent, setIntent] = useState(DEFAULT_INTENT)
+  const [audience, setAudience] = useState(DEFAULT_AUDIENCE)
   const [draftSurveyId, setDraftSurveyId] = useState("")
   const [draftMessage, setDraftMessage] = useState<string | null>(null)
   const [isSavingDraft, setIsSavingDraft] = useState(false)
@@ -257,6 +263,28 @@ export default function QuestionnairesV1Page() {
       setDraftMessage("Last question change undone.")
     }
   }, [])
+
+  const startNewDraft = useCallback(() => {
+    setDraftSurveyId(createSurveyId(DEFAULT_SURVEY_TITLE, user?.id || "creator"))
+    setPublishedSurveyId(null)
+    setTitle(DEFAULT_SURVEY_TITLE)
+    setDecisionTarget(DEFAULT_DECISION_TARGET)
+    setChangeType(DEFAULT_CHANGE_TYPE)
+    setDesiredOutcome(DEFAULT_DESIRED_OUTCOME)
+    setDecisionDetail("")
+    setIntent(DEFAULT_INTENT)
+    setAudience(DEFAULT_AUDIENCE)
+    setQuestions(initialQuestions)
+    setSelectedIndex(0)
+    setQuestionHistory([])
+    setDraggedIndex(null)
+    setDragOverIndex(null)
+    window.localStorage.removeItem("audioform_survey_draft_v1")
+    setDraftMessage("Started a new draft. Previous saved drafts are still available from dashboard.")
+    trackEvent("creator_clicked_start", {
+      source: requestedSurveyId ? "loaded_draft" : "builder",
+    })
+  }, [requestedSurveyId, user?.id])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -377,8 +405,8 @@ export default function QuestionnairesV1Page() {
         if (!survey || canceled) return
 
         setDraftSurveyId(survey.id)
-        setTitle(survey.title || "Activation Decision Pulse")
-        setIntent(survey.intent || "critique")
+        setTitle(survey.title || DEFAULT_SURVEY_TITLE)
+        setIntent(survey.intent || DEFAULT_INTENT)
         setDecisionDetail(survey.decisionFocus || "")
         if (Array.isArray(survey.questions) && survey.questions.length > 0) {
           setQuestions(survey.questions)
@@ -500,6 +528,13 @@ export default function QuestionnairesV1Page() {
                 Back to dashboard
               </Button>
             </Link>
+            <Button
+              variant="outline"
+              className="border-[#cfbea4] bg-[#efe3cf]"
+              onClick={startNewDraft}
+            >
+              New draft
+            </Button>
             <Button
               className="bg-[#b85e2d] text-[#fff6ed] hover:bg-[#a05227]"
               onClick={async () => {

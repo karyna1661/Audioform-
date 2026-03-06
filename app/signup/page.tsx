@@ -73,7 +73,7 @@ export default function SignupPage() {
         </aside>
 
         <section className="p-6 sm:p-8">
-          <div className="max-w-md">
+          <div className="max-w-md pt-8 sm:pt-10 lg:pt-14">
             <h2 className="text-3xl font-semibold text-balance">Create your creator account</h2>
             <p className="font-body mt-2 text-[#5c5146] text-pretty">Create your account and launch your first signal survey.</p>
 
@@ -84,7 +84,7 @@ export default function SignupPage() {
               </Alert>
             )}
 
-            <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+            <form onSubmit={handleSubmit} className="mt-10 space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="name">Name</Label>
                 <Input

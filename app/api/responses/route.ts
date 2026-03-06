@@ -196,6 +196,13 @@ export async function POST(request: NextRequest) {
     )
   } catch (error) {
     console.error("Error handling audio upload:", error)
+    const message = error instanceof Error ? error.message : "Failed to process audio upload"
+    if (message.includes("B2 storage is not configured")) {
+      return NextResponse.json(
+        { error: "Storage is not configured. Please contact support and retry shortly." },
+        { status: 503 },
+      )
+    }
     return NextResponse.json({ error: "Failed to process audio upload" }, { status: 500 })
   }
 }

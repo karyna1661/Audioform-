@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { AlertCircle, CheckCircle2 } from "lucide-react"
+import { AlertCircle } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AudioRecorder } from "@/components/audio-recorder"
 import { Button } from "@/components/ui/button"
@@ -39,7 +39,6 @@ export default function QuestionnaireV1Page() {
   const [index, setIndex] = useState(0)
   const [answers, setAnswers] = useState<Record<string, Blob>>({})
   const [permissionGranted, setPermissionGranted] = useState<boolean | null>(null)
-  const [complete, setComplete] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [pendingUploads, setPendingUploads] = useState(0)
   const [failedQueue, setFailedQueue] = useState<Array<{ questionId: string; blob: Blob }>>([])
@@ -176,21 +175,12 @@ export default function QuestionnaireV1Page() {
       return
     }
 
-    setComplete(true)
     trackEvent("respondent_completed")
+    const target = resolvedSurveyId
+      ? `/questionnaire/thank-you?surveyId=${encodeURIComponent(resolvedSurveyId)}`
+      : "/questionnaire/thank-you"
+    router.push(target)
   }
-
-  useEffect(() => {
-    if (!complete) return
-    const timeout = window.setTimeout(() => {
-      const target = resolvedSurveyId
-        ? `/questionnaire/thank-you?surveyId=${encodeURIComponent(resolvedSurveyId)}`
-        : "/questionnaire/thank-you"
-      router.push(target)
-    }, 150)
-
-    return () => window.clearTimeout(timeout)
-  }, [complete, resolvedSurveyId, router])
 
   const retryFailedUploads = async () => {
     const queued = [...failedQueue]
@@ -267,16 +257,7 @@ export default function QuestionnaireV1Page() {
           <div className="h-2 rounded-full bg-[#b85e2d]" style={{ width: `${(Object.keys(answers).length / questionList.length) * 100}%` }} />
         </div>
 
-        {complete ? (
-          <div className="mt-10 text-center">
-            <CheckCircle2 className="mx-auto size-16 text-[#2d5a17]" aria-hidden="true" />
-            <h1 className="mt-4 text-3xl font-semibold text-balance">You just helped shape our roadmap.</h1>
-            <p className={`font-body mt-2 text-[#5c5146] text-pretty`}>
-              Want to collect voice feedback like this on your own site? Redirecting now.
-            </p>
-          </div>
-        ) : (
-          <div className="mt-8">
+        <div className="mt-8">
             <h1 className="text-2xl font-semibold text-balance sm:text-3xl">{current.text}</h1>
             <p className={`font-body mt-2 text-sm text-[#5c5146] text-pretty`}>
               Give your honest take as if the builder will hear this directly. 20-45 seconds is ideal.
@@ -335,7 +316,6 @@ export default function QuestionnaireV1Page() {
               <p className={`font-body text-center text-sm text-[#5c5146] sm:text-left`}>{Object.keys(answers).length} answered</p>
             </div>
           </div>
-        )}
       </section>
     </main>
   )

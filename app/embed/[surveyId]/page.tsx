@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import { AudioRecorder } from "@/components/audio-recorder"
 import { useMobile } from "@/hooks/use-mobile"
 import { SurveyLoadingSkeleton } from "@/components/survey-loading-skeleton"
@@ -32,22 +32,24 @@ function buildPrompts(survey: PublicSurvey): PromptItem[] {
 }
 
 export default function EmbedSurveyPage() {
+  const router = useRouter()
   const params = useParams<{ surveyId: string }>()
   const surveyId = params.surveyId
   const isMobile = useMobile()
 
   const [survey, setSurvey] = useState<PublicSurvey | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [surveyError, setSurveyError] = useState<string | null>(null)
+  const [uploadError, setUploadError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [index, setIndex] = useState(0)
   const [submittedCount, setSubmittedCount] = useState(0)
-  const [isUploading, setIsUploading] = useState(false)
-  const [isDone, setIsDone] = useState(false)
+  const [pendingUploads, setPendingUploads] = useState(0)
+  const [failedQueue, setFailedQueue] = useState<Array<{ questionId: string; blob: Blob }>>([])
 
   useEffect(() => {
     const loadSurvey = async () => {
       setLoading(true)
-      setError(null)
+      setSurveyError(null)
       try {
         const response = await fetch(`/api/surveys/public/${encodeURIComponent(surveyId)}`, {
           cache: "no-store",
@@ -57,7 +59,7 @@ export default function EmbedSurveyPage() {
         if (!json.survey) throw new Error("Survey payload is missing.")
         setSurvey(json.survey)
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load survey.")
+        setSurveyError(err instanceof Error ? err.message : "Failed to load survey.")
       } finally {
         setLoading(false)
       }
@@ -69,48 +71,68 @@ export default function EmbedSurveyPage() {
   const prompts = useMemo(() => (survey ? buildPrompts(survey) : []), [survey])
   const currentPrompt = prompts[index]
 
-  const onSubmit = async (blob: Blob) => {
-    if (!currentPrompt) return
-    setIsUploading(true)
-    setError(null)
-
+  const uploadResponse = async (questionId: string, blob: Blob, attempt = 1): Promise<void> => {
+    setPendingUploads((value) => value + 1)
     try {
       const formData = new FormData()
-      formData.append("audio", blob, `${currentPrompt.id}.webm`)
-      formData.append("questionId", currentPrompt.id)
+      formData.append("audio", blob, `${questionId}-${Date.now()}.webm`)
+      formData.append("questionId", questionId)
       formData.append("surveyId", surveyId)
 
+      const controller = new AbortController()
+      const timeout = window.setTimeout(() => controller.abort(), 15000)
       const response = await fetch("/api/responses", {
         method: "POST",
         body: formData,
-      })
+        keepalive: true,
+        signal: controller.signal,
+      }).finally(() => window.clearTimeout(timeout))
       if (!response.ok) throw new Error("Failed to submit your voice take.")
-
-      const nextSubmitted = submittedCount + 1
-      setSubmittedCount(nextSubmitted)
-      if (index < prompts.length - 1) {
-        setIndex((prev) => prev + 1)
-      } else {
-        setIsDone(true)
-      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to submit your voice take.")
+      if (attempt < 4) {
+        const delayMs = 500 * Math.pow(2, attempt - 1)
+        await new Promise((resolve) => window.setTimeout(resolve, delayMs))
+        await uploadResponse(questionId, blob, attempt + 1)
+      } else {
+        setUploadError(err instanceof Error ? err.message : "Failed to submit your voice take.")
+        setFailedQueue((items) => [...items, { questionId, blob }])
+      }
     } finally {
-      setIsUploading(false)
+      setPendingUploads((value) => Math.max(0, value - 1))
     }
+  }
+
+  const onSubmit = (blob: Blob) => {
+    if (!currentPrompt) return
+    const submittedQuestionId = currentPrompt.id
+    setUploadError(null)
+    setSubmittedCount((value) => value + 1)
+    void uploadResponse(submittedQuestionId, blob)
+    if (index < prompts.length - 1) {
+      setIndex((prev) => prev + 1)
+      return
+    }
+    router.push(`/questionnaire/thank-you?surveyId=${encodeURIComponent(surveyId)}`)
+  }
+
+  const retryFailedUploads = async () => {
+    const queued = [...failedQueue]
+    setFailedQueue([])
+    setUploadError(null)
+    await Promise.all(queued.map((item) => uploadResponse(item.questionId, item.blob)))
   }
 
   if (loading) {
     return <SurveyLoadingSkeleton />
   }
 
-  if (error || !survey) {
+  if (surveyError || !survey) {
     return (
       <main className={`min-h-dvh bg-[#f3ecdf] p-4`}>
         <section className="mx-auto max-w-2xl rounded-3xl border border-[#dbcdb8] bg-[#f9f4ea] p-6">
           <p className="text-lg font-semibold">Survey unavailable</p>
           <p className={`font-body mt-2 text-sm text-[#5c5146]`}>
-            {error || "This survey is unavailable right now."}
+            {surveyError || "This survey is unavailable right now."}
           </p>
         </section>
       </main>
@@ -148,29 +170,39 @@ export default function EmbedSurveyPage() {
           />
         </div>
 
-        {isDone ? (
-          <div className="mt-6 rounded-2xl border border-[#dbcdb8] bg-[#fff6ed] p-5">
-            <p className="text-lg font-semibold">Voice take received.</p>
-            <p className={`font-body mt-1 text-sm text-[#5c5146]`}>
-              Thanks for helping shape what ships next.
-            </p>
+        <>
+          <h2 className="mt-6 text-2xl font-semibold text-balance">{currentPrompt?.text}</h2>
+          <p className={`font-body mt-2 text-sm text-[#5c5146]`}>
+            Prompt {index + 1} of {prompts.length}. Keep it concrete and specific.
+          </p>
+          <div className="mt-4 rounded-2xl border border-[#dbcdb8] bg-[#fff6ed] p-4">
+            <AudioRecorder
+              onSubmit={onSubmit}
+              questionId={currentPrompt?.id || "q1"}
+              isMobile={isMobile}
+              isUploading={false}
+            />
           </div>
-        ) : (
-          <>
-            <h2 className="mt-6 text-2xl font-semibold text-balance">{currentPrompt?.text}</h2>
-            <p className={`font-body mt-2 text-sm text-[#5c5146]`}>
-              Prompt {index + 1} of {prompts.length}. Keep it concrete and specific.
-            </p>
-            <div className="mt-4 rounded-2xl border border-[#dbcdb8] bg-[#fff6ed] p-4">
-              <AudioRecorder
-                onSubmit={onSubmit}
-                questionId={currentPrompt?.id || "q1"}
-                isMobile={isMobile}
-                isUploading={isUploading}
-              />
+          {uploadError ? (
+            <div className={`font-body mt-3 rounded-lg border border-[#e0b8ad] bg-[#f9e6e0] px-3 py-2 text-sm text-[#8a3d2b]`}>
+              <p>{uploadError}</p>
+              {failedQueue.length > 0 ? (
+                <button
+                  type="button"
+                  className="mt-2 rounded-lg border border-[#e0b8ad] bg-[#fff6ed] px-3 py-2 text-sm hover:bg-[#f5ebdd]"
+                  onClick={() => void retryFailedUploads()}
+                >
+                  Retry failed upload{failedQueue.length > 1 ? "s" : ""}
+                </button>
+              ) : null}
             </div>
-          </>
-        )}
+          ) : null}
+          {pendingUploads > 0 ? (
+            <p className={`font-body mt-3 rounded-lg border border-[#dbcdb8] bg-[#f3ecdf] px-3 py-2 text-sm text-[#5c5146]`}>
+              Syncing {pendingUploads} response{pendingUploads === 1 ? "" : "s"} in the background...
+            </p>
+          ) : null}
+        </>
 
         <p className={`font-body mt-6 text-center text-xs text-[#5c5146]`}>
           Powered by{" "}

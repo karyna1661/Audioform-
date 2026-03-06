@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react"
 import { useAuth } from "@/lib/auth-context"
 import { useRequireAdmin } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, ArrowUpRight, Bell, Calendar, Mic, Target, Trash2 } from "lucide-react"
+import { ArrowLeft, ArrowUpRight, Calendar, Mic, Target, Trash2 } from "lucide-react"
 import { trackEvent } from "@/lib/analytics"
 import { SurveyLoadingSkeleton } from "@/components/survey-loading-skeleton"
 import { AdminMobileNav } from "@/components/admin-mobile-nav"
@@ -217,11 +217,6 @@ export default function AdminDashboardV4Page() {
             {loadError ? <p className={`font-body mt-1 text-sm text-[#8a3d2b]`}>{loadError}</p> : null}
           </div>
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
-            <Link href="/admin/notifications" aria-label="Open notifications" className="inline-flex sm:hidden">
-              <Button variant="outline" size="icon" className="border-[#dbcdb8] bg-[#f3ecdf]">
-                <Bell className="size-4" aria-hidden="true" />
-              </Button>
-            </Link>
             <Button
               variant="outline"
               className="w-full border-[#dbcdb8] bg-[#f3ecdf] sm:w-auto"
@@ -233,7 +228,7 @@ export default function AdminDashboardV4Page() {
               <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
               Sign out
             </Button>
-            <Link href="/admin/questionnaires">
+            <Link href="/admin/questionnaires" className="hidden sm:inline-flex">
               <Button className="w-full bg-[#b85e2d] text-[#fff6ed] hover:bg-[#a05227] sm:w-auto">
                 <Mic className="mr-2 size-4" aria-hidden="true" />
                 Create new survey
