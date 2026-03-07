@@ -19,6 +19,47 @@ body {
   .font-mono {
     font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   }
+  .af-shell {
+    background:
+      radial-gradient(1200px 420px at 82% -8%, rgba(184, 94, 45, 0.16), transparent 62%),
+      radial-gradient(900px 360px at -12% 102%, rgba(210, 151, 74, 0.12), transparent 58%),
+      #f3ecdf;
+  }
+  .af-panel {
+    border-color: #dbcdb8;
+    background:
+      linear-gradient(165deg, rgba(255, 250, 242, 0.92) 0%, rgba(249, 244, 234, 0.96) 100%);
+    box-shadow: 0 20px 60px rgba(90, 60, 24, 0.08);
+  }
+  .af-accent-card {
+    border-color: #d4bea2;
+    background:
+      linear-gradient(150deg, rgba(255, 246, 237, 0.98) 0%, rgba(247, 236, 221, 0.9) 100%);
+  }
+  .af-chip {
+    background: linear-gradient(145deg, rgba(255, 247, 238, 1) 0%, rgba(244, 227, 205, 0.9) 100%);
+    border-color: #d7c0a4;
+  }
+  .af-fade-up {
+    animation: afFadeUp 0.42s ease-out both;
+  }
+  .af-glow-hover {
+    transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+  }
+  .af-glow-hover:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 14px 26px rgba(135, 73, 34, 0.14);
+    border-color: #c78e6e;
+  }
+  .af-delay-1 {
+    animation-delay: 70ms;
+  }
+  .af-delay-2 {
+    animation-delay: 140ms;
+  }
+  .af-delay-3 {
+    animation-delay: 210ms;
+  }
 }
 
 @layer base {
@@ -131,5 +172,32 @@ body {
   :focus-visible {
     outline: 2px solid var(--af-color-primary);
     outline-offset: 2px;
+  }
+}
+
+@keyframes afFadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .af-fade-up,
+  .af-delay-1,
+  .af-delay-2,
+  .af-delay-3 {
+    animation: none !important;
+  }
+  .af-glow-hover {
+    transition: none;
+  }
+  .af-glow-hover:hover {
+    transform: none;
+    box-shadow: none;
   }
 }

@@ -48,9 +48,9 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="min-h-dvh bg-[#f3ecdf] p-4 sm:p-6">
-      <section className="mx-auto grid max-w-6xl overflow-hidden rounded-[2rem] border border-[#dbcdb8] bg-[#f9f4ea] lg:grid-cols-[1.15fr_1fr]">
-        <aside className="border-b border-[#dbcdb8] bg-[#fff6ed] p-6 sm:p-8 lg:border-b-0 lg:border-r">
+    <main className="af-shell min-h-dvh p-4 sm:p-6">
+      <section className="af-panel af-fade-up mx-auto grid max-w-6xl overflow-hidden rounded-[2rem] border lg:grid-cols-[1.15fr_1fr]">
+        <aside className="af-accent-card border-b border-[#dbcdb8] p-6 sm:p-8 lg:border-b-0 lg:border-r">
           <Link
             href="/"
             className="inline-flex items-center rounded-full border border-[#dbcdb8] bg-[#f9f4ea] px-4 py-2 text-sm text-[#5c5146] hover:bg-[#f3ecdf]"
@@ -62,20 +62,20 @@ export default function SignupPage() {
             Start your <span className="whitespace-nowrap">high-signal</span> feedback loop
           </h1>
           <p className="font-body mt-4 text-base text-[#5c5146] text-pretty">
-            Create a workspace to ask better prompts, collect 30-second voice takes, and make faster product decisions.
+            Create a workspace, publish one focused survey, and collect decision-ready signal.
           </p>
 
           <div className="mt-6 space-y-3">
             <InfoTile icon={<Mic className="size-4 text-[#8a431f]" aria-hidden="true" />} title="Signal over noise" text="Capture conviction and hesitation that text comments miss." />
-            <InfoTile icon={<Users className="size-4 text-[#8a431f]" aria-hidden="true" />} title="Built for builders" text="Run repeatable ask -> listen -> decide loops with your community." />
-            <InfoTile icon={<CheckCircle2 className="size-4 text-[#8a431f]" aria-hidden="true" />} title="Fast first run" text="Go from signup to your first live voice survey in minutes." />
+            <InfoTile icon={<Users className="size-4 text-[#8a431f]" aria-hidden="true" />} title="Built for builders" text="Run a clear ask -> listen -> decide loop with your community." />
+            <InfoTile icon={<CheckCircle2 className="size-4 text-[#8a431f]" aria-hidden="true" />} title="Fast first run" text="Go from signup to published survey quickly." />
           </div>
         </aside>
 
         <section className="p-6 sm:p-8">
           <div className="max-w-md pt-8 sm:pt-10 lg:pt-14">
             <h2 className="text-3xl font-semibold text-balance">Create your creator account</h2>
-            <p className="font-body mt-2 text-[#5c5146] text-pretty">Create your account and launch your first signal survey.</p>
+            <p className="font-body mt-2 text-[#5c5146] text-pretty">Create your account and launch your first survey.</p>
 
             {error && (
               <Alert variant="destructive" className="mt-4" aria-live="assertive" id={errorId}>
@@ -145,6 +145,15 @@ export default function SignupPage() {
                 )}
               </Button>
             </form>
+
+            <article className="mt-5 rounded-xl border border-[#dbcdb8] bg-[#f9f4ea] p-3">
+              <p className="text-sm font-semibold text-balance">What happens next</p>
+              <ol className="font-body mt-2 space-y-1 text-sm text-[#5c5146] text-pretty">
+                <li>1. Define one product decision.</li>
+                <li>2. Publish a short voice survey.</li>
+                <li>3. Review your first high-signal responses.</li>
+              </ol>
+            </article>
 
             <p className="font-body mt-6 text-sm text-[#5c5146] text-pretty">
               Already have an account?{" "}

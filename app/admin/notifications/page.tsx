@@ -145,14 +145,14 @@ export default function NotificationsPage() {
   }
 
   return (
-    <main className={`min-h-dvh bg-[#f3ecdf] p-4 pb-28 sm:p-6 sm:pb-6`}>
-      <section className="mx-auto max-w-7xl rounded-[2rem] border border-[#dbcdb8] bg-[#f9f4ea] p-4 sm:p-6">
+    <main className={`af-shell min-h-dvh p-4 pb-28 sm:p-6 sm:pb-6`}>
+      <section className="af-panel af-fade-up mx-auto max-w-7xl rounded-[2rem] border p-4 sm:p-6">
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#dbcdb8] pb-4">
           <div>
-            <p className={`font-body text-sm text-[#5c5146] text-pretty`}>Admin Communication Center</p>
+            <p className={`font-body text-sm text-[#5c5146] text-pretty`}>Admin notifications</p>
             <h1 className="text-3xl font-semibold text-balance">Email Notifications</h1>
             <p className={`font-body mt-1 text-sm text-[#5c5146] text-pretty`}>
-              Configure response alerts, tune message tone, and test deliverability from one place.
+              Configure alert rules, save one clear template, then send a live test.
             </p>
           </div>
           <Link href="/admin/dashboard/v4">
@@ -164,10 +164,10 @@ export default function NotificationsPage() {
         </header>
 
         <section className="mt-6 grid gap-4 lg:grid-cols-[320px_1fr_360px]">
-          <aside className="rounded-2xl border border-[#dbcdb8] bg-[#f3ecdf] p-4">
+          <aside className="af-accent-card af-fade-up af-delay-1 rounded-2xl border p-4">
             <h2 className="text-xl font-semibold text-balance">Delivery Rules</h2>
             <p className={`font-body mt-1 text-xs text-[#5c5146]`}>
-              Save rules first, then test with a live email before enabling team workflows.
+              Save rules first, then run one test email.
             </p>
             <div className="mt-3 space-y-3">
               <RuleRow
@@ -219,10 +219,10 @@ export default function NotificationsPage() {
             </Button>
           </aside>
 
-          <section className="rounded-2xl border border-[#dbcdb8] bg-[#fff6ed] p-5">
+          <section className="af-accent-card af-fade-up af-delay-1 rounded-2xl border p-5">
             <h2 className="text-2xl font-semibold text-balance">Template Editor</h2>
             <p className={`font-body mt-1 text-sm text-[#5c5146] text-pretty`}>
-              Keep one clear message style for all response alerts sent to your team.
+              Keep one clear message style for all response alerts.
             </p>
 
             <div className="mt-4 space-y-4">
@@ -273,10 +273,10 @@ export default function NotificationsPage() {
             </div>
           </section>
 
-          <aside className="rounded-2xl border border-[#dbcdb8] bg-[#f3ecdf] p-4">
+          <aside className="af-accent-card af-fade-up af-delay-2 rounded-2xl border p-4">
             <h2 className="text-xl font-semibold text-balance">Test Console</h2>
             <p className={`font-body mt-1 text-sm text-[#5c5146] text-pretty`}>
-              Send yourself a test alert using the current template before turning rules on.
+              Send a test alert before enabling new rules.
             </p>
 
             {success && (
@@ -318,7 +318,7 @@ export default function NotificationsPage() {
                   onChange={(e) => setEmailRecipients(e.target.value)}
                   aria-invalid={!!error}
                 />
-                <p className={`font-body text-xs text-[#5c5146]`}>Comma-separate multiple recipients.</p>
+                <p className={`font-body text-xs text-[#5c5146]`}>Use commas for multiple recipients.</p>
               </div>
               <button
                 type="button"

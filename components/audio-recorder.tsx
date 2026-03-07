@@ -32,8 +32,9 @@ export function AudioRecorder({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
   const audioRef = useRef<HTMLAudioElement | null>(null)
-  const timerRef = useRef<NodeJS.Timeout | null>(null)
+  const timerRef = useRef<number | null>(null)
   const playbackRafRef = useRef<number | null>(null)
+  const recordingActiveRef = useRef(false)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const animationFrameRef = useRef<number | null>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
@@ -73,8 +74,9 @@ export function AudioRecorder({
         cancelAnimationFrame(animationFrameRef.current)
       }
 
-      if (timerRef.current) {
-        clearInterval(timerRef.current)
+      if (timerRef.current !== null) {
+        window.clearInterval(timerRef.current)
+        timerRef.current = null
       }
 
       if (playbackRafRef.current) {
@@ -93,6 +95,14 @@ export function AudioRecorder({
   // Start recording
   const startRecording = async () => {
     try {
+      if (audioUrl) {
+        URL.revokeObjectURL(audioUrl)
+      }
+      setAudioBlob(null)
+      setAudioUrl(null)
+      setPlaybackTime(0)
+      setPlaybackDuration(0)
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       streamRef.current = stream
 
@@ -145,11 +155,12 @@ export function AudioRecorder({
 
       // Start recording
       mediaRecorder.start(250)
+      recordingActiveRef.current = true
       setIsRecording(true)
       onRecordingStart?.()
 
       // Start timer
-      timerRef.current = setInterval(() => {
+      timerRef.current = window.setInterval(() => {
         setRecordingTime((prev) => prev + 1)
       }, 1000)
 
@@ -164,10 +175,12 @@ export function AudioRecorder({
   const stopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop()
+      recordingActiveRef.current = false
       setIsRecording(false)
 
-      if (timerRef.current) {
-        clearInterval(timerRef.current)
+      if (timerRef.current !== null) {
+        window.clearInterval(timerRef.current)
+        timerRef.current = null
       }
 
       if (animationFrameRef.current) {
@@ -183,7 +196,9 @@ export function AudioRecorder({
   // Play recorded audio
   const playAudio = () => {
     if (audioRef.current && audioUrl) {
-      void audioRef.current.play()
+      void audioRef.current.play().catch(() => {
+        setIsPlaying(false)
+      })
       setIsPlaying(true)
 
       const syncPlayback = () => {
@@ -253,7 +268,7 @@ export function AudioRecorder({
     const dataArray = new Uint8Array(bufferLength)
 
     const draw = () => {
-      if (!isRecording) return
+      if (!recordingActiveRef.current) return
 
       animationFrameRef.current = requestAnimationFrame(draw)
       analyser.getByteFrequencyData(dataArray)
@@ -278,10 +293,18 @@ export function AudioRecorder({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" aria-busy={isUploading}>
       {/* Waveform visualization */}
       <div className="relative h-24 bg-muted rounded-lg overflow-hidden">
-        {isRecording ? (
+        {isUploading ? (
+          <div className="flex h-full items-center justify-center px-4">
+            <div className="w-full max-w-md animate-pulse space-y-2" aria-live="polite">
+              <div className="h-2.5 w-3/4 rounded-full bg-[#d9cdbd]" />
+              <div className="h-2.5 w-full rounded-full bg-[#e5d9ca]" />
+              <div className="h-2.5 w-5/6 rounded-full bg-[#d9cdbd]" />
+            </div>
+          </div>
+        ) : isRecording ? (
           <canvas ref={canvasRef} className="w-full h-full" width={isMobile ? 300 : 500} height={96} />
         ) : audioBlob ? (
           <div className="flex items-center justify-center h-full">

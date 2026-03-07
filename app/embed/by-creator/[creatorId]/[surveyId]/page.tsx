@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { AudioRecorder } from "@/components/audio-recorder"
 import { useMobile } from "@/hooks/use-mobile"
@@ -41,6 +41,14 @@ export default function CreatorScopedEmbedPage() {
   const [submittedCount, setSubmittedCount] = useState(0)
   const [pendingUploads, setPendingUploads] = useState(0)
   const [failedQueue, setFailedQueue] = useState<Array<{ questionId: string; blob: Blob }>>([])
+  const [isSubmittingAnswer, setIsSubmittingAnswer] = useState(false)
+  const isMountedRef = useRef(true)
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
 
   useEffect(() => {
     const loadSurvey = async () => {
@@ -67,8 +75,10 @@ export default function CreatorScopedEmbedPage() {
   const prompts = useMemo(() => (survey ? buildPrompts(survey) : []), [survey])
   const currentPrompt = prompts[index]
 
-  const uploadResponse = async (questionId: string, blob: Blob, attempt = 1): Promise<void> => {
-    setPendingUploads((value) => value + 1)
+  const uploadResponse = async (questionId: string, blob: Blob, attempt = 1): Promise<boolean> => {
+    if (isMountedRef.current) {
+      setPendingUploads((value) => value + 1)
+    }
     try {
       const formData = new FormData()
       formData.append("audio", blob, `${questionId}-${Date.now()}.webm`)
@@ -85,29 +95,48 @@ export default function CreatorScopedEmbedPage() {
       }).finally(() => window.clearTimeout(timeout))
 
       if (!response.ok) throw new Error("Failed to submit your voice take.")
+      return true
     } catch (err) {
       if (attempt < 4) {
         const delayMs = 500 * Math.pow(2, attempt - 1)
         await new Promise((resolve) => window.setTimeout(resolve, delayMs))
-        await uploadResponse(questionId, blob, attempt + 1)
+        return uploadResponse(questionId, blob, attempt + 1)
       } else {
-        setUploadError(err instanceof Error ? err.message : "Failed to submit your voice take.")
-        setFailedQueue((items) => [...items, { questionId, blob }])
+        if (isMountedRef.current) {
+          setUploadError(err instanceof Error ? err.message : "Failed to submit your voice take.")
+          setFailedQueue((items) => [...items, { questionId, blob }])
+        }
+        return false
       }
     } finally {
-      setPendingUploads((value) => Math.max(0, value - 1))
+      if (isMountedRef.current) {
+        setPendingUploads((value) => Math.max(0, value - 1))
+      }
     }
   }
 
   const onSubmit = (blob: Blob) => {
+    void submitAndAdvance(blob)
+  }
+
+  const submitAndAdvance = async (blob: Blob) => {
+    if (isSubmittingAnswer || !currentPrompt) return
+    setIsSubmittingAnswer(true)
+
     if (!currentPrompt) return
     const submittedQuestionId = currentPrompt.id
-    setUploadError(null)
+    if (isMountedRef.current) setUploadError(null)
+    const uploaded = await uploadResponse(submittedQuestionId, blob)
+    if (!isMountedRef.current) return
+    if (!uploaded) {
+      setIsSubmittingAnswer(false)
+      return
+    }
     setSubmittedCount((value) => value + 1)
-    void uploadResponse(submittedQuestionId, blob)
 
     if (index < prompts.length - 1) {
       setIndex((prev) => prev + 1)
+      setIsSubmittingAnswer(false)
       return
     }
     router.push(`/questionnaire/thank-you?surveyId=${encodeURIComponent(surveyId)}`)
@@ -154,7 +183,12 @@ export default function CreatorScopedEmbedPage() {
             Prompt {index + 1} of {prompts.length}. Keep it concrete and specific.
           </p>
           <div className="mt-4 rounded-2xl border border-[#dbcdb8] bg-[#fff6ed] p-4">
-            <AudioRecorder onSubmit={onSubmit} questionId={currentPrompt?.id || "q1"} isMobile={isMobile} isUploading={false} />
+            <AudioRecorder
+              onSubmit={onSubmit}
+              questionId={currentPrompt?.id || "q1"}
+              isMobile={isMobile}
+              isUploading={isSubmittingAnswer || pendingUploads > 0}
+            />
           </div>
           {uploadError ? (
             <div className={`font-body mt-3 rounded-lg border border-[#e0b8ad] bg-[#f9e6e0] px-3 py-2 text-sm text-[#8a3d2b]`}>

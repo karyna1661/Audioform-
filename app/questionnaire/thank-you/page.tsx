@@ -13,6 +13,7 @@ export default function ThankYouPage() {
   const searchParams = useSearchParams()
   const surveyId = searchParams.get("surveyId")
   const backToSurveyHref = surveyId ? `/questionnaire?surveyId=${encodeURIComponent(surveyId)}` : "/questionnaire"
+  const supportEmail = process.env.NEXT_PUBLIC_SUPPORT_EMAIL?.trim()
 
   useEffect(() => {
     trackEvent("respondent_thank_you_viewed")
@@ -72,7 +73,17 @@ export default function ThankYouPage() {
         </div>
 
         <p className={`font-body mt-6 text-center text-sm text-[#5c5146] text-pretty`}>
-          Questions? Contact <span className="font-semibold">support@audioform.example.com</span>
+          {supportEmail ? (
+            <>
+              Questions? Contact{" "}
+              <a className="font-semibold underline" href={`mailto:${supportEmail}`}>
+                {supportEmail}
+              </a>
+              .
+            </>
+          ) : (
+            "Questions? Contact the creator using the same channel where you received this survey link."
+          )}
         </p>
       </section>
     </main>

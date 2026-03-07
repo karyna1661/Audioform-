@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { AlertCircle } from "lucide-react"
@@ -42,10 +42,18 @@ export default function QuestionnaireV1Page() {
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [pendingUploads, setPendingUploads] = useState(0)
   const [failedQueue, setFailedQueue] = useState<Array<{ questionId: string; blob: Blob }>>([])
+  const [isSubmittingAnswer, setIsSubmittingAnswer] = useState(false)
   const [lastDurationSeconds, setLastDurationSeconds] = useState<number | null>(null)
   const [surveyLoading, setSurveyLoading] = useState(true)
   const [surveyError, setSurveyError] = useState<string | null>(null)
   const [questionList, setQuestionList] = useState<Array<{ id: string; text: string }>>([])
+  const isMountedRef = useRef(true)
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
 
   useEffect(() => {
     trackEvent("respondent_started")
@@ -123,12 +131,16 @@ export default function QuestionnaireV1Page() {
     }
   }, [resolvedSurveyId])
 
-  const uploadResponse = async (questionId: string, blob: Blob, attempt = 1): Promise<void> => {
+  const uploadResponse = async (questionId: string, blob: Blob, attempt = 1): Promise<boolean> => {
     if (!resolvedSurveyId) {
-      setUploadError("Survey id missing. Re-open the creator's survey link.")
-      return
+      if (isMountedRef.current) {
+        setUploadError("Survey id missing. Re-open the creator's survey link.")
+      }
+      return false
     }
-    setPendingUploads((value) => value + 1)
+    if (isMountedRef.current) {
+      setPendingUploads((value) => value + 1)
+    }
     try {
       const formData = new FormData()
       formData.append("audio", blob, `${questionId}-${Date.now()}.webm`)
@@ -150,28 +162,48 @@ export default function QuestionnaireV1Page() {
       }
 
       recordFirstResponseForActiveSurvey()
+      return true
     } catch (error) {
       if (attempt < 4) {
         const delayMs = 500 * Math.pow(2, attempt - 1)
         await new Promise((resolve) => window.setTimeout(resolve, delayMs))
-        await uploadResponse(questionId, blob, attempt + 1)
+        return uploadResponse(questionId, blob, attempt + 1)
       } else {
-        setUploadError(error instanceof Error ? error.message : "Failed to save response.")
-        setFailedQueue((items) => [...items, { questionId, blob }])
+        if (isMountedRef.current) {
+          setUploadError(error instanceof Error ? error.message : "Failed to save response.")
+          setFailedQueue((items) => [...items, { questionId, blob }])
+        }
+        return false
       }
     } finally {
-      setPendingUploads((value) => Math.max(0, value - 1))
+      if (isMountedRef.current) {
+        setPendingUploads((value) => Math.max(0, value - 1))
+      }
     }
   }
 
   const onSubmit = (blob: Blob) => {
+    void submitAndAdvance(blob)
+  }
+
+  const submitAndAdvance = async (blob: Blob) => {
+    if (isSubmittingAnswer || !current) return
+    setIsSubmittingAnswer(true)
+
     const questionId = current.id
     setUploadError(null)
+    const uploaded = await uploadResponse(questionId, blob)
+    if (!isMountedRef.current) return
+    if (!uploaded) {
+      setIsSubmittingAnswer(false)
+      return
+    }
+
     setAnswers((prev) => ({ ...prev, [questionId]: blob }))
-    void uploadResponse(questionId, blob)
 
     if (index < questionList.length - 1) {
       setIndex((prev) => prev + 1)
+      setIsSubmittingAnswer(false)
       return
     }
 
@@ -244,7 +276,7 @@ export default function QuestionnaireV1Page() {
           </div>
         ) : null}
           <p className={`font-body text-sm text-[#5c5146] text-pretty`}>
-            We are deciding what to build next. Your 30-second voice take directly shapes our roadmap.
+            Give one clear 30-second response so the builder can decide what to improve next.
           </p>
         <div className="mt-3 flex items-center justify-between">
           <p className={`font-body text-sm text-[#5c5146]`}>
@@ -260,14 +292,14 @@ export default function QuestionnaireV1Page() {
         <div className="mt-8">
             <h1 className="text-2xl font-semibold text-balance sm:text-3xl">{current.text}</h1>
             <p className={`font-body mt-2 text-sm text-[#5c5146] text-pretty`}>
-              Give your honest take as if the builder will hear this directly. 20-45 seconds is ideal.
+              Speak directly. One concrete moment in 20-45 seconds is ideal.
             </p>
             <div className="mt-6 rounded-2xl border border-[#dbcdb8] bg-[#fff6ed] p-4">
               <AudioRecorder
                 onSubmit={onSubmit}
                 questionId={current.id}
                 isMobile={isMobile}
-                isUploading={false}
+                isUploading={isSubmittingAnswer || pendingUploads > 0}
                 onRecordingStart={() => trackEvent("response_recording_started", { question_id: current.id })}
                 onRecordingSubmit={({ questionId, durationSeconds }) => {
                   setLastDurationSeconds(durationSeconds)
@@ -301,7 +333,7 @@ export default function QuestionnaireV1Page() {
             ) : null}
             {lastDurationSeconds !== null && lastDurationSeconds < 10 ? (
               <p className={`font-body mt-3 rounded-lg border border-[#dbcdb8] bg-[#f3ecdf] px-3 py-2 text-sm text-[#5c5146]`}>
-                Add one concrete example before submitting. High-signal answers are usually 20+ seconds.
+                Add one concrete example before submitting.
               </p>
             ) : null}
             {pendingUploads > 0 ? (
@@ -310,7 +342,12 @@ export default function QuestionnaireV1Page() {
               </p>
             ) : null}
             <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <Button variant="outline" className="w-full border-[#dbcdb8] bg-[#f3ecdf] sm:w-auto" onClick={() => setIndex((prev) => Math.max(0, prev - 1))} disabled={index === 0}>
+              <Button
+                variant="outline"
+                className="w-full border-[#dbcdb8] bg-[#f3ecdf] sm:w-auto"
+                onClick={() => setIndex((prev) => Math.max(0, prev - 1))}
+                disabled={index === 0 || isSubmittingAnswer}
+              >
                 Previous
               </Button>
               <p className={`font-body text-center text-sm text-[#5c5146] sm:text-left`}>{Object.keys(answers).length} answered</p>

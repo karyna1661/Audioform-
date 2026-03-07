@@ -207,6 +207,39 @@ function remapSelectedIndexForReorder(currentSelected: number, fromIndex: number
   return currentSelected
 }
 
+function evaluateQuestionQuality(question: string): {
+  score: number
+  checks: Array<{ label: string; ok: boolean }>
+} {
+  const text = question.trim()
+  const lower = text.toLowerCase()
+  const questionMarks = (text.match(/\?/g) || []).length
+  const words = text.split(/\s+/).filter(Boolean).length
+
+  const checks = [
+    { label: "Enough context (8+ words)", ok: words >= 8 },
+    { label: "Asks one question", ok: questionMarks <= 1 },
+    {
+      label: "Open-ended phrasing",
+      ok: /^(what|how|where|which|describe|tell)\b/i.test(lower),
+    },
+    {
+      label: "Has concrete anchor (moment/example/timeframe)",
+      ok: /(last|week|day|moment|example|specific|when|where|task|step|flow)\b/i.test(lower),
+    },
+    {
+      label: "Avoids yes/no framing",
+      ok: !/^(is|are|do|did|can|will|would|should|could)\b/i.test(lower),
+    },
+  ]
+
+  const passed = checks.filter((item) => item.ok).length
+  return {
+    score: Math.round((passed / checks.length) * 100),
+    checks,
+  }
+}
+
 export default function QuestionnairesV1Page() {
   const { status, user } = useRequireAdmin()
   const searchParams = useSearchParams()
@@ -453,6 +486,7 @@ export default function QuestionnairesV1Page() {
     target: decisionTarget,
     outcome: desiredOutcome,
   })
+  const selectedQuestionQuality = evaluateQuestionQuality(selected)
   const applyStarterPack = (pack: { id: string; label: string; intent: string; audience: string }) => {
     setIntent(pack.intent)
     setAudience(pack.audience)
@@ -491,6 +525,23 @@ export default function QuestionnairesV1Page() {
   ]
   const completionScore =
     readinessItems.reduce((sum, item) => sum + Number(item.ok), 0) / readinessItems.length
+  const builderOnboardingChecklist = [
+    {
+      id: "decision",
+      label: "Write one decision-focused prompt set",
+      done: readyChecks.hasDecisionSpecificity && readyChecks.hasTwoQuestions,
+    },
+    {
+      id: "quality",
+      label: "Reach 80%+ quality on active prompt",
+      done: selectedQuestionQuality.score >= 80,
+    },
+    {
+      id: "publish",
+      label: "Publish and copy a share link",
+      done: Boolean(publishedSurveyId),
+    },
+  ]
 
   const creatorId = user?.id || ""
   const surveyLink =
@@ -511,9 +562,9 @@ export default function QuestionnairesV1Page() {
     : ""
 
   return (
-    <main className={`min-h-dvh bg-[#f1e7d7] p-4 pb-28 sm:p-6 sm:pb-6`}>
-      <div className="mx-auto max-w-7xl rounded-[2.2rem] border border-[#cfbea4] bg-[linear-gradient(160deg,#fbf6ec_0%,#f4ead9_55%,#efe2ca_100%)] p-4 shadow-[0_20px_80px_rgba(78,53,20,0.08)] sm:p-6">
-        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#cfbea4] pb-5">
+    <main className={`af-shell min-h-dvh p-4 pb-28 sm:p-6 sm:pb-6`}>
+      <div className="af-panel af-fade-up mx-auto max-w-7xl rounded-[2.2rem] border border-[#cfbea4] p-4 sm:p-6">
+        <header className="af-fade-up af-delay-1 flex flex-wrap items-center justify-between gap-3 border-b border-[#cfbea4] pb-5">
           <div>
             <p className={`font-body text-sm text-[#665746] text-pretty`}>Build-in-public signal composer</p>
             <h1 className="text-3xl font-semibold text-balance sm:text-4xl">Design the feedback loop, not just the form</h1>
@@ -588,7 +639,7 @@ export default function QuestionnairesV1Page() {
 
         <section className="mt-6 grid gap-5 lg:grid-cols-[1fr_340px]">
           <div className="space-y-5">
-            <section className="overflow-hidden rounded-3xl border border-[#cfbea4] bg-[#fff7ee]">
+            <section className="af-accent-card af-fade-up af-delay-1 overflow-hidden rounded-3xl border border-[#cfbea4]">
               <div className="border-b border-[#cfbea4] bg-[#f6ead8] px-5 py-3">
                 <p className="text-sm font-semibold uppercase tracking-wide text-[#7a6146]">Trigger: Decision Context</p>
               </div>
@@ -730,7 +781,7 @@ export default function QuestionnairesV1Page() {
               </div>
             </section>
 
-            <section className="overflow-hidden rounded-3xl border border-[#cfbea4] bg-[#fff7ee]">
+            <section className="af-accent-card af-fade-up af-delay-2 overflow-hidden rounded-3xl border border-[#cfbea4]">
               <div className="border-b border-[#cfbea4] bg-[#f6ead8] px-5 py-3">
                 <p className="text-sm font-semibold uppercase tracking-wide text-[#7a6146]">Action: Prompt Flow</p>
               </div>
@@ -840,6 +891,69 @@ export default function QuestionnairesV1Page() {
                         commitQuestionChange(next, selectedIndex)
                       }}
                     />
+                    <div className="mt-3 rounded-2xl border border-[#cfbea4] bg-[#f8efdf] p-3">
+                      <p className="text-sm font-semibold">Question quality coach</p>
+                      <p className={`font-body mt-1 text-xs text-[#665746]`}>
+                        Target 80%+ before publish. Strong prompts ask for one concrete moment, not a rating.
+                      </p>
+                      <div className="mt-2 flex items-center justify-between rounded-lg border border-[#cfbea4] bg-[#fff7ee] px-3 py-2">
+                        <p className="text-xs uppercase tracking-wide text-[#7a6146]">Quality score</p>
+                        <p className="text-sm font-semibold text-[#6e3316]">{selectedQuestionQuality.score}%</p>
+                      </div>
+                      <ul className="mt-2 space-y-1.5">
+                        {selectedQuestionQuality.checks.map((item) => (
+                          <li key={item.label} className="flex items-center gap-2 text-xs">
+                            <CheckCircle2 className={`size-3.5 ${item.ok ? "text-[#2d5a17]" : "text-[#8c7f70]"}`} aria-hidden="true" />
+                            <span className={item.ok ? "text-[#2d5a17]" : "text-[#665746]"}>{item.label}</span>
+                          </li>
+                        ))}
+                      </ul>
+                      <div className="mt-3 grid gap-2">
+                        <Button
+                          variant="outline"
+                          className="w-full border-[#cfbea4] bg-[#fff7ee] text-xs"
+                          onClick={() => {
+                            if (!selected.trim()) return
+                            const next = [...questions]
+                            next[selectedIndex] = /last|week|day|recent|moment/i.test(selected)
+                              ? selected
+                              : `In the last week, ${selected.charAt(0).toLowerCase()}${selected.slice(1)}`
+                            commitQuestionChange(next, selectedIndex)
+                          }}
+                        >
+                          Add timeframe
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="w-full border-[#cfbea4] bg-[#fff7ee] text-xs"
+                          onClick={() => {
+                            if (!selected.trim()) return
+                            const next = [...questions]
+                            next[selectedIndex] = selected.replace(
+                              /^(is|are|do|did|can|will|would|should|could)\b/i,
+                              "What",
+                            )
+                            commitQuestionChange(next, selectedIndex)
+                          }}
+                        >
+                          Convert to open question
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="w-full border-[#cfbea4] bg-[#fff7ee] text-xs"
+                          onClick={() => {
+                            if (!selected.trim()) return
+                            const next = [...questions]
+                            next[selectedIndex] = /example|specific|moment/i.test(selected)
+                              ? selected
+                              : `${selected.replace(/\?*$/, "?")} Share one specific moment.`
+                            commitQuestionChange(next, selectedIndex)
+                          }}
+                        >
+                          Add depth cue
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                   <div className="rounded-2xl border border-[#cfbea4] bg-[#f8efdf] p-3">
                   <p className="text-sm font-semibold">Depth starters</p>
@@ -925,9 +1039,24 @@ export default function QuestionnairesV1Page() {
             </section>
           </div>
 
-          <aside className="h-fit rounded-3xl border border-[#cfbea4] bg-[#f7ecdc] p-4 lg:sticky lg:top-6">
+          <aside className="af-accent-card af-fade-up af-delay-2 h-fit rounded-3xl border border-[#cfbea4] p-4 lg:sticky lg:top-6">
             <h2 className="text-xl font-semibold text-balance">Launch Console</h2>
             <p className={`font-body mt-1 text-sm text-[#665746]`}>Release when quality is credible, not just complete.</p>
+
+            <div className="mt-4 rounded-2xl border border-[#cfbea4] bg-[#fff7ee] p-3">
+              <p className="text-sm font-semibold">Builder onboarding</p>
+              <p className="font-body mt-1 text-xs text-[#665746] text-pretty">
+                Move through this path to get your first decision-ready response set.
+              </p>
+              <ul className="mt-2 space-y-2">
+                {builderOnboardingChecklist.map((item) => (
+                  <li key={item.id} className="flex items-center gap-2 text-sm">
+                    <CheckCircle2 className={`size-4 ${item.done ? "text-[#2d5a17]" : "text-[#8c7f70]"}`} aria-hidden="true" />
+                    <span className={item.done ? "text-[#2d5a17]" : "text-[#665746]"}>{item.label}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
 
             <div className="mt-4 rounded-2xl border border-[#cfbea4] bg-[#fff7ee] p-3">
               <p className="text-sm font-semibold">Readiness index</p>
@@ -1002,17 +1131,21 @@ export default function QuestionnairesV1Page() {
 
             {draftSurveyId ? (
               <div className="mt-4 rounded-2xl border border-[#cfbea4] bg-[#fff7ee] p-3">
-                <p className="text-sm font-semibold">Draft collaboration</p>
+                <p className="text-sm font-semibold">Draft link</p>
                 <p className={`font-body mt-1 text-xs text-[#665746]`}>
-                  Share this link to reopen and keep editing this draft later.
+                  Share to reopen this exact draft later.
                 </p>
                 <Button
                   variant="outline"
                   className="mt-2 w-full border-[#cfbea4] bg-[#fff7ee]"
                   onClick={async () => {
-                    const draftLink = `${window.location.origin}/admin/questionnaires/v1?surveyId=${encodeURIComponent(draftSurveyId)}`
-                    await navigator.clipboard.writeText(draftLink)
-                    setDraftMessage("Draft link copied.")
+                    try {
+                      const draftLink = `${window.location.origin}/admin/questionnaires/v1?surveyId=${encodeURIComponent(draftSurveyId)}`
+                      await navigator.clipboard.writeText(draftLink)
+                      setDraftMessage("Draft link copied.")
+                    } catch {
+                      setDraftMessage("Could not copy draft link. Copy it from the browser address bar.")
+                    }
                   }}
                 >
                   <Copy className="mr-2 size-4" aria-hidden="true" />
@@ -1023,18 +1156,22 @@ export default function QuestionnairesV1Page() {
 
             {publishedSurveyId ? (
               <div className="mt-4 rounded-2xl border border-[#cfbea4] bg-[#fff7ee] p-3">
-                <p className="text-sm font-semibold">Share and embed distribution</p>
+                <p className="text-sm font-semibold">Share and embed</p>
                 <p className={`font-body mt-1 text-xs text-[#665746]`}>
-                  Copy the survey link for direct responses, or use embed/iframe for on-site collection.
+                  Copy a direct link or embed code.
                 </p>
                 <div className="mt-2 grid gap-2">
                   <Button
                     variant="outline"
                     className="w-full border-[#cfbea4] bg-[#fff7ee]"
                     onClick={async () => {
-                      await navigator.clipboard.writeText(surveyLink)
-                      trackEvent("share_link_copied", { share_link: surveyLink, share_type: "survey" })
-                      setDraftMessage("Survey link copied.")
+                      try {
+                        await navigator.clipboard.writeText(surveyLink)
+                        trackEvent("share_link_copied", { share_link: surveyLink, share_type: "survey" })
+                        setDraftMessage("Survey link copied.")
+                      } catch {
+                        setDraftMessage("Could not copy survey link. Copy it from the address bar.")
+                      }
                     }}
                   >
                     <Copy className="mr-2 size-4" aria-hidden="true" />
@@ -1044,9 +1181,13 @@ export default function QuestionnairesV1Page() {
                     variant="outline"
                     className="w-full border-[#cfbea4] bg-[#fff7ee]"
                     onClick={async () => {
-                      await navigator.clipboard.writeText(embedLink)
-                      trackEvent("share_link_copied", { share_link: embedLink, share_type: "embed" })
-                      setDraftMessage("Embed link copied.")
+                      try {
+                        await navigator.clipboard.writeText(embedLink)
+                        trackEvent("share_link_copied", { share_link: embedLink, share_type: "embed" })
+                        setDraftMessage("Embed link copied.")
+                      } catch {
+                        setDraftMessage("Could not copy embed link. Copy it manually from the field.")
+                      }
                     }}
                   >
                     <Copy className="mr-2 size-4" aria-hidden="true" />
@@ -1056,8 +1197,12 @@ export default function QuestionnairesV1Page() {
                     variant="outline"
                     className="w-full border-[#cfbea4] bg-[#fff7ee]"
                     onClick={async () => {
-                      await navigator.clipboard.writeText(iframeSnippet)
-                      setDraftMessage("Iframe embed code copied.")
+                      try {
+                        await navigator.clipboard.writeText(iframeSnippet)
+                        setDraftMessage("Iframe embed code copied.")
+                      } catch {
+                        setDraftMessage("Could not copy iframe code. Copy it manually from this panel.")
+                      }
                     }}
                   >
                     <Copy className="mr-2 size-4" aria-hidden="true" />
@@ -1067,8 +1212,12 @@ export default function QuestionnairesV1Page() {
                     variant="outline"
                     className="w-full border-[#cfbea4] bg-[#fff7ee]"
                     onClick={async () => {
-                      await navigator.clipboard.writeText(scriptSnippet)
-                      setDraftMessage("Script embed code copied.")
+                      try {
+                        await navigator.clipboard.writeText(scriptSnippet)
+                        setDraftMessage("Script embed code copied.")
+                      } catch {
+                        setDraftMessage("Could not copy script code. Copy it manually from this panel.")
+                      }
                     }}
                   >
                     <Copy className="mr-2 size-4" aria-hidden="true" />
@@ -1083,7 +1232,7 @@ export default function QuestionnairesV1Page() {
                 <Sparkles className="size-3.5" aria-hidden="true" />
                 Behavioral cue
               </p>
-              <p className="mt-1">Strong prompts ask for lived moments, not ratings. Edit every question for depth and specificity.</p>
+              <p className="mt-1">Strong prompts ask for one lived moment, one friction point, and one clear suggestion.</p>
             </div>
           </aside>
         </section>

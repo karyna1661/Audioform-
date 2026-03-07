@@ -12,8 +12,8 @@ export default function Home() {
   const { status } = useAuth()
   const prefersReducedMotion = useReducedMotion()
   const [isHydrated, setIsHydrated] = useState(false)
-  const lineOne = "Builders don't lack feedback. They lack decision-ready signal."
-  const lineTwo = "Audioform helps you hear conviction and decide what to ship next."
+  const lineOne = "Ask one focused question. Collect voice signal. Decide what to ship next."
+  const lineTwo = "Audioform turns short responses into decision-ready signal."
   const [typedLineOne, setTypedLineOne] = useState(prefersReducedMotion ? lineOne : "")
   const [typedLineTwo, setTypedLineTwo] = useState(prefersReducedMotion ? lineTwo : "")
   const signalLoopHref = status === "authenticated" ? "/admin/dashboard/v4" : "/signup"
@@ -106,9 +106,9 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-dvh bg-[#f3ecdf] text-[#1f1b17]">
+    <main className="af-shell min-h-dvh text-[#1f1b17]">
       <div className="mx-auto max-w-6xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-8">
-        <header className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#dbcdb8] bg-[#f7efe2] px-4 py-3 sm:rounded-full sm:px-5">
+        <header className="af-fade-up flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#dbcdb8] bg-[#f7efe2] px-4 py-3 sm:rounded-full sm:px-5">
           <p className="text-sm font-medium uppercase text-balance">AudioForm</p>
           <div className="flex w-full items-center gap-2 sm:w-auto">
             <Link
@@ -128,7 +128,7 @@ export default function Home() {
           </div>
         </header>
 
-        <section className="mt-8 rounded-[1.75rem] border border-[#dbcdb8] bg-[#f9f4ea] p-5 sm:mt-10 sm:rounded-[2.5rem] sm:p-12">
+        <section className="af-panel af-fade-up af-delay-1 mt-8 rounded-[1.75rem] border p-5 sm:mt-10 sm:rounded-[2.5rem] sm:p-12">
           <p className="font-body text-sm uppercase text-[#5c5146] text-balance">Decision-ready voice signal for builders</p>
           <motion.div className="mt-4 max-w-3xl overflow-hidden sm:mt-5">
             <motion.h1
@@ -158,15 +158,14 @@ export default function Home() {
             </motion.p>
           </div>
 
-          <div className="mt-5 grid gap-2 sm:grid-cols-3">
+          <div className="mt-5 grid gap-2 sm:grid-cols-2">
             {[
-              "What decision are you trying to make this week?",
-              "What signal would change your mind?",
-              "What response would make your next step obvious?",
+              "Define the decision you need to make this week.",
+              "Collect 30-second takes that reveal conviction and friction.",
             ].map((line) => (
               <div
                 key={line}
-                className="font-body flex min-h-20 items-center justify-center rounded-xl border border-[#dbcdb8] bg-[#fff6ed] px-3 py-3 text-center text-sm font-medium leading-snug text-[#5c5146]"
+              className="af-chip af-fade-up af-delay-2 font-body flex min-h-20 items-center justify-center rounded-xl border px-3 py-3 text-center text-sm font-medium leading-snug text-[#5c5146]"
               >
                 {line}
               </div>
@@ -177,16 +176,16 @@ export default function Home() {
             <Link
               href={signalLoopHref}
               onClick={() => trackEvent("creator_clicked_start", { entry_point: "home_open_dashboard" })}
-              className="w-full rounded-full bg-[#b85e2d] px-5 py-3 text-center text-sm font-medium text-[#fff6ed] hover:bg-[#a85327] sm:w-auto"
+              className="af-glow-hover w-full rounded-full bg-[#b85e2d] px-5 py-3 text-center text-sm font-medium text-[#fff6ed] hover:bg-[#a85327] sm:w-auto"
             >
               Create your survey
             </Link>
             <Link
               href={questionnaireHref}
               onClick={() => trackEvent("creator_clicked_start", { entry_point: "home_try_voice_survey" })}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[#dbcdb8] bg-[#fff6ed] px-5 py-3 text-center text-sm font-medium text-[#1f1b17] hover:bg-[#f5ebdd] sm:w-auto sm:justify-start"
+              className="af-chip af-glow-hover inline-flex w-full items-center justify-center gap-2 rounded-full border px-5 py-3 text-center text-sm font-medium text-[#1f1b17] hover:bg-[#f5ebdd] sm:w-auto sm:justify-start"
             >
-              Leave a 30s voice take
+              Preview respondent flow
               <ChevronRight className="size-4" aria-hidden="true" />
             </Link>
           </div>
@@ -210,7 +209,7 @@ export default function Home() {
               text: "Replay strongest responses, identify the blocking tension, and commit to the next action.",
             },
           ].map((item) => (
-            <article key={item.title} className="rounded-3xl border border-[#dbcdb8] bg-[#faf6ee] p-6">
+            <article key={item.title} className="af-accent-card af-glow-hover af-fade-up af-delay-3 rounded-3xl border p-6">
               <div className="inline-flex rounded-full border border-[#dbcdb8] p-2 text-[#b85e2d]">{item.icon}</div>
               <h2 className="mt-4 text-xl font-medium text-balance">{item.title}</h2>
               <p className="mt-2 text-pretty text-sm leading-relaxed text-[#5c5146]">{item.text}</p>

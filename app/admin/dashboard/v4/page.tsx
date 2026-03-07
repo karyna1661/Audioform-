@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react"
 import { useAuth } from "@/lib/auth-context"
 import { useRequireAdmin } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, ArrowUpRight, Calendar, Mic, Target, Trash2 } from "lucide-react"
+import { ArrowLeft, ArrowUpRight, Calendar, CheckCircle2, Mic, Target, Trash2 } from "lucide-react"
 import { trackEvent } from "@/lib/analytics"
 import { SurveyLoadingSkeleton } from "@/components/survey-loading-skeleton"
 import { AdminMobileNav } from "@/components/admin-mobile-nav"
@@ -168,6 +168,26 @@ export default function AdminDashboardV4Page() {
     () => surveys.filter((survey) => survey.status === "published"),
     [surveys],
   )
+  const onboardingChecklist = useMemo(
+    () => [
+      {
+        id: "first-survey",
+        label: "Create your first survey",
+        done: surveys.length > 0,
+      },
+      {
+        id: "publish",
+        label: "Publish one survey",
+        done: publishedSurveys.length > 0,
+      },
+      {
+        id: "first-response",
+        label: "Collect one voice response",
+        done: responses.length > 0,
+      },
+    ],
+    [surveys.length, publishedSurveys.length, responses.length],
+  )
   const surveyTitleById = useMemo(() => new Map(surveys.map((survey) => [survey.id, survey.title])), [surveys])
 
   const ttfrLabel = useMemo(() => {
@@ -206,8 +226,8 @@ export default function AdminDashboardV4Page() {
   }
 
   return (
-    <main className={`min-h-dvh bg-[#f3ecdf] p-4 pb-28 sm:p-6 sm:pb-6`}>
-      <div className="mx-auto max-w-7xl rounded-[1.5rem] border border-[#dbcdb8] bg-[#f9f4ea] p-4 sm:rounded-[2rem] sm:p-6">
+    <main className={`af-shell min-h-dvh p-4 pb-28 sm:p-6 sm:pb-6`}>
+      <div className="af-panel af-fade-up mx-auto max-w-7xl rounded-[1.5rem] border p-4 sm:rounded-[2rem] sm:p-6">
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#dbcdb8] pb-4">
           <div>
             <p className={`font-body text-sm text-[#5c5146] text-pretty`}>Builder workspace</p>
@@ -237,8 +257,31 @@ export default function AdminDashboardV4Page() {
           </div>
         </header>
 
+        <section className="af-accent-card af-fade-up af-delay-1 mt-5 rounded-2xl border p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-lg font-semibold text-balance">First-run checklist</h2>
+            <p className="font-body text-xs text-[#5c5146] text-pretty">
+              Complete these three steps to reach first value fast.
+            </p>
+          </div>
+          <ul className="mt-3 grid gap-2 sm:grid-cols-3">
+            {onboardingChecklist.map((item) => (
+              <li key={item.id} className="rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] p-3 text-sm">
+                <p className="inline-flex items-center gap-2 font-semibold text-balance">
+                  <CheckCircle2
+                    className={`size-4 ${item.done ? "text-[#2d5a17]" : "text-[#8c7f70]"}`}
+                    aria-hidden="true"
+                  />
+                  {item.label}
+                </p>
+                <p className="font-body mt-1 text-xs text-[#5c5146]">{item.done ? "Done" : "Next"}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+
         <section className="mt-6 grid gap-4 lg:grid-cols-[260px_1fr_300px]">
-          <aside className="rounded-2xl border border-[#dbcdb8] bg-[#f3ecdf] p-4">
+          <aside className="af-accent-card af-fade-up af-delay-1 rounded-2xl border p-4">
             <h2 className="text-xl font-semibold text-balance">Decision KPIs</h2>
             <div className="mt-3 space-y-2">
               <Metric label="Published rate" value={`${publishedRate}%`} />
@@ -247,7 +290,7 @@ export default function AdminDashboardV4Page() {
             </div>
           </aside>
 
-          <section className="rounded-2xl border border-[#dbcdb8] bg-[#fff6ed] p-5">
+          <section className="af-accent-card af-fade-up af-delay-1 rounded-2xl border p-5">
             <h2 className="text-2xl font-semibold text-balance">Survey Stack</h2>
             <p className={`font-body mt-1 text-sm text-[#5c5146] text-pretty`}>
               One row per survey. Open a survey to review responses and decide your next change.
@@ -278,19 +321,16 @@ export default function AdminDashboardV4Page() {
                 <article className="rounded-xl border border-[#dbcdb8] bg-[#f9f4ea] p-4">
                   <p className="text-sm font-semibold text-balance">No surveys yet</p>
                   <p className={`font-body mt-1 text-sm text-[#5c5146]`}>
-                    Start in under 60 seconds: define one decision, pick an intent mode, publish three prompts.
+                    Start with one decision question and publish your first survey.
                   </p>
                   <ol className={`font-body mt-3 space-y-1 text-sm text-[#5c5146]`}>
-                    <li>1. Define one decision you need to make this week.</li>
-                    <li>2. Pick a truth lens: validation, critique, confusion, or emotion.</li>
-                    <li>3. Publish and collect your first 5 voice responses.</li>
+                    <li>1. Write one focused prompt.</li>
+                    <li>2. Publish.</li>
+                    <li>3. Collect and review first responses.</li>
                   </ol>
                   <div className="mt-3 flex flex-col gap-2 sm:flex-row">
                     <Link href="/admin/questionnaires" className="inline-flex items-center justify-center rounded-lg bg-[#b85e2d] px-3 py-2 text-sm text-[#fff6ed] hover:bg-[#a05227]">
                       Create first survey
-                    </Link>
-                    <Link href="/questionnaire/v1" className="inline-flex items-center justify-center rounded-lg border border-[#dbcdb8] bg-[#fff6ed] px-3 py-2 text-sm hover:bg-[#efe4d3]">
-                      Preview respondent flow
                     </Link>
                   </div>
                 </article>
@@ -341,9 +381,13 @@ export default function AdminDashboardV4Page() {
                         variant="outline"
                         className="w-full border-[#dbcdb8] bg-[#fff6ed] sm:w-auto"
                         onClick={async () => {
-                          const draftLink = `${window.location.origin}/admin/questionnaires/v1?surveyId=${encodeURIComponent(survey.id)}`
-                          await navigator.clipboard.writeText(draftLink)
-                          setUiMessage(`Draft link copied for "${survey.title}".`)
+                          try {
+                            const draftLink = `${window.location.origin}/admin/questionnaires/v1?surveyId=${encodeURIComponent(survey.id)}`
+                            await navigator.clipboard.writeText(draftLink)
+                            setUiMessage(`Draft link copied for "${survey.title}".`)
+                          } catch {
+                            setUiMessage("Could not copy draft link. Please copy from the browser address bar.")
+                          }
                         }}
                       >
                         Copy draft link
@@ -369,7 +413,7 @@ export default function AdminDashboardV4Page() {
           </section>
 
           <aside className="space-y-4">
-            <article className="rounded-2xl border border-[#dbcdb8] bg-[#f3ecdf] p-4">
+            <article className="af-accent-card af-fade-up af-delay-2 rounded-2xl border p-4">
               <h2 className="text-lg font-semibold text-balance">Today</h2>
               <p className={`font-body mt-1 text-xs text-[#5c5146]`}>
                 Real-time activity feed from survey, response, and reminder events.
@@ -388,7 +432,7 @@ export default function AdminDashboardV4Page() {
                 )}
               </ul>
             </article>
-            <article className="rounded-2xl border border-[#dbcdb8] bg-[#f3ecdf] p-4">
+            <article className="af-accent-card af-fade-up af-delay-2 rounded-2xl border p-4">
               <h2 className="text-lg font-semibold text-balance">Quick Actions</h2>
               <div className="mt-3 hidden gap-2 sm:grid">
                 <Link href="/admin/responses" className="inline-flex items-center justify-between rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] px-3 py-2 text-sm hover:bg-[#efe4d3]">

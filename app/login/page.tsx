@@ -4,23 +4,26 @@ import type React from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useEffect, useState } from "react"
-import { AlertCircle, Eye, EyeOff, Headphones, Loader2, ShieldCheck, Sparkles } from "lucide-react"
+import { AlertCircle, Eye, EyeOff, Headphones, Loader2, ShieldCheck } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
+function isAllowedCallbackUrl(value: string): boolean {
+  if (!value.startsWith("/") || value.startsWith("//")) return false
+  if (value === "/") return true
+  const allowedRoots = ["/admin", "/questionnaire", "/embed"]
+  return allowedRoots.some((root) => value === root || value.startsWith(`${root}/`))
+}
+
 export default function LoginPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const requestedCallbackUrl = searchParams.get("callbackUrl")
-  const allowedCallbackPrefixes = ["/admin", "/questionnaire", "/"]
   const callbackUrl =
-    requestedCallbackUrl &&
-    requestedCallbackUrl.startsWith("/") &&
-    !requestedCallbackUrl.startsWith("//") &&
-    allowedCallbackPrefixes.some((prefix) => requestedCallbackUrl.startsWith(prefix))
+    requestedCallbackUrl && isAllowedCallbackUrl(requestedCallbackUrl)
       ? requestedCallbackUrl
       : "/admin/dashboard/v4"
   const { signIn, status } = useAuth()
@@ -58,9 +61,9 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-dvh bg-[#f3ecdf] p-4 sm:p-6">
-      <section className="mx-auto grid max-w-6xl overflow-hidden rounded-[2rem] border border-[#dbcdb8] bg-[#f9f4ea] lg:grid-cols-[1.15fr_1fr]">
-        <aside className="border-b border-[#dbcdb8] bg-[#fff6ed] p-6 sm:p-8 lg:border-b-0 lg:border-r">
+    <main className="af-shell min-h-dvh p-4 sm:p-6">
+      <section className="af-panel af-fade-up mx-auto grid max-w-6xl overflow-hidden rounded-[2rem] border lg:grid-cols-[1.15fr_1fr]">
+        <aside className="af-accent-card border-b border-[#dbcdb8] p-6 sm:p-8 lg:border-b-0 lg:border-r">
           <Link
             href="/"
             className="inline-flex items-center rounded-full border border-[#dbcdb8] bg-[#f9f4ea] px-4 py-2 text-sm text-[#5c5146] hover:bg-[#f3ecdf]"
@@ -70,13 +73,12 @@ export default function LoginPage() {
           <p className="font-body mt-4 text-sm text-[#5c5146] text-pretty">AudioForm Access</p>
           <h1 className="mt-2 text-4xl font-semibold text-balance">Sign in to your signal inbox</h1>
           <p className="font-body mt-4 text-base text-[#5c5146] text-pretty">
-            Continue your build-in-public loop: review voice feedback, find conviction, and decide what to ship next.
+            Review responses, find signal, and decide your next build step.
           </p>
 
           <div className="mt-6 space-y-3">
-            <FeatureRow icon={<Headphones className="size-4 text-[#8a431f]" aria-hidden="true" />} text="Hear what users actually felt, not just what they typed." />
-            <FeatureRow icon={<ShieldCheck className="size-4 text-[#8a431f]" aria-hidden="true" />} text="Creator and respondent flows stay separate and clean." />
-            <FeatureRow icon={<Sparkles className="size-4 text-[#8a431f]" aria-hidden="true" />} text="Run a weekly loop: ask, listen, decide, and ship." />
+            <FeatureRow icon={<Headphones className="size-4 text-[#8a431f]" aria-hidden="true" />} text="Hear what users felt, not just what they typed." />
+            <FeatureRow icon={<ShieldCheck className="size-4 text-[#8a431f]" aria-hidden="true" />} text="Creator and respondent flows stay separated." />
           </div>
 
           <div className="mt-8 rounded-xl border border-[#dbcdb8] bg-[#f9f4ea] p-4">
@@ -153,6 +155,15 @@ export default function LoginPage() {
                 )}
               </Button>
             </form>
+
+            <article className="mt-5 rounded-xl border border-[#dbcdb8] bg-[#f9f4ea] p-3">
+              <p className="text-sm font-semibold text-balance">Resume your loop</p>
+              <ol className="font-body mt-2 space-y-1 text-sm text-[#5c5146] text-pretty">
+                <li>1. Open your active survey draft.</li>
+                <li>2. Publish or share the link.</li>
+                <li>3. Replay strongest responses in Signal Inbox.</li>
+              </ol>
+            </article>
 
             <p className="font-body mt-6 text-sm text-[#5c5146]">
               Don&apos;t have an account?{" "}

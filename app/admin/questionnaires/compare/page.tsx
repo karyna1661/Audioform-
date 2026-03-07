@@ -12,9 +12,9 @@ export default function QuestionnairesComparePage() {
   if (status === "loading") return <SurveyLoadingSkeleton label="Loading questionnaire options..." />
 
   return (
-    <main className={`min-h-dvh bg-[#f3ecdf] p-4 pb-28 sm:p-6 sm:pb-6`}>
-      <section className="mx-auto max-w-5xl rounded-[2rem] border border-[#dbcdb8] bg-[#f9f4ea] p-6">
-        <p className={`font-body text-sm text-[#5c5146]`}>Survey Creation Tool</p>
+    <main className={`af-shell min-h-dvh p-4 pb-28 sm:p-6 sm:pb-6`}>
+      <section className="af-panel af-fade-up mx-auto max-w-5xl rounded-[2rem] border border-[#dbcdb8] p-6">
+        <p className={`font-body text-sm text-[#5c5146] text-pretty`}>Survey Creation Tool</p>
         <h1 className="mt-1 text-4xl font-semibold text-balance">Selection Complete</h1>
         <p className={`font-body mt-3 text-pretty text-[#5c5146]`}>
           Version 1 is selected and active as the default survey creation experience.
@@ -31,9 +31,12 @@ export default function QuestionnairesComparePage() {
 
 function OptionCard({ href, title, description }: { href: string; title: string; description: string }) {
   return (
-    <Link href={href} className="rounded-2xl border border-[#dbcdb8] bg-[#fff6ed] p-4 transition hover:-translate-y-0.5 hover:border-[#b85e2d]">
+    <Link
+      href={href}
+      className="af-accent-card af-fade-up af-delay-1 af-glow-hover rounded-2xl border border-[#dbcdb8] p-4"
+    >
       <h2 className="text-2xl font-semibold text-balance">{title}</h2>
-      <p className="mt-2 text-sm text-[#5c5146] text-pretty">{description}</p>
+      <p className="font-body mt-2 text-sm text-[#5c5146] text-pretty">{description}</p>
       <p className="mt-4 text-sm font-semibold text-[#8a431f]">Open</p>
     </Link>
   )
