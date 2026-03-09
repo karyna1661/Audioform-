@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { readFile } from "node:fs/promises"
 import { getSessionFromRequest } from "@/lib/server/auth-session"
-import { getStoredResponseById } from "@/lib/server/response-store"
-import { getSurveyById } from "@/lib/server/survey-store"
+import { getStoredResponseByIdForSurveyIds } from "@/lib/server/response-store"
+import { listSurveys } from "@/lib/server/survey-store"
 import { downloadFromB2StoragePath } from "@/lib/server/b2-storage"
 
 export async function GET(
@@ -15,13 +15,10 @@ export async function GET(
   }
 
   const { id } = await context.params
-  const response = await getStoredResponseById(id)
+  const ownedSurveyIds = (await listSurveys({ createdBy: session.sub })).map((survey) => survey.id)
+  const response = await getStoredResponseByIdForSurveyIds(id, ownedSurveyIds)
   if (!response) {
     return NextResponse.json({ error: "Response not found." }, { status: 404 })
-  }
-  const survey = await getSurveyById(response.surveyId)
-  if (!survey || survey.createdBy !== session.sub) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 
   try {

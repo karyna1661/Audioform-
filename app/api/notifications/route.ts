@@ -5,6 +5,7 @@ import {
   getNotificationConfigByUserId,
   upsertNotificationConfig,
 } from "@/lib/server/notification-store"
+import { hasTrustedOrigin } from "@/lib/server/request-guards"
 
 const configSchema = z.object({
   newResponse: z.boolean(),
@@ -37,6 +38,17 @@ export async function PUT(request: NextRequest) {
   }
 
   try {
+    if (
+      !hasTrustedOrigin({
+        requestOrigin: request.headers.get("origin"),
+        requestReferer: request.headers.get("referer"),
+        requestUrl: request.url,
+        configuredAppUrl: process.env.NEXT_PUBLIC_APP_URL,
+      })
+    ) {
+      return NextResponse.json({ error: "Invalid request origin." }, { status: 403 })
+    }
+
     const json = await request.json()
     const parsed = configSchema.safeParse(json)
     if (!parsed.success) {

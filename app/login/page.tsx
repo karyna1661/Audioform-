@@ -6,27 +6,20 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { useEffect, useState } from "react"
 import { AlertCircle, Eye, EyeOff, Headphones, Loader2, ShieldCheck } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
+import { sanitizeCallbackUrl } from "@/lib/auth/callback-url"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-
-function isAllowedCallbackUrl(value: string): boolean {
-  if (!value.startsWith("/") || value.startsWith("//")) return false
-  if (value === "/") return true
-  const allowedRoots = ["/admin", "/questionnaire", "/embed"]
-  return allowedRoots.some((root) => value === root || value.startsWith(`${root}/`))
-}
+import { PrivyAuthActions } from "@/components/privy-auth-actions"
 
 export default function LoginPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const requestedCallbackUrl = searchParams.get("callbackUrl")
-  const callbackUrl =
-    requestedCallbackUrl && isAllowedCallbackUrl(requestedCallbackUrl)
-      ? requestedCallbackUrl
-      : "/admin/dashboard/v4"
+  const callbackUrl = sanitizeCallbackUrl(requestedCallbackUrl)
   const { signIn, status } = useAuth()
+  const hasPrivy = Boolean(process.env.NEXT_PUBLIC_PRIVY_APP_ID)
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -100,8 +93,8 @@ export default function LoginPage() {
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
-
             <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+              {hasPrivy ? <PrivyAuthActions callbackUrl={callbackUrl} mode="login" /> : null}
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input

@@ -12,11 +12,7 @@ import { AdminMobileNav } from "@/components/admin-mobile-nav"
 import { SurveyLoadingSkeleton } from "@/components/survey-loading-skeleton"
 
 
-const initialQuestions = [
-  "What part of this product helped you most this week?",
-  "Where did you hesitate before completing your task?",
-  "What would you change first to make this easier to use?",
-]
+const initialQuestions: string[] = []
 const DEFAULT_SURVEY_TITLE = "Activation Decision Pulse"
 const DEFAULT_DECISION_TARGET = "Onboarding flow"
 const DEFAULT_CHANGE_TYPE = "Simplify"

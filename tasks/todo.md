@@ -33,6 +33,7 @@
 - [x] Build 30/60/90 GTM execution board from `future-work/audioform-marketing-department-gtm-os.md`.
 - [ ] Ship category positioning update on primary landing page.
 - [ ] Implement first weekly "Signal Log" content cycle (anchor + derivatives + distribution).
+- [x] Build local-only 30-day pre-beta content scheduler with completion checklist.
 - [x] Add responder -> creator conversion CTA on thank-you page with event tracking.
 - [ ] Instrument channel attribution events for X/Farcaster -> signup -> first survey published.
 - [x] Analyze Apify dataset for GTM language and content pattern signals.
@@ -74,3 +75,5 @@
 - Notification persistence review: rules/template now load + save through `/api/notifications` and Supabase `notification_configs`.
 - Notification automation review: `POST /api/responses` now sends creator notification when `newResponse` rule is enabled.
 - Response-store migration review: `lib/server/response-store.ts` now persists to Supabase `response_records` instead of local `responses.json`.
+- Local content scheduler review: added `/local/content-scheduler` with 30 seeded pre-beta posts, copy-to-clipboard actions, and persistent completion tracking via local storage; production route returns 404.
+- Local X signal dashboard review: added `/local/x-signal` to surface the latest Apify X analysis file, summarize posting patterns, and recommend the strongest next scheduler cards; production route returns 404.

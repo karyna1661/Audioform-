@@ -10,6 +10,7 @@ import { ArrowLeft, ArrowUpRight, Calendar, CheckCircle2, Mic, Target, Trash2 } 
 import { trackEvent } from "@/lib/analytics"
 import { SurveyLoadingSkeleton } from "@/components/survey-loading-skeleton"
 import { AdminMobileNav } from "@/components/admin-mobile-nav"
+import { PrivySignOutButton } from "@/components/privy-sign-out-button"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -225,6 +226,8 @@ export default function AdminDashboardV4Page() {
     return <SurveyLoadingSkeleton label="Loading signal inbox..." />
   }
 
+  const hasPrivy = Boolean(process.env.NEXT_PUBLIC_PRIVY_APP_ID)
+
   return (
     <main className={`af-shell min-h-dvh p-4 pb-28 sm:p-6 sm:pb-6`}>
       <div className="af-panel af-fade-up mx-auto max-w-7xl rounded-[1.5rem] border p-4 sm:rounded-[2rem] sm:p-6">
@@ -237,17 +240,32 @@ export default function AdminDashboardV4Page() {
             {loadError ? <p className={`font-body mt-1 text-sm text-[#8a3d2b]`}>{loadError}</p> : null}
           </div>
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
-            <Button
-              variant="outline"
-              className="w-full border-[#dbcdb8] bg-[#f3ecdf] sm:w-auto"
-              onClick={async () => {
-                await signOut()
-                router.push("/login")
-              }}
-            >
-              <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
-              Sign out
-            </Button>
+            {hasPrivy ? (
+              <PrivySignOutButton redirectTo="/login">
+                {({ onClick }) => (
+                  <Button
+                    variant="outline"
+                    className="w-full border-[#dbcdb8] bg-[#f3ecdf] sm:w-auto"
+                    onClick={onClick}
+                  >
+                    <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
+                    Sign out
+                  </Button>
+                )}
+              </PrivySignOutButton>
+            ) : (
+              <Button
+                variant="outline"
+                className="w-full border-[#dbcdb8] bg-[#f3ecdf] sm:w-auto"
+                onClick={async () => {
+                  await signOut()
+                  router.push("/login")
+                }}
+              >
+                <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
+                Sign out
+              </Button>
+            )}
             <Link href="/admin/questionnaires" className="hidden sm:inline-flex">
               <Button className="w-full bg-[#b85e2d] text-[#fff6ed] hover:bg-[#a05227] sm:w-auto">
                 <Mic className="mr-2 size-4" aria-hidden="true" />
@@ -282,6 +300,22 @@ export default function AdminDashboardV4Page() {
 
         <section className="mt-6 grid gap-4 lg:grid-cols-[260px_1fr_300px]">
           <aside className="af-accent-card af-fade-up af-delay-1 rounded-2xl border p-4">
+            <h2 className="text-lg font-semibold text-balance">Quick Actions</h2>
+            <div className="mt-3 hidden gap-2 sm:grid">
+              <Link href="/admin/responses" className="inline-flex items-center justify-between rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] px-3 py-2 text-sm hover:bg-[#efe4d3]">
+                Moderate queue (response-level)
+                <ArrowUpRight className="size-4" aria-hidden="true" />
+              </Link>
+              <Link href="/admin/notifications" className="rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] px-3 py-2 text-sm hover:bg-[#efe4d3]">
+                Configure creator notifications
+              </Link>
+              <Link href="/questionnaire/v1" className="rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] px-3 py-2 text-sm hover:bg-[#efe4d3]">
+                Open respondent flow preview
+              </Link>
+            </div>
+
+            <div className="my-4 border-t border-[#dbcdb8]" />
+
             <h2 className="text-xl font-semibold text-balance">Decision KPIs</h2>
             <div className="mt-3 space-y-2">
               <Metric label="Published rate" value={`${publishedRate}%`} />
@@ -431,21 +465,6 @@ export default function AdminDashboardV4Page() {
                   </li>
                 )}
               </ul>
-            </article>
-            <article className="af-accent-card af-fade-up af-delay-2 rounded-2xl border p-4">
-              <h2 className="text-lg font-semibold text-balance">Quick Actions</h2>
-              <div className="mt-3 hidden gap-2 sm:grid">
-                <Link href="/admin/responses" className="inline-flex items-center justify-between rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] px-3 py-2 text-sm hover:bg-[#efe4d3]">
-                  Moderate queue (response-level)
-                  <ArrowUpRight className="size-4" aria-hidden="true" />
-                </Link>
-                <Link href="/admin/notifications" className="rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] px-3 py-2 text-sm hover:bg-[#efe4d3]">
-                  Configure creator notifications
-                </Link>
-                <Link href="/questionnaire/v1" className="rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] px-3 py-2 text-sm hover:bg-[#efe4d3]">
-                  Open respondent flow preview
-                </Link>
-              </div>
             </article>
           </aside>
         </section>

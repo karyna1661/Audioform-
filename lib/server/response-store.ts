@@ -188,6 +188,7 @@ export async function createStoredResponse(input: {
 
 export async function listStoredResponses(filters?: {
   surveyId?: string
+  surveyIds?: string[]
   questionId?: string
   userId?: string
 }): Promise<StoredResponse[]> {
@@ -196,6 +197,7 @@ export async function listStoredResponses(filters?: {
     "order=created_at.desc",
   ]
   if (filters?.surveyId) params.push(`survey_id=eq.${encodeURIComponent(filters.surveyId)}`)
+  if (filters?.surveyIds?.length) params.push(`survey_id=in.(${filters.surveyIds.map((id) => encodeURIComponent(id)).join(",")})`)
   if (filters?.questionId) params.push(`question_id=eq.${encodeURIComponent(filters.questionId)}`)
   if (filters?.userId) params.push(`user_id=eq.${encodeURIComponent(filters.userId)}`)
 
@@ -206,6 +208,20 @@ export async function listStoredResponses(filters?: {
 export async function getStoredResponseById(id: string): Promise<StoredResponse | null> {
   const rows = await supabaseRequest<ResponseRow[]>(
     `/rest/v1/response_records?id=eq.${encodeURIComponent(id)}&select=id,survey_id,question_id,user_id,file_name,mime_type,size,storage_path,public_url,flagged,high_signal,bookmarked,moderation_updated_at,created_at&limit=1`,
+  )
+  if (!rows.length) return null
+  return mapRow(rows[0])
+}
+
+export async function getStoredResponseByIdForSurveyIds(
+  id: string,
+  surveyIds: string[],
+): Promise<StoredResponse | null> {
+  if (!surveyIds.length) return null
+  const rows = await supabaseRequest<ResponseRow[]>(
+    `/rest/v1/response_records?id=eq.${encodeURIComponent(id)}&survey_id=in.(${surveyIds
+      .map((surveyId) => encodeURIComponent(surveyId))
+      .join(",")})&select=id,survey_id,question_id,user_id,file_name,mime_type,size,storage_path,public_url,flagged,high_signal,bookmarked,moderation_updated_at,created_at&limit=1`,
   )
   if (!rows.length) return null
   return mapRow(rows[0])
@@ -234,6 +250,34 @@ export async function updateStoredResponse(
   return mapRow(rows[0])
 }
 
+export async function updateStoredResponseForSurveyIds(
+  id: string,
+  surveyIds: string[],
+  patch: Partial<Pick<StoredResponse, "flagged" | "highSignal" | "bookmarked">>,
+): Promise<StoredResponse | null> {
+  if (!surveyIds.length) return null
+
+  const body: Record<string, unknown> = {
+    moderation_updated_at: new Date().toISOString(),
+  }
+  if (patch.flagged !== undefined) body.flagged = patch.flagged
+  if (patch.highSignal !== undefined) body.high_signal = patch.highSignal
+  if (patch.bookmarked !== undefined) body.bookmarked = patch.bookmarked
+
+  const rows = await supabaseRequest<ResponseRow[]>(
+    `/rest/v1/response_records?id=eq.${encodeURIComponent(id)}&survey_id=in.(${surveyIds
+      .map((surveyId) => encodeURIComponent(surveyId))
+      .join(",")})`,
+    {
+      method: "PATCH",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify(body),
+    },
+  )
+  if (!rows.length) return null
+  return mapRow(rows[0])
+}
+
 export async function deleteStoredResponse(id: string): Promise<StoredResponse | null> {
   const existing = await getStoredResponseById(id)
   if (!existing) return null
@@ -245,6 +289,34 @@ export async function deleteStoredResponse(id: string): Promise<StoredResponse |
 
   // Best-effort local cleanup. B2 object cleanup is intentionally skipped for now
   // because file IDs are not stored with the record metadata.
+  if (!existing.storagePath.startsWith("b2://")) {
+    try {
+      await unlink(existing.storagePath)
+    } catch {
+      // Non-blocking cleanup.
+    }
+  }
+
+  return existing
+}
+
+export async function deleteStoredResponseForSurveyIds(
+  id: string,
+  surveyIds: string[],
+): Promise<StoredResponse | null> {
+  const existing = await getStoredResponseByIdForSurveyIds(id, surveyIds)
+  if (!existing) return null
+
+  await supabaseRequest<unknown>(
+    `/rest/v1/response_records?id=eq.${encodeURIComponent(id)}&survey_id=in.(${surveyIds
+      .map((surveyId) => encodeURIComponent(surveyId))
+      .join(",")})`,
+    {
+      method: "DELETE",
+      headers: { Prefer: "return=minimal" },
+    },
+  )
+
   if (!existing.storagePath.startsWith("b2://")) {
     try {
       await unlink(existing.storagePath)

@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Bell, Settings, HelpCircle, LogOut } from "lucide-react"
+import { PrivySignOutButton } from "@/components/privy-sign-out-button"
 
 
 interface AdminHeaderProps {
@@ -25,6 +26,7 @@ export function AdminHeader({ title }: AdminHeaderProps) {
   const { user, signOut } = useAuth()
   const router = useRouter()
   const [unreadNotifications] = useState(3)
+  const hasPrivy = Boolean(process.env.NEXT_PUBLIC_PRIVY_APP_ID)
 
   const handleSignOut = async () => {
     await signOut()
@@ -98,10 +100,21 @@ export function AdminHeader({ title }: AdminHeaderProps) {
               <Link href="/admin/settings">Settings</Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleSignOut}>
-              <LogOut className="h-4 w-4 mr-2" />
-              Log out
-            </DropdownMenuItem>
+            {hasPrivy ? (
+              <PrivySignOutButton redirectTo="/">
+                {({ onClick }) => (
+                  <DropdownMenuItem onClick={onClick}>
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Log out
+                  </DropdownMenuItem>
+                )}
+              </PrivySignOutButton>
+            ) : (
+              <DropdownMenuItem onClick={handleSignOut}>
+                <LogOut className="h-4 w-4 mr-2" />
+                Log out
+              </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

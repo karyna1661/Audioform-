@@ -2,12 +2,23 @@ import { type NextRequest, NextResponse } from "next/server"
 import { getSessionFromRequest } from "@/lib/server/auth-session"
 import { recordDashboardEvent } from "@/lib/server/survey-store"
 import { sendEmail } from "@/lib/server/email-sender"
+import { hasTrustedOrigin } from "@/lib/server/request-guards"
 
 export async function POST(request: NextRequest) {
   try {
     const session = await getSessionFromRequest()
     if (!session || session.role !== "admin") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+    if (
+      !hasTrustedOrigin({
+        requestOrigin: request.headers.get("origin"),
+        requestReferer: request.headers.get("referer"),
+        requestUrl: request.url,
+        configuredAppUrl: process.env.NEXT_PUBLIC_APP_URL,
+      })
+    ) {
+      return NextResponse.json({ error: "Invalid request origin." }, { status: 403 })
     }
 
     const { to, subject, html, text } = await request.json()

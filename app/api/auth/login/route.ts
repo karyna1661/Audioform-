@@ -3,6 +3,7 @@ import { z } from "zod"
 import { toSafeUser, verifyUserPassword } from "@/lib/server/auth-store"
 import { issueSessionToken, setSessionCookie } from "@/lib/server/auth-session"
 import { applyRateLimit, getRequestClientIp } from "@/lib/server/rate-limit"
+import { hasTrustedOrigin } from "@/lib/server/request-guards"
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -11,6 +12,17 @@ const loginSchema = z.object({
 
 export async function POST(request: Request) {
   try {
+    if (
+      !hasTrustedOrigin({
+        requestOrigin: request.headers.get("origin"),
+        requestReferer: request.headers.get("referer"),
+        requestUrl: request.url,
+        configuredAppUrl: process.env.NEXT_PUBLIC_APP_URL,
+      })
+    ) {
+      return NextResponse.json({ error: "Invalid request origin." }, { status: 403 })
+    }
+
     const ip = getRequestClientIp(request.headers)
     const rate = applyRateLimit({
       key: `auth:login:${ip}`,

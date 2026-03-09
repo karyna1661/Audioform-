@@ -14,6 +14,7 @@ type User = {
 type AuthContextType = {
   user: User | null
   status: "loading" | "authenticated" | "unauthenticated"
+  refreshSession: () => Promise<void>
   signIn: (email: string, password: string) => Promise<boolean>
   signUp: (input: { name: string; email: string; password: string }) => Promise<{ ok: boolean; error?: string }>
   signOut: () => Promise<void>
@@ -22,6 +23,7 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType>({
   user: null,
   status: "loading",
+  refreshSession: async () => {},
   signIn: async () => false,
   signUp: async () => ({ ok: false, error: "Unavailable" }),
   signOut: async () => {},
@@ -107,7 +109,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  return <AuthContext.Provider value={{ user, status, signIn, signUp, signOut }}>{children}</AuthContext.Provider>
+  return <AuthContext.Provider value={{ user, status, refreshSession, signIn, signUp, signOut }}>{children}</AuthContext.Provider>
 }
 
 export function useAuth() {

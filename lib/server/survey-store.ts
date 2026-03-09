@@ -158,17 +158,25 @@ export async function getSurveyById(id: string): Promise<StoredSurvey | null> {
   return rows[0] ?? null
 }
 
-export async function upsertSurvey(input: {
-  id: string
-  title: string
-  decisionFocus?: string
-  intent?: string
-  templatePack?: string
-  questionCount: number
-  status: "draft" | "published"
-  createdBy: string
-}): Promise<StoredSurvey> {
-  const payload = {
+export async function getSurveyByIdForCreator(id: string, creatorId: string): Promise<StoredSurvey | null> {
+  const rows = await listSurveys({ id, createdBy: creatorId })
+  return rows[0] ?? null
+}
+
+function buildSurveyPayload(
+  input: {
+    id: string
+    title: string
+    decisionFocus?: string
+    intent?: string
+    templatePack?: string
+    questionCount: number
+    status: "draft" | "published"
+    createdBy: string
+  },
+  publishedAt: string | null,
+) {
+  return {
     id: input.id,
     title: input.title,
     decision_focus: input.decisionFocus || null,
@@ -178,14 +186,48 @@ export async function upsertSurvey(input: {
     status: input.status,
     created_by: input.createdBy,
     updated_at: new Date().toISOString(),
-    published_at: input.status === "published" ? new Date().toISOString() : null,
+    published_at: publishedAt,
+  }
+}
+
+export async function saveSurveyForCreator(input: {
+  id: string
+  title: string
+  decisionFocus?: string
+  intent?: string
+  templatePack?: string
+  questionCount: number
+  status: "draft" | "published"
+  createdBy: string
+}): Promise<StoredSurvey> {
+  const existing = await getSurveyById(input.id)
+  const publishedAt =
+    input.status === "published" ? existing?.publishedAt || new Date().toISOString() : null
+
+  if (!existing) {
+    const payload = buildSurveyPayload(input, publishedAt)
+    const rows = await supabaseRequest<SurveyRow[]>("/rest/v1/surveys", {
+      method: "POST",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify([payload]),
+    })
+    if (!rows.length) throw new Error("Failed to save survey.")
+    return mapSurvey(rows[0])
   }
 
-  const rows = await supabaseRequest<SurveyRow[]>("/rest/v1/surveys?on_conflict=id", {
-    method: "POST",
-    headers: { Prefer: "resolution=merge-duplicates,return=representation" },
-    body: JSON.stringify([payload]),
-  })
+  if (existing.createdBy !== input.createdBy) {
+    throw new Error("Forbidden survey access.")
+  }
+
+  const payload = buildSurveyPayload(input, publishedAt)
+  const rows = await supabaseRequest<SurveyRow[]>(
+    `/rest/v1/surveys?id=eq.${encodeURIComponent(input.id)}&created_by=eq.${encodeURIComponent(input.createdBy)}`,
+    {
+      method: "PATCH",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify(payload),
+    },
+  )
   if (!rows.length) throw new Error("Failed to save survey.")
   return mapSurvey(rows[0])
 }
@@ -217,6 +259,18 @@ export async function listDashboardEvents(limit = 20): Promise<DashboardEvent[]>
   return rows.map(mapEvent)
 }
 
+export async function listDashboardEventsForSurveyIds(
+  surveyIds: string[],
+  limit = 20,
+): Promise<DashboardEvent[]> {
+  if (!surveyIds.length) return []
+  const scopedIds = surveyIds.map((id) => encodeURIComponent(id)).join(",")
+  const rows = await supabaseRequest<DashboardEventRow[]>(
+    `/rest/v1/dashboard_events?select=id,type,survey_id,message,metadata,created_at&survey_id=in.(${scopedIds})&order=created_at.desc&limit=${limit}`,
+  )
+  return rows.map(mapEvent)
+}
+
 export async function getLatestPublishedSurveyQuestions(surveyId: string): Promise<string[]> {
   const rows = await supabaseRequest<DashboardEventRow[]>(
     `/rest/v1/dashboard_events?select=id,type,survey_id,message,metadata,created_at&survey_id=eq.${encodeURIComponent(
@@ -241,7 +295,10 @@ export async function getLatestSurveyQuestions(surveyId: string): Promise<string
   return questions.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
 }
 
-export async function deleteSurveyById(id: string): Promise<void> {
+export async function deleteSurveyByIdForCreator(id: string, creatorId: string): Promise<boolean> {
+  const existing = await getSurveyByIdForCreator(id, creatorId)
+  if (!existing) return false
+
   // Delete response rows first to avoid FK violations in stricter schemas.
   await supabaseRequest<unknown>(`/rest/v1/response_records?survey_id=eq.${encodeURIComponent(id)}`, {
     method: "DELETE",
@@ -253,6 +310,18 @@ export async function deleteSurveyById(id: string): Promise<void> {
     headers: { Prefer: "return=minimal" },
   })
 
+  await supabaseRequest<unknown>(
+    `/rest/v1/surveys?id=eq.${encodeURIComponent(id)}&created_by=eq.${encodeURIComponent(creatorId)}`,
+    {
+      method: "DELETE",
+      headers: { Prefer: "return=minimal" },
+    },
+  )
+
+  return true
+}
+
+export async function deleteSurveyById(id: string): Promise<void> {
   await supabaseRequest<unknown>(`/rest/v1/surveys?id=eq.${encodeURIComponent(id)}`, {
     method: "DELETE",
     headers: { Prefer: "return=minimal" },

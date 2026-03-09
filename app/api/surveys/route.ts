@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { getSessionFromRequest } from "@/lib/server/auth-session"
+import { hasTrustedOrigin } from "@/lib/server/request-guards"
 import {
-  deleteSurveyById,
+  deleteSurveyByIdForCreator,
+  getSurveyByIdForCreator,
   getLatestSurveyQuestions,
-  getSurveyById,
   listSurveys,
   recordDashboardEvent,
-  upsertSurvey,
+  saveSurveyForCreator,
 } from "@/lib/server/survey-store"
 
 const surveySchema = z.object({
@@ -29,12 +30,9 @@ export async function GET(request: NextRequest) {
 
   const id = request.nextUrl.searchParams.get("id")
   if (id) {
-    const survey = await getSurveyById(id)
+    const survey = await getSurveyByIdForCreator(id, session.sub)
     if (!survey) {
       return NextResponse.json({ error: "Survey not found." }, { status: 404 })
-    }
-    if (survey.createdBy !== session.sub) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
     const questions = await getLatestSurveyQuestions(survey.id)
     return NextResponse.json({ survey: { ...survey, questions } })
@@ -53,13 +51,24 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    if (
+      !hasTrustedOrigin({
+        requestOrigin: request.headers.get("origin"),
+        requestReferer: request.headers.get("referer"),
+        requestUrl: request.url,
+        configuredAppUrl: process.env.NEXT_PUBLIC_APP_URL,
+      })
+    ) {
+      return NextResponse.json({ error: "Invalid request origin." }, { status: 403 })
+    }
+
     const json = await request.json()
     const parsed = surveySchema.safeParse(json)
     if (!parsed.success) {
       return NextResponse.json({ error: "Invalid survey payload", details: parsed.error.flatten() }, { status: 400 })
     }
 
-    const survey = await upsertSurvey({
+    const survey = await saveSurveyForCreator({
       ...parsed.data,
       createdBy: session.sub,
     })
@@ -83,7 +92,10 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ success: true, survey })
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.message === "Forbidden survey access.") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
     return NextResponse.json({ error: "Failed to save survey." }, { status: 500 })
   }
 }
@@ -99,14 +111,20 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: "Missing survey id." }, { status: 400 })
   }
 
-  const survey = await getSurveyById(id)
-  if (!survey) {
-    return NextResponse.json({ error: "Survey not found." }, { status: 404 })
-  }
-  if (survey.createdBy !== session.sub) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  if (
+    !hasTrustedOrigin({
+      requestOrigin: request.headers.get("origin"),
+      requestReferer: request.headers.get("referer"),
+      requestUrl: request.url,
+      configuredAppUrl: process.env.NEXT_PUBLIC_APP_URL,
+    })
+  ) {
+    return NextResponse.json({ error: "Invalid request origin." }, { status: 403 })
   }
 
-  await deleteSurveyById(id)
+  const deleted = await deleteSurveyByIdForCreator(id, session.sub)
+  if (!deleted) {
+    return NextResponse.json({ error: "Survey not found." }, { status: 404 })
+  }
   return NextResponse.json({ success: true })
 }

@@ -2,10 +2,10 @@ import { type NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import {
   createStoredResponse,
-  deleteStoredResponse,
-  getStoredResponseById,
+  deleteStoredResponseForSurveyIds,
+  getStoredResponseByIdForSurveyIds,
   listStoredResponses,
-  updateStoredResponse,
+  updateStoredResponseForSurveyIds,
 } from "@/lib/server/response-store"
 import { getSessionFromRequest } from "@/lib/server/auth-session"
 import {
@@ -19,6 +19,7 @@ import { getNotificationConfigByUserId } from "@/lib/server/notification-store"
 import { findUserById } from "@/lib/server/auth-store"
 import { sendEmail } from "@/lib/server/email-sender"
 import { applyRateLimit, getRequestClientIp } from "@/lib/server/rate-limit"
+import { hasTrustedOrigin } from "@/lib/server/request-guards"
 
 const uploadSchema = z.object({
   questionId: z.string().min(1),
@@ -223,20 +224,24 @@ export async function GET(request: NextRequest) {
   const ownedSurveys = await listSurveys({ createdBy: session.sub })
   const ownedSurveyIds = new Set(ownedSurveys.map((survey) => survey.id))
   const surveyTitleById = new Map(ownedSurveys.map((survey) => [survey.id, survey.title]))
+  const scopedSurveyIds = surveyId ? [surveyId] : Array.from(ownedSurveyIds)
   if (surveyId && !ownedSurveyIds.has(surveyId)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
+  if (!scopedSurveyIds.length) {
+    return NextResponse.json({ responses: [] })
+  }
 
-  const responsesRaw = await listStoredResponses({
-    surveyId,
+  const responses = await listStoredResponses({
+    surveyId: surveyId || undefined,
+    surveyIds: surveyId ? undefined : scopedSurveyIds,
     questionId,
     userId: userId || undefined,
   })
-  const scoped = responsesRaw.filter((item) => ownedSurveyIds.has(item.surveyId))
-  const responses = limit ? scoped.slice(0, limit) : scoped
+  const limitedResponses = limit ? responses.slice(0, limit) : responses
 
   return NextResponse.json({
-    responses: responses.map((item) => ({
+    responses: limitedResponses.map((item) => ({
       id: item.id,
       surveyId: item.surveyId,
       surveyTitle: surveyTitleById.get(item.surveyId) || "Untitled survey",
@@ -262,6 +267,17 @@ export async function PATCH(request: NextRequest) {
   }
 
   try {
+    if (
+      !hasTrustedOrigin({
+        requestOrigin: request.headers.get("origin"),
+        requestReferer: request.headers.get("referer"),
+        requestUrl: request.url,
+        configuredAppUrl: process.env.NEXT_PUBLIC_APP_URL,
+      })
+    ) {
+      return NextResponse.json({ error: "Invalid request origin." }, { status: 403 })
+    }
+
     const json = await request.json()
     const parsed = moderationSchema.safeParse(json)
     if (!parsed.success) {
@@ -273,16 +289,17 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "No moderation fields provided." }, { status: 400 })
     }
 
-    const existing = await getStoredResponseById(id)
+    const ownedSurveyIds = (await listSurveys({ createdBy: session.sub })).map((survey) => survey.id)
+    const existing = await getStoredResponseByIdForSurveyIds(id, ownedSurveyIds)
     if (!existing) {
       return NextResponse.json({ error: "Response not found." }, { status: 404 })
     }
-    const owningSurvey = await getSurveyById(existing.surveyId)
-    if (!owningSurvey || owningSurvey.createdBy !== session.sub) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
-    }
 
-    const updated = await updateStoredResponse(id, { flagged, highSignal, bookmarked })
+    const updated = await updateStoredResponseForSurveyIds(id, ownedSurveyIds, {
+      flagged,
+      highSignal,
+      bookmarked,
+    })
     if (!updated) {
       return NextResponse.json({ error: "Response not found." }, { status: 404 })
     }
@@ -322,16 +339,22 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: "Missing response id." }, { status: 400 })
   }
 
-  const existing = await getStoredResponseById(id)
-  if (!existing) {
+  if (
+    !hasTrustedOrigin({
+      requestOrigin: request.headers.get("origin"),
+      requestReferer: request.headers.get("referer"),
+      requestUrl: request.url,
+      configuredAppUrl: process.env.NEXT_PUBLIC_APP_URL,
+    })
+  ) {
+    return NextResponse.json({ error: "Invalid request origin." }, { status: 403 })
+  }
+
+  const ownedSurveyIds = (await listSurveys({ createdBy: session.sub })).map((survey) => survey.id)
+  const deleted = await deleteStoredResponseForSurveyIds(id, ownedSurveyIds)
+  if (!deleted) {
     return NextResponse.json({ error: "Response not found." }, { status: 404 })
   }
 
-  const owningSurvey = await getSurveyById(existing.surveyId)
-  if (!owningSurvey || owningSurvey.createdBy !== session.sub) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
-  }
-
-  await deleteStoredResponse(id)
   return NextResponse.json({ success: true })
 }
