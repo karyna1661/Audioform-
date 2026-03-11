@@ -119,24 +119,27 @@ export default function EmbedSurveyPage() {
   }
 
   const onSubmit = (blob: Blob) => {
-    void submitAndAdvance(blob)
+    // Capture questionId and index synchronously at time of submission
+    // This prevents race conditions where currentPrompt/index might change during async execution
+    if (!currentPrompt) return
+    const questionIdForSubmission = currentPrompt.id
+    const indexForSubmission = index
+    void submitAndAdvance(blob, questionIdForSubmission, indexForSubmission)
   }
 
-  const submitAndAdvance = async (blob: Blob) => {
-    if (isSubmittingAnswer || !currentPrompt) return
+  const submitAndAdvance = async (blob: Blob, questionId: string, currentIndex: number) => {
+    if (isSubmittingAnswer) return
     setIsSubmittingAnswer(true)
 
-    if (!currentPrompt) return
-    const submittedQuestionId = currentPrompt.id
     if (isMountedRef.current) setUploadError(null)
-    const uploaded = await uploadResponse(submittedQuestionId, blob)
+    const uploaded = await uploadResponse(questionId, blob)
     if (!isMountedRef.current) return
     if (!uploaded) {
       setIsSubmittingAnswer(false)
       return
     }
     setSubmittedCount((value) => value + 1)
-    if (index < prompts.length - 1) {
+    if (currentIndex < prompts.length - 1) {
       setIndex((prev) => prev + 1)
       setIsSubmittingAnswer(false)
       return

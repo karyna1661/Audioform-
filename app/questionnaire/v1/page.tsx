@@ -183,14 +183,18 @@ export default function QuestionnaireV1Page() {
   }
 
   const onSubmit = (blob: Blob) => {
-    void submitAndAdvance(blob)
+    // Capture questionId and index synchronously at time of submission
+    // This prevents race conditions where current/index might change during async execution
+    if (!current) return
+    const questionIdForSubmission = current.id
+    const indexForSubmission = index
+    void submitAndAdvance(blob, questionIdForSubmission, indexForSubmission)
   }
 
-  const submitAndAdvance = async (blob: Blob) => {
-    if (isSubmittingAnswer || !current) return
+  const submitAndAdvance = async (blob: Blob, questionId: string, currentIndex: number) => {
+    if (isSubmittingAnswer) return
     setIsSubmittingAnswer(true)
 
-    const questionId = current.id
     setUploadError(null)
     const uploaded = await uploadResponse(questionId, blob)
     if (!isMountedRef.current) return
@@ -201,7 +205,7 @@ export default function QuestionnaireV1Page() {
 
     setAnswers((prev) => ({ ...prev, [questionId]: blob }))
 
-    if (index < questionList.length - 1) {
+    if (currentIndex < questionList.length - 1) {
       setIndex((prev) => prev + 1)
       setIsSubmittingAnswer(false)
       return
