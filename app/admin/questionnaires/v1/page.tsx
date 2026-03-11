@@ -24,7 +24,7 @@ const decisionTargetOptions = [
   "Onboarding flow",
   "Pricing page",
   "Feature experience",
-  "Messaging clarity",
+  "Messaging",
   "Dashboard usability",
   "Other",
 ]
