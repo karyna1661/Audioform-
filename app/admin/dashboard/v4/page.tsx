@@ -410,6 +410,51 @@ export default function AdminDashboardV4Page() {
                         Save to clip bin
                       </Button>
                     ) : null}
+                    {survey.status === "published" ? (
+                      <Button
+                        variant="outline"
+                        className="w-full border-[#dbcdb8] bg-[#fff6ed] sm:w-auto"
+                        onClick={async () => {
+                          if (typeof window === "undefined") return
+                          const link = `${window.location.origin}/questionnaire/v1?surveyId=${encodeURIComponent(
+                            survey.id,
+                          )}`
+                          try {
+                            await navigator.clipboard.writeText(link)
+                            setUiMessage(`Survey link copied for "${survey.title}".`)
+                            trackEvent("share_link_copied", { share_link: link, share_type: "survey_stack_survey" })
+                          } catch {
+                            setUiMessage("Could not copy survey link. Copy it from the browser address bar.")
+                          }
+                        }}
+                      >
+                        Copy survey link
+                      </Button>
+                    ) : null}
+                    {survey.status === "published" && user?.id ? (
+                      <Button
+                        variant="outline"
+                        className="w-full border-[#dbcdb8] bg-[#fff6ed] sm:w-auto"
+                        onClick={async () => {
+                          if (typeof window === "undefined") return
+                          const creatorId = user.id
+                          const embedLink = `${window.location.origin}/embed/by-creator/${creatorId}/${survey.id}`
+                          const iframeSnippet = `<iframe src="${embedLink}" width="100%" height="760" style="border:0;border-radius:16px;" title="Audioform survey"></iframe>`
+                          try {
+                            await navigator.clipboard.writeText(iframeSnippet)
+                            setUiMessage(`Embed code copied for "${survey.title}".`)
+                            trackEvent("share_link_copied", {
+                              share_link: embedLink,
+                              share_type: "survey_stack_embed_iframe",
+                            })
+                          } catch {
+                            setUiMessage("Could not copy embed code. Copy it manually from your site.")
+                          }
+                        }}
+                      >
+                        Copy embed code
+                      </Button>
+                    ) : null}
                     {survey.status === "draft" ? (
                       <Button
                         variant="outline"
