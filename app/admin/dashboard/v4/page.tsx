@@ -370,7 +370,31 @@ export default function AdminDashboardV4Page() {
                 </article>
               ) : (
                 surveys.map((survey) => (
-                <article key={survey.id} className="rounded-xl border border-[#dbcdb8] bg-[#f9f4ea] p-4">
+                <article
+                  key={survey.id}
+                  className="rounded-xl border border-[#dbcdb8] bg-[#f9f4ea] p-4 cursor-pointer hover:bg-[#f3e7d8]"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => {
+                    if (survey.status === "draft") {
+                      router.push(`/admin/questionnaires/v1?surveyId=${encodeURIComponent(survey.id)}`)
+                      return
+                    }
+                    trackEvent("response_replayed", { survey_id: survey.id, source: "survey_stack_top_signal" })
+                    router.push(`/admin/responses?surveyId=${survey.id}&focus=top-signal`)
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault()
+                      if (survey.status === "draft") {
+                        router.push(`/admin/questionnaires/v1?surveyId=${encodeURIComponent(survey.id)}`)
+                        return
+                      }
+                      trackEvent("response_replayed", { survey_id: survey.id, source: "survey_stack_top_signal" })
+                      router.push(`/admin/responses?surveyId=${survey.id}&focus=top-signal`)
+                    }
+                  }}
+                >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <h3 className="text-lg font-semibold text-balance">{survey.title}</h3>
                     <span className="rounded-full bg-[#e6f0df] px-2 py-1 text-xs text-[#2d5a17]">{survey.status}</span>
@@ -387,29 +411,6 @@ export default function AdminDashboardV4Page() {
                     <p className="tabular-nums">{responsesBySurvey[survey.id] ?? 0} responses</p>
                   </div>
                   <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-                    <Button
-                      variant="outline"
-                      className="w-full border-[#dbcdb8] bg-[#fff6ed] sm:w-auto"
-                      onClick={() => {
-                        if (survey.status === "draft") {
-                          router.push(`/admin/questionnaires/v1?surveyId=${encodeURIComponent(survey.id)}`)
-                          return
-                        }
-                        trackEvent("response_replayed", { survey_id: survey.id, source: "survey_stack_top_signal" })
-                        router.push(`/admin/responses?surveyId=${survey.id}&focus=top-signal`)
-                      }}
-                    >
-                      {survey.status === "draft" ? "Edit draft" : "Open top signal"}
-                    </Button>
-                    {survey.status !== "draft" ? (
-                      <Button
-                        variant="outline"
-                        className="w-full border-[#dbcdb8] bg-[#fff6ed] sm:w-auto"
-                        onClick={() => trackEvent("response_bookmarked", { survey_id: survey.id, bookmark_action: true })}
-                      >
-                        Save to clip bin
-                      </Button>
-                    ) : null}
                     {survey.status === "published" ? (
                       <Button
                         variant="outline"
