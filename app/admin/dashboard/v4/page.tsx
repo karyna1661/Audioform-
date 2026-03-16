@@ -309,7 +309,10 @@ export default function AdminDashboardV4Page() {
               <Link href="/admin/notifications" className="rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] px-3 py-2 text-sm hover:bg-[#efe4d3]">
                 Configure creator notifications
               </Link>
-              <Link href="/questionnaire/v1" className="rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] px-3 py-2 text-sm hover:bg-[#efe4d3]">
+              <Link
+                href={activeSurveyId ? `/questionnaire/v1?surveyId=${encodeURIComponent(activeSurveyId)}` : "/admin/questionnaires/v1"}
+                className="rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] px-3 py-2 text-sm hover:bg-[#efe4d3]"
+              >
                 Open respondent flow preview
               </Link>
             </div>

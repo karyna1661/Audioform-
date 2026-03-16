@@ -12,7 +12,137 @@ import { AdminMobileNav } from "@/components/admin-mobile-nav"
 import { SurveyLoadingSkeleton } from "@/components/survey-loading-skeleton"
 
 
-const initialQuestions: string[] = []
+const initialQuestions: string[] = [
+  "What's one specific moment when you experienced this problem recently?",
+  "What have you tried before to solve this, and what frustrated you most?",
+  "What would success look like for you in this situation?",
+]
+
+// Question Category System
+const questionCategories = [
+  {
+    id: "ux",
+    label: "User Experience",
+    description: "Confusion, friction, and usability insights",
+    icon: "🎯",
+    questions: [
+      "What confused you the most when you first used this product?",
+      "At what moment did you almost stop using it?",
+      "What felt surprisingly easy or delightful?",
+      "Walk me through your experience. What part felt confusing?",
+    ],
+  },
+  {
+    id: "product",
+    label: "Product Feedback",
+    description: "Missing features and improvement areas",
+    icon: "💡",
+    questions: [
+      "What problem were you hoping this product would solve?",
+      "What feels missing right now?",
+      "If you could change one thing, what would it be?",
+      "When using this product, was there a moment you almost stopped? What happened?",
+    ],
+  },
+  {
+    id: "feature",
+    label: "Feature Ideas",
+    description: "Discovery of needed capabilities",
+    icon: "✨",
+    questions: [
+      "What feature would make this product indispensable for you?",
+      "What do you currently use instead of this product?",
+      "What workflow would you love this product to support?",
+      "What would make you use this product every week?",
+    ],
+  },
+  {
+    id: "market",
+    label: "Market Validation",
+    description: "Competitive landscape and alternatives",
+    icon: "🔍",
+    questions: [
+      "How are you currently solving this problem?",
+      "What frustrates you about existing solutions?",
+      "What would convince you to switch to a new solution?",
+      "Tell me about the last time you tried solving this problem. What made it difficult?",
+    ],
+  },
+  {
+    id: "satisfaction",
+    label: "Customer Satisfaction",
+    description: "Emotional response and loyalty signals",
+    icon: "❤️",
+    questions: [
+      "What was your reaction when you first saw this product?",
+      "What increased or decreased your confidence?",
+      "What would make you recommend this to a colleague?",
+    ],
+  },
+  {
+    id: "insight",
+    label: "Open Insight",
+    description: "Broad exploration and storytelling",
+    icon: "🌟",
+    questions: [
+      "Tell me about the last time you tried to get feedback from users. What was frustrating about it?",
+      "What's the most important outcome you're trying to achieve?",
+      "Describe a moment when this product really clicked for you.",
+    ],
+  },
+]
+
+// Pre-built Survey Templates
+const surveyTemplates = [
+  {
+    id: "pmf-discovery",
+    label: "PMF Discovery",
+    description: "Uncover product-market fit signals",
+    questions: [
+      "What problem were you hoping this product would solve for you?",
+      "What part of the experience felt confusing or frustrating?",
+      "What would make this product something you use every week?",
+    ],
+  },
+  {
+    id: "user-feedback",
+    label: "User Feedback",
+    description: "Understand user experience and pain points",
+    questions: [
+      "What problem were you hoping this product would solve?",
+      "What confused you the most while using it?",
+      "What feature would make you use this weekly?",
+    ],
+  },
+  {
+    id: "feature-validation",
+    label: "Feature Validation",
+    description: "Validate new feature ideas",
+    questions: [
+      "How are you currently solving this problem today?",
+      "What feature would make this product indispensable?",
+      "What would convince you to adopt this feature immediately?",
+    ],
+  },
+  {
+    id: "onboarding",
+    label: "Onboarding Insights",
+    description: "Identify onboarding friction points",
+    questions: [
+      "What confused you the most when you first used this product?",
+      "At what moment did you almost give up?",
+      "What would have made onboarding feel effortless?",
+    ],
+  },
+  {
+    id: "efr-format",
+    label: "Experience → Friction → Desire",
+    description: "High-signal story-based questions",
+    questions: [
+      "Tell me about the last time you tried to solve this problem. What was frustrating about it, and what do you wish existed instead?",
+    ],
+  },
+]
 const DEFAULT_SURVEY_TITLE = "Activation Decision Pulse"
 const DEFAULT_DECISION_TARGET = "Onboarding flow"
 const DEFAULT_CHANGE_TYPE = "Simplify"
@@ -61,29 +191,7 @@ const audienceOptions = [
   { id: "customers", label: "Paying customers" },
 ]
 
-const starterPackOptions = [
-  {
-    id: "community-feedback",
-    label: "Community feedback pack",
-    description: "For open users and community members sharing broad product sentiment.",
-    intent: "confusion",
-    audience: "community",
-  },
-  {
-    id: "beta-testers",
-    label: "Beta tester pack",
-    description: "For early testers validating direction before wider release.",
-    intent: "critique",
-    audience: "builders",
-  },
-  {
-    id: "power-users",
-    label: "Power user pack",
-    description: "For experienced users who can spot depth issues and advanced friction.",
-    intent: "validation",
-    audience: "customers",
-  },
-]
+// REMOVED: starterPackOptions - Replaced by surveyTemplates in Question Intelligence System
 
 function toLower(value: string): string {
   return value.trim().toLowerCase()
@@ -104,76 +212,8 @@ function composeDecisionSentence(input: {
   return `Should we ${toLower(changeType)} ${toLower(target)} to improve ${toLower(outcome)}?`
 }
 
-function buildIntentAlignedPrompts(input: {
-  target: string
-  changeType: string
-  outcome: string
-  intent: string
-  audience: string
-}): string[] {
-  const target = toLower(input.target)
-  const outcome = toLower(input.outcome)
-  const audienceLead =
-    input.audience === "community"
-      ? "From your community perspective,"
-      : input.audience === "customers"
-        ? "As a paying customer,"
-        : "As a builder,"
-
-  if (input.intent === "confusion") {
-    return [
-      `${audienceLead} describe the exact moment the ${target} felt unclear or harder than expected.`,
-      `Where did you hesitate while trying to achieve better ${outcome}?`,
-      `What one change to the ${target} would remove confusion first?`,
-    ]
-  }
-
-  if (input.intent === "critique") {
-    return [
-      `${audienceLead} what is the strongest reason this change to the ${target} could fail right now?`,
-      `What risk might this introduce in real usage?`,
-      `What must we resolve before this feels safe to ship for better ${outcome}?`,
-    ]
-  }
-
-  if (input.intent === "emotion") {
-    return [
-      `${audienceLead} when you think about the ${target}, what do you feel first?`,
-      `What part of this direction increases or reduces your confidence?`,
-      `What one improvement would make this feel clearly better for ${outcome}?`,
-    ]
-  }
-
-  return [
-    `${audienceLead} would this change to the ${target} move us in the right direction for ${outcome}? Why or why not?`,
-    `What signal would increase your confidence that this is the right move?`,
-    `What would make you change your mind about this direction?`,
-  ]
-}
-
-function buildStarterDecisionReframes(input: { audience: string; target: string; outcome: string }): string[] {
-  const target = toLower(input.target)
-  const outcome = toLower(input.outcome)
-  if (input.audience === "community") {
-    return [
-      `What are community members most likely to misunderstand about this ${target} change?`,
-      `What feedback pattern from the community would make this decision obvious?`,
-      `What would make this change feel like a clear win for the community and for ${outcome}?`,
-    ]
-  }
-  if (input.audience === "customers") {
-    return [
-      `What would a paying customer need to see before trusting this ${target} change?`,
-      `Which customer risk should we prevent before shipping this decision?`,
-      `What one improvement would make this change clearly better for ${outcome}?`,
-    ]
-  }
-  return [
-    "What user signal would most change your mind about this decision?",
-    "Which friction point must we fix before the next release?",
-    `What one improvement to the ${target} would clearly improve ${outcome}?`,
-  ]
-}
+// REMOVED: buildIntentAlignedPrompts - Replaced by questionCategories
+// REMOVED: buildStarterDecisionReframes - Replaced by surveyTemplates
 
 function createSurveyId(title: string, creatorId: string): string {
   const creatorPrefix = creatorId.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 12) || "creator"
@@ -470,37 +510,14 @@ export default function QuestionnairesV1Page() {
     outcome: desiredOutcome,
     detail: decisionDetail,
   })
-  const intentAlignedPrompts = buildIntentAlignedPrompts({
-    target: decisionTarget,
-    changeType,
-    outcome: desiredOutcome,
-    intent,
-    audience,
-  })
-  const starterDecisionReframes = buildStarterDecisionReframes({
-    audience,
-    target: decisionTarget,
-    outcome: desiredOutcome,
-  })
+  // REMOVED: intentAlignedPrompts - Replaced by Question Intelligence System categories
+  // REMOVED: starterDecisionReframes - Replaced by surveyTemplates
   const selectedQuestionQuality = evaluateQuestionQuality(selected)
-  const applyStarterPack = (pack: { id: string; label: string; intent: string; audience: string }) => {
-    setIntent(pack.intent)
-    setAudience(pack.audience)
-    const nextPrompts = buildIntentAlignedPrompts({
-      target: decisionTarget,
-      changeType,
-      outcome: desiredOutcome,
-      intent: pack.intent,
-      audience: pack.audience,
-    })
-    commitQuestionChange(nextPrompts, 0)
-    setDraftMessage(`${pack.label} applied. Run an internal test by recording 3 quick voice answers.`)
-    trackEvent("starter_pack_applied", {
-      starter_pack: pack.id,
-      intent_type: pack.intent,
-      audience_type: pack.audience,
-    })
-  }
+  const averageQuestionQuality = questions.length > 0
+    ? Math.round(questions.reduce((sum, q) => sum + evaluateQuestionQuality(q).score, 0) / questions.length)
+    : 0
+  const minimumQualityThreshold = 60
+  // REMOVED: applyStarterPack function - Replaced by template application in Question Intelligence
   const readyChecks = {
     hasTitle: title.trim().length > 0,
     hasDecisionTarget: decisionTarget.trim().length > 0,
@@ -789,23 +806,112 @@ export default function QuestionnairesV1Page() {
                   <span className="font-semibold">{audienceOptions.find((item) => item.id === audience)?.label ?? "Audience"}</span>.
                 </div>
 
-                <div className="rounded-2xl border border-[#cfbea4] bg-[#fffdf8] p-4">
-                  <p className="text-sm font-semibold">One-click packs</p>
-                  <p className={`font-body mt-1 text-xs text-[#665746]`}>
-                    Apply an audience-aware starter pack, then test it internally with 3 short voice answers.
-                  </p>
-                  <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                    {starterPackOptions.map((pack) => (
-                      <button
-                        key={pack.id}
-                        type="button"
-                        onClick={() => applyStarterPack(pack)}
-                        className="rounded-xl border border-[#cfbea4] bg-[#fff7ee] px-3 py-3 text-left hover:bg-[#fffdf8]"
-                      >
-                        <p className="text-sm font-semibold text-[#6e3316]">{pack.label}</p>
-                        <p className={`font-body mt-1 text-xs text-[#665746]`}>{pack.description}</p>
-                      </button>
-                    ))}
+                {/* Question Intelligence System */}
+                <div className="rounded-2xl border border-[#cfbea4] bg-[#fff7ee] p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold">🧠 Question Intelligence</p>
+                      <p className={`font-body mt-1 text-xs text-[#665746]`}>
+                        Choose a template or browse high-signal question categories.
+                      </p>
+                    </div>
+                    {questions.length > 3 && (
+                      <div className="rounded-full border border-[#e0b8ad] bg-[#f9e6e0] px-2 py-1 text-xs font-semibold text-[#8a3d2b]">
+                        ⚠️ Consider reducing to 1-3 questions
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Survey Templates */}
+                  <div className="mt-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#7a6146]">Pre-built Templates</p>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                      {surveyTemplates.map((template) => (
+                        <button
+                          key={template.id}
+                          type="button"
+                          onClick={() => {
+                            commitQuestionChange(template.questions, 0)
+                            setDraftMessage(`Applied ${template.label} template. These questions are optimized for voice responses.`)
+                            trackEvent("survey_template_applied", {
+                              template_id: template.id,
+                              template_label: template.label,
+                              question_count: template.questions.length,
+                            })
+                          }}
+                          className="rounded-xl border border-[#cfbea4] bg-[#fffdf8] px-3 py-3 text-left hover:border-[#b85e2d] hover:bg-[#fff7ee]"
+                        >
+                          <p className="text-sm font-semibold text-[#6e3316]">{template.label}</p>
+                          <p className={`font-body mt-1 text-xs text-[#665746]`}>{template.description}</p>
+                          <p className={`font-body mt-2 text-xs text-[#8c7f70]`}>
+                            {template.questions.length} question{template.questions.length !== 1 ? "s" : ""}
+                          </p>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Question Categories */}
+                  <div className="mt-6">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#7a6146]">Browse by Category</p>
+                    <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {questionCategories.map((category) => (
+                        <details key={category.id} className="group rounded-xl border border-[#cfbea4] bg-[#fffdf8] p-3">
+                          <summary className="flex cursor-pointer list-none items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg">{category.icon}</span>
+                              <div className="text-left">
+                                <p className="text-sm font-semibold text-[#6e3316]">{category.label}</p>
+                                <p className={`font-body text-xs text-[#665746]`}>{category.description}</p>
+                              </div>
+                            </div>
+                            <ChevronRight className="size-4 transition-transform group-open:rotate-90" />
+                          </summary>
+                          <div className="mt-3 space-y-2">
+                            {category.questions.map((question, idx) => (
+                              <button
+                                key={idx}
+                                type="button"
+                                onClick={() => {
+                                  const next = [...questions, question]
+                                  commitQuestionChange(next, questions.length)
+                                  trackEvent("category_question_added", {
+                                    category_id: category.id,
+                                    category_label: category.label,
+                                  })
+                                }}
+                                className="w-full rounded-lg border border-[#cfbea4] bg-[#f8efdf] px-3 py-2 text-left text-sm text-[#665746] hover:border-[#b85e2d] hover:bg-[#fff7ee]"
+                              >
+                                {question}
+                              </button>
+                            ))}
+                          </div>
+                        </details>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Voice Tips */}
+                  <div className="mt-6 rounded-xl border border-[#cfbea4] bg-[#fffdf8] p-3">
+                    <p className="text-sm font-semibold">💡 Voice Question Tips</p>
+                    <ul className={`font-body mt-2 space-y-1.5 text-xs text-[#665746]`}>
+                      <li className="flex items-start gap-2">
+                        <CheckCircle2 className="mt-0.5 size-3.5 text-[#2d5a17]" />
+                        <span>Good voice questions invite <strong>stories</strong>, not opinions</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <CheckCircle2 className="mt-0.5 size-3.5 text-[#2d5a17]" />
+                        <span>Ask about <strong>specific moments</strong>: "What confused you the most..." vs "Did you like it?"</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <CheckCircle2 className="mt-0.5 size-3.5 text-[#2d5a17]" />
+                        <span><strong>Experience → Friction → Desire</strong> format produces 30-60 second insights</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <CheckCircle2 className="mt-0.5 size-3.5 text-[#2d5a17]" />
+                        <span>Voice surveys work best with <strong>1-3 thoughtful questions</strong></span>
+                      </li>
+                    </ul>
                   </div>
                 </div>
 
@@ -813,51 +919,66 @@ export default function QuestionnairesV1Page() {
                   <p className="text-sm font-semibold">Question sequence (signal path)</p>
                   <p className={`font-body mt-1 text-xs text-[#665746]`}>Drag question cards to reorder. Use Undo or Ctrl/Cmd+Z to reverse changes.</p>
                   <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                    {questions.map((q, i) => (
-                      <button
-                        key={`${q}-${i}`}
-                        type="button"
-                        draggable
-                        onDragStart={(event) => {
-                          setDraggedIndex(i)
-                          event.dataTransfer.effectAllowed = "move"
-                        }}
-                        onDragOver={(event) => {
-                          event.preventDefault()
-                          if (dragOverIndex !== i) setDragOverIndex(i)
-                          event.dataTransfer.dropEffect = "move"
-                        }}
-                        onDragLeave={() => {
-                          if (dragOverIndex === i) setDragOverIndex(null)
-                        }}
-                        onDrop={(event) => {
-                          event.preventDefault()
-                          if (draggedIndex === null || draggedIndex === i) return
-                          const nextQuestions = reorderQuestionList(questions, draggedIndex, i)
-                          const nextSelected = remapSelectedIndexForReorder(selectedIndex, draggedIndex, i)
-                          commitQuestionChange(nextQuestions, nextSelected)
-                          setDragOverIndex(null)
-                          setDraggedIndex(null)
-                        }}
-                        onDragEnd={() => {
-                          setDragOverIndex(null)
-                          setDraggedIndex(null)
-                        }}
-                        onClick={() => setSelectedIndex(i)}
-                        className={`rounded-xl border px-3 py-3 text-left ${
-                          i === selectedIndex
-                            ? "border-[#b85e2d] bg-[#fff7ee]"
-                            : "border-[#cfbea4] bg-[#f8efdf]"
-                        } ${dragOverIndex === i ? "ring-2 ring-[#b85e2d]/40" : ""}`}
-                        aria-label={`Edit question ${i + 1}`}
-                      >
-                        <p className="flex items-center gap-1 text-xs uppercase tracking-wide text-[#7a6146]">
-                          <GripVertical className="size-3.5" aria-hidden="true" />
-                          Question {i + 1}
-                        </p>
-                        <p className={`font-body mt-1 line-clamp-2 text-sm text-[#665746]`}>{q}</p>
-                      </button>
-                    ))}
+                    {questions.map((q, i) => {
+                      const questionQuality = evaluateQuestionQuality(q)
+                      const isLowQuality = questionQuality.score < minimumQualityThreshold
+                      return (
+                        <button
+                          key={`${q}-${i}`}
+                          type="button"
+                          draggable
+                          onDragStart={(event) => {
+                            setDraggedIndex(i)
+                            event.dataTransfer.effectAllowed = "move"
+                          }}
+                          onDragOver={(event) => {
+                            event.preventDefault()
+                            if (dragOverIndex !== i) setDragOverIndex(i)
+                            event.dataTransfer.dropEffect = "move"
+                          }}
+                          onDragLeave={() => {
+                            if (dragOverIndex === i) setDragOverIndex(null)
+                          }}
+                          onDrop={(event) => {
+                            event.preventDefault()
+                            if (draggedIndex === null || draggedIndex === i) return
+                            const nextQuestions = reorderQuestionList(questions, draggedIndex, i)
+                            const nextSelected = remapSelectedIndexForReorder(selectedIndex, draggedIndex, i)
+                            commitQuestionChange(nextQuestions, nextSelected)
+                            setDragOverIndex(null)
+                            setDraggedIndex(null)
+                          }}
+                          onDragEnd={() => {
+                            setDragOverIndex(null)
+                            setDraggedIndex(null)
+                          }}
+                          onClick={() => setSelectedIndex(i)}
+                          className={`rounded-xl border px-3 py-3 text-left ${
+                            i === selectedIndex
+                              ? "border-[#b85e2d] bg-[#fff7ee]"
+                              : "border-[#cfbea4] bg-[#f8efdf]"
+                          } ${dragOverIndex === i ? "ring-2 ring-[#b85e2d]/40" : ""`} ${
+                            isLowQuality ? "border-l-4 border-l-[#e0b8ad]" : ""
+                          }`}
+                          aria-label={`Edit question ${i + 1}`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <p className="flex items-center gap-1 text-xs uppercase tracking-wide text-[#7a6146]">
+                              <GripVertical className="size-3.5" aria-hidden="true" />
+                              Question {i + 1}
+                            </p>
+                            <span
+                              className={`text-xs font-semibold ${
+                                isLowQuality ? "text-[#8a3d2b]" : "text-[#2d5a17]"
+                              }`}
+                            >
+                              {questionQuality.score}%
+                            </span>
+                          </div>
+                          <p className={`font-body mt-1 line-clamp-2 text-sm text-[#665746]`}>{q}</p>
+                        </button>
+                      )
+                    })}
                     <button
                       type="button"
                       onClick={() => {
@@ -888,10 +1009,19 @@ export default function QuestionnairesV1Page() {
                       }}
                     />
                     <div className="mt-3 rounded-2xl border border-[#cfbea4] bg-[#f8efdf] p-3">
-                      <p className="text-sm font-semibold">Question quality coach</p>
-                      <p className={`font-body mt-1 text-xs text-[#665746]`}>
-                        Target 80%+ before publish. Strong prompts ask for one concrete moment, not a rating.
-                      </p>
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-semibold">Question quality coach</p>
+                          <p className={`font-body mt-1 text-xs text-[#665746]`}>
+                            Target 80%+ before publish. Strong prompts ask for one concrete moment, not a rating.
+                          </p>
+                        </div>
+                        {selectedQuestionQuality.score < minimumQualityThreshold && (
+                          <div className="rounded-full border border-[#e0b8ad] bg-[#f9e6e0] px-2 py-1 text-xs font-semibold text-[#8a3d2b]">
+                            Needs improvement
+                          </div>
+                        )}
+                      </div>
                       <div className="mt-2 flex items-center justify-between rounded-lg border border-[#cfbea4] bg-[#fff7ee] px-3 py-2">
                         <p className="text-xs uppercase tracking-wide text-[#7a6146]">Quality score</p>
                         <p className="text-sm font-semibold text-[#6e3316]">{selectedQuestionQuality.score}%</p>
@@ -951,47 +1081,8 @@ export default function QuestionnairesV1Page() {
                       </div>
                     </div>
                   </div>
-                  <div className="rounded-2xl border border-[#cfbea4] bg-[#f8efdf] p-3">
-                  <p className="text-sm font-semibold">Depth starters</p>
-                  <div className="mt-2 grid gap-2">
-                      {intentAlignedPrompts.map((template) => (
-                        <button
-                          key={template}
-                          type="button"
-                          onClick={() => {
-                            const next = [...questions]
-                            next[selectedIndex] = template
-                            commitQuestionChange(next, selectedIndex)
-                            trackEvent("prompt_template_applied", {
-                              template_pack: intent,
-                              question_index: selectedIndex + 1,
-                            })
-                          }}
-                          className={`font-body rounded-xl border border-[#cfbea4] bg-[#fff7ee] px-3 py-2 text-left text-sm text-[#665746] hover:bg-[#fffdf8]`}
-                        >
-                          {template}
-                        </button>
-                      ))}
-                  </div>
-                    <Button
-                      variant="outline"
-                      className="mt-3 w-full border-[#cfbea4] bg-[#fff7ee]"
-                      onClick={undoQuestionChange}
-                      disabled={questionHistory.length === 0}
-                    >
-                      <Undo2 className="mr-2 size-4" aria-hidden="true" />
-                      Undo last change
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="mt-3 w-full border-[#cfbea4] bg-[#fff7ee]"
-                      onClick={() => {
-                        commitQuestionChange(intentAlignedPrompts, 0)
-                        setDraftMessage("Starter prompts generated from decision context, intent mode, and audience mode.")
-                      }}
-                    >
-                      Apply decision-aligned starter flow
-                    </Button>
+
+                  {/* REMOVED: Old Depth starters section - Replaced by Question Intelligence categories */}
                     <Button
                       variant="outline"
                       className="mt-3 w-full border-[#cfbea4] bg-[#fff7ee]"
@@ -1093,6 +1184,17 @@ export default function QuestionnairesV1Page() {
                 onClick={async () => {
                   if (!readyChecks.hasTitle || !readyChecks.hasDecisionSpecificity || !readyChecks.hasTwoQuestions) {
                     setDraftMessage("Complete title, structured decision context, and at least two prompts before publishing.")
+                    return
+                  }
+
+                  // Quality gate validation
+                  const allQuestionScores = questions.map(q => evaluateQuestionQuality(q).score)
+                  const lowQualityQuestions = allQuestionScores.filter(score => score < minimumQualityThreshold)
+                  
+                  if (lowQualityQuestions.length > 0) {
+                    setDraftMessage(
+                      `Improve question quality first. ${lowQualityQuestions.length} question(s) below ${minimumQualityThreshold}% threshold. Use the quality coach to reach 80%+.`,
+                    )
                     return
                   }
 

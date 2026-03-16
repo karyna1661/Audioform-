@@ -17,8 +17,18 @@ export default function Home() {
   const [typedLineOne, setTypedLineOne] = useState(prefersReducedMotion ? lineOne : "")
   const [typedLineTwo, setTypedLineTwo] = useState(prefersReducedMotion ? lineTwo : "")
   const signalLoopHref = status === "authenticated" ? "/admin/dashboard/v4" : "/signup"
+  
+  // Homepage feedback survey - always points to official Audioform feedback survey
+  const feedbackSurveyId = process.env.NEXT_PUBLIC_AUDIOFORM_FEEDBACK_SURVEY_ID
+  const homepageQuestionnaireHref = feedbackSurveyId
+    ? `/questionnaire/v1?surveyId=${encodeURIComponent(feedbackSurveyId)}`
+    : "/questionnaire/v1"
+  
+  // Admin dashboard preview - points to user's active survey
   const activeSurveyId = status === "authenticated" ? getActiveSurveyId() : null
-  const questionnaireHref = activeSurveyId ? `/questionnaire/v1?surveyId=${encodeURIComponent(activeSurveyId)}` : "/questionnaire/v1"
+  const adminPreviewHref = activeSurveyId
+    ? `/questionnaire/v1?surveyId=${encodeURIComponent(activeSurveyId)}`
+    : "/admin/questionnaires/v1"
 
   useEffect(() => {
     trackEvent("creator_onboarding_started")
@@ -181,7 +191,7 @@ export default function Home() {
               Create your survey
             </Link>
             <Link
-              href={questionnaireHref}
+              href={homepageQuestionnaireHref}
               onClick={() => trackEvent("creator_clicked_start", { entry_point: "home_try_voice_survey" })}
               className="af-chip af-glow-hover inline-flex w-full items-center justify-center gap-2 rounded-full border px-5 py-3 text-center text-sm font-medium text-[#1f1b17] hover:bg-[#f5ebdd] sm:w-auto sm:justify-start"
             >
