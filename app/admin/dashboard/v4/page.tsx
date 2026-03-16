@@ -169,6 +169,7 @@ export default function AdminDashboardV4Page() {
     () => surveys.filter((survey) => survey.status === "published"),
     [surveys],
   )
+  const activeSurveyId = publishedSurveys[0]?.id ?? null
   const onboardingChecklist = useMemo(
     () => [
       {

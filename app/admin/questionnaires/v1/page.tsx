@@ -5,7 +5,7 @@ import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { useRequireAdmin } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, CheckCircle2, Copy, GripVertical, Plus, Rocket, Sparkles, Target, Trash2, Undo2 } from "lucide-react"
+import { ArrowLeft, CheckCircle2, ChevronRight, Copy, GripVertical, Plus, Rocket, Sparkles, Target, Trash2, Undo2 } from "lucide-react"
 import { trackEvent } from "@/lib/analytics"
 import { recordSurveyPublished } from "@/lib/behavior-metrics"
 import { AdminMobileNav } from "@/components/admin-mobile-nav"
@@ -732,16 +732,22 @@ export default function QuestionnairesV1Page() {
                   <p className={`font-body mt-2 rounded-xl border border-[#cfbea4] bg-[#fff7ee] px-3 py-2 text-sm text-[#665746]`}>
                     {decisionFocus}
                   </p>
-                  <p className="mt-4 text-sm font-semibold">Starter decision reframes</p>
+                  <p className="mt-4 text-sm font-semibold">Pre-built survey templates</p>
                   <div className="mt-3 grid gap-2">
-                    {starterDecisionReframes.map((reframe) => (
+                    {surveyTemplates.map((template) => (
                       <button
-                        key={reframe}
+                        key={template.id}
                         type="button"
-                        onClick={() => setDecisionDetail(reframe)}
+                        onClick={() => {
+                          setDecisionDetail(template.questions[0])
+                          trackEvent("starter_pack_applied", {
+                            template_id: template.id,
+                            template_label: template.label,
+                          })
+                        }}
                         className={`font-body rounded-xl border border-[#cfbea4] bg-[#fff7ee] px-3 py-2 text-left text-sm text-[#665746] hover:bg-[#fffdf8]`}
                       >
-                        {reframe}
+                        {template.label}: {template.description}
                       </button>
                     ))}
                   </div>
@@ -833,7 +839,7 @@ export default function QuestionnairesV1Page() {
                           onClick={() => {
                             commitQuestionChange(template.questions, 0)
                             setDraftMessage(`Applied ${template.label} template. These questions are optimized for voice responses.`)
-                            trackEvent("survey_template_applied", {
+                            trackEvent("prompt_template_applied", {
                               template_id: template.id,
                               template_label: template.label,
                               question_count: template.questions.length,
@@ -875,7 +881,7 @@ export default function QuestionnairesV1Page() {
                                 onClick={() => {
                                   const next = [...questions, question]
                                   commitQuestionChange(next, questions.length)
-                                  trackEvent("category_question_added", {
+                                  trackEvent("decision_intent_prompt_viewed", {
                                     category_id: category.id,
                                     category_label: category.label,
                                   })
@@ -953,13 +959,7 @@ export default function QuestionnairesV1Page() {
                             setDraggedIndex(null)
                           }}
                           onClick={() => setSelectedIndex(i)}
-                          className={`rounded-xl border px-3 py-3 text-left ${
-                            i === selectedIndex
-                              ? "border-[#b85e2d] bg-[#fff7ee]"
-                              : "border-[#cfbea4] bg-[#f8efdf]"
-                          } ${dragOverIndex === i ? "ring-2 ring-[#b85e2d]/40" : ""`} ${
-                            isLowQuality ? "border-l-4 border-l-[#e0b8ad]" : ""
-                          }`}
+                          className={`rounded-xl border px-3 py-3 text-left ${i === selectedIndex ? "border-[#b85e2d] bg-[#fff7ee]" : "border-[#cfbea4] bg-[#f8efdf]"} ${dragOverIndex === i ? "ring-2 ring-[#b85e2d]/40" : ""} ${isLowQuality ? "border-l-4 border-l-[#e0b8ad]" : ""}`}
                           aria-label={`Edit question ${i + 1}`}
                         >
                           <div className="flex items-center justify-between">
@@ -1083,19 +1083,6 @@ export default function QuestionnairesV1Page() {
                   </div>
 
                   {/* REMOVED: Old Depth starters section - Replaced by Question Intelligence categories */}
-                    <Button
-                      variant="outline"
-                      className="mt-3 w-full border-[#cfbea4] bg-[#fff7ee]"
-                      onClick={() => {
-                        if (questions.length <= 1) return
-                        const next = questions.filter((_, i) => i !== selectedIndex)
-                        commitQuestionChange(next, Math.max(0, selectedIndex - 1))
-                      }}
-                    >
-                      <Trash2 className="mr-2 size-4" aria-hidden="true" />
-                      Remove question
-                    </Button>
-                  </div>
                 </div>
               </div>
             </section>
