@@ -47,6 +47,19 @@ const moderationSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
+    // Add CORS headers for cross-origin requests from mobile
+    const corsHeaders = {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Credentials': 'true',
+    }
+
+    // Handle preflight OPTIONS request
+    if (request.method === 'OPTIONS') {
+      return new NextResponse(null, { status: 204, headers: corsHeaders })
+    }
+
     const ip = getRequestClientIp(request.headers)
     const rate = applyRateLimit({
       key: `responses:post:${ip}`,
@@ -56,7 +69,7 @@ export async function POST(request: NextRequest) {
     if (!rate.allowed) {
       return NextResponse.json(
         { error: "Too many submissions. Please retry shortly." },
-        { status: 429, headers: { "Retry-After": String(rate.retryAfterSeconds) } },
+        { status: 429, headers: { ...corsHeaders, "Retry-After": String(rate.retryAfterSeconds) } },
       )
     }
 
@@ -70,25 +83,25 @@ export async function POST(request: NextRequest) {
     if (!audioFile || !parsed.success) {
       return NextResponse.json(
         { error: "Invalid payload", details: parsed.success ? undefined : parsed.error.flatten() },
-        { status: 400 },
+        { status: 400, headers: corsHeaders },
       )
     }
 
     if (audioFile.size <= 0 || audioFile.size > MAX_AUDIO_SIZE_BYTES) {
       return NextResponse.json(
         { error: `Invalid audio size. Max allowed is ${Math.floor(MAX_AUDIO_SIZE_BYTES / (1024 * 1024))}MB.` },
-        { status: 413 },
+        { status: 413, headers: corsHeaders },
       )
     }
 
     const mimeType = (audioFile.type || "").toLowerCase()
     if (!ALLOWED_AUDIO_MIME.has(mimeType)) {
-      return NextResponse.json({ error: "Unsupported audio format." }, { status: 415 })
+      return NextResponse.json({ error: "Unsupported audio format." }, { status: 415, headers: corsHeaders })
     }
 
     const publishedSurvey = await getPublishedSurveyById(parsed.data.surveyId)
     if (!publishedSurvey) {
-      return NextResponse.json({ error: "Survey is unavailable or unpublished." }, { status: 404 })
+      return NextResponse.json({ error: "Survey is unavailable or unpublished." }, { status: 404, headers: corsHeaders })
     }
     const publishedQuestions = await getLatestPublishedSurveyQuestions(parsed.data.surveyId)
     const allowedQuestionIds = new Set(
@@ -97,7 +110,7 @@ export async function POST(request: NextRequest) {
     if (!allowedQuestionIds.has(parsed.data.questionId)) {
       return NextResponse.json(
         { error: "Question does not belong to this published survey." },
-        { status: 400 },
+        { status: 400, headers: corsHeaders },
       )
     }
 
@@ -193,7 +206,7 @@ export async function POST(request: NextRequest) {
           timestamp: stored.createdAt,
         },
       },
-      { status: 201 },
+      { status: 201, headers: corsHeaders },
     )
   } catch (error) {
     console.error("Error handling audio upload:", error)
@@ -201,17 +214,37 @@ export async function POST(request: NextRequest) {
     if (message.includes("B2 storage is not configured")) {
       return NextResponse.json(
         { error: "Storage is not configured. Please contact support and retry shortly." },
-        { status: 503 },
+        { status: 503, headers: corsHeaders },
       )
     }
-    return NextResponse.json({ error: "Failed to process audio upload" }, { status: 500 })
+    return NextResponse.json({ error: "Failed to process audio upload" }, { status: 500, headers: corsHeaders })
   }
 }
 
+// Handle preflight CORS requests
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Credentials': 'true',
+    },
+  })
+}
+
 export async function GET(request: NextRequest) {
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Credentials': 'true',
+  }
+
   const session = await getSessionFromRequest()
   if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: corsHeaders })
   }
 
   const searchParams = request.nextUrl.searchParams
@@ -257,13 +290,20 @@ export async function GET(request: NextRequest) {
       moderationUpdatedAt: item.moderationUpdatedAt,
       timestamp: item.createdAt,
     })),
-  })
+  }, { headers: corsHeaders })
 }
 
 export async function PATCH(request: NextRequest) {
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Credentials': 'true',
+  }
+
   const session = await getSessionFromRequest()
   if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: corsHeaders })
   }
 
   try {
@@ -328,9 +368,16 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Credentials': 'true',
+  }
+
   const session = await getSessionFromRequest()
   if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: corsHeaders })
   }
 
   const searchParams = request.nextUrl.searchParams
