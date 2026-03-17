@@ -58,8 +58,8 @@ export function verifySessionToken(token: string): SessionPayload | null {
   const [payloadB64, signature] = token.split(".")
   if (!payloadB64 || !signature) return null
   const expected = sign(payloadB64)
-  const sigA = Buffer.from(signature)
-  const sigB = Buffer.from(expected)
+  const sigA = Buffer.from(signature) as unknown as Uint8Array
+  const sigB = Buffer.from(expected) as unknown as Uint8Array
   if (sigA.length !== sigB.length) return null
   if (!timingSafeEqual(sigA, sigB)) return null
 
@@ -98,8 +98,14 @@ export function clearSessionCookie(response: NextResponse): void {
 }
 
 export async function getSessionFromRequest(): Promise<SessionPayload | null> {
-  const cookieStore = await cookies()
-  const token = cookieStore.get(AUTH_COOKIE_NAME)?.value
-  if (!token) return null
-  return verifySessionToken(token)
+  try {
+    const { cookies } = await import('next/headers')
+    const cookieStore = await cookies()
+    const token = cookieStore.get(AUTH_COOKIE_NAME)?.value
+    if (!token) return null
+    return verifySessionToken(token)
+  } catch (error) {
+    console.error('Failed to get session from cookies:', error)
+    return null
+  }
 }

@@ -143,77 +143,9 @@ const surveyTemplates = [
     ],
   },
 ]
-const DEFAULT_SURVEY_TITLE = "Activation Decision Pulse"
-const DEFAULT_DECISION_TARGET = "Onboarding flow"
-const DEFAULT_CHANGE_TYPE = "Simplify"
-const DEFAULT_DESIRED_OUTCOME = "Conversion"
-const DEFAULT_INTENT = "critique"
-const DEFAULT_AUDIENCE = "builders"
-
-const decisionTargetOptions = [
-  "Onboarding flow",
-  "Pricing page",
-  "Feature experience",
-  "Messaging",
-  "Dashboard usability",
-  "Other",
-]
-
-const changeTypeOptions = [
-  "Add",
-  "Remove",
-  "Simplify",
-  "Reorder",
-  "Reposition",
-  "Validate as-is",
-]
-
-const desiredOutcomeOptions = [
-  "Conversion",
-  "Clarity",
-  "Trust",
-  "Adoption",
-  "Retention",
-  "Engagement",
-  "Other",
-]
-
-const intentOptions = [
-  { id: "validation", label: "Validate Direction" },
-  { id: "critique", label: "Find Weak Spots" },
-  { id: "confusion", label: "Find Confusion" },
-  { id: "emotion", label: "Capture Emotion" },
-]
-
-const audienceOptions = [
-  { id: "builders", label: "Builders" },
-  { id: "community", label: "Community users" },
-  { id: "customers", label: "Paying customers" },
-]
+const DEFAULT_SURVEY_TITLE = "User Insights Survey"
 
 // REMOVED: starterPackOptions - Replaced by surveyTemplates in Question Intelligence System
-
-function toLower(value: string): string {
-  return value.trim().toLowerCase()
-}
-
-function composeDecisionSentence(input: {
-  target: string
-  changeType: string
-  outcome: string
-  detail: string
-}): string {
-  const target = input.target.trim()
-  const changeType = input.changeType.trim()
-  const outcome = input.outcome.trim()
-  const detail = input.detail.trim()
-
-  if (detail.length > 0) return detail
-  return `Should we ${toLower(changeType)} ${toLower(target)} to improve ${toLower(outcome)}?`
-}
-
-// REMOVED: buildIntentAlignedPrompts - Replaced by questionCategories
-// REMOVED: buildStarterDecisionReframes - Replaced by surveyTemplates
 
 function createSurveyId(title: string, creatorId: string): string {
   const creatorPrefix = creatorId.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 12) || "creator"
@@ -286,18 +218,13 @@ export default function QuestionnairesV1Page() {
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
   const [title, setTitle] = useState(DEFAULT_SURVEY_TITLE)
-  const [decisionTarget, setDecisionTarget] = useState(DEFAULT_DECISION_TARGET)
-  const [changeType, setChangeType] = useState(DEFAULT_CHANGE_TYPE)
-  const [desiredOutcome, setDesiredOutcome] = useState(DEFAULT_DESIRED_OUTCOME)
-  const [decisionDetail, setDecisionDetail] = useState("")
-  const [intent, setIntent] = useState(DEFAULT_INTENT)
-  const [audience, setAudience] = useState(DEFAULT_AUDIENCE)
   const [draftSurveyId, setDraftSurveyId] = useState("")
   const [draftMessage, setDraftMessage] = useState<string | null>(null)
   const [isSavingDraft, setIsSavingDraft] = useState(false)
   const [isPublishing, setIsPublishing] = useState(false)
   const [publishedSurveyId, setPublishedSurveyId] = useState<string | null>(null)
   const [draftLoading, setDraftLoading] = useState(false)
+  const [showTemplates, setShowTemplates] = useState(true) // Toggle for mobile: templates vs categories
 
   const commitQuestionChange = useCallback(
     (nextQuestions: string[], nextSelectedIndex: number) => {
@@ -337,12 +264,6 @@ export default function QuestionnairesV1Page() {
     setDraftSurveyId(createSurveyId(DEFAULT_SURVEY_TITLE, user?.id || "creator"))
     setPublishedSurveyId(null)
     setTitle(DEFAULT_SURVEY_TITLE)
-    setDecisionTarget(DEFAULT_DECISION_TARGET)
-    setChangeType(DEFAULT_CHANGE_TYPE)
-    setDesiredOutcome(DEFAULT_DESIRED_OUTCOME)
-    setDecisionDetail("")
-    setIntent(DEFAULT_INTENT)
-    setAudience(DEFAULT_AUDIENCE)
     setQuestions(initialQuestions)
     setSelectedIndex(0)
     setQuestionHistory([])
@@ -372,18 +293,9 @@ export default function QuestionnairesV1Page() {
       setDraftSurveyId(surveyId)
     }
     const normalizedQuestions = questions.map((q) => q.trim()).filter((q) => q.length > 0)
-    const decisionFocus = composeDecisionSentence({
-      target: decisionTarget,
-      changeType,
-      outcome: desiredOutcome,
-      detail: decisionDetail,
-    })
     const payload = {
       id: surveyId,
       title: title.trim(),
-      decisionFocus: decisionFocus.trim(),
-      intent,
-      templatePack: intent,
       questions: normalizedQuestions,
       questionCount: normalizedQuestions.length,
       status: nextStatus,
@@ -412,25 +324,11 @@ export default function QuestionnairesV1Page() {
       const parsed = JSON.parse(rawDraft) as {
         surveyId?: string
         title?: string
-        decisionFocus?: string
-        decisionTarget?: string
-        changeType?: string
-        desiredOutcome?: string
-        decisionDetail?: string
-        intent?: string
-        audience?: string
         questions?: string[]
         savedAt?: string
       }
       if (parsed.title) setTitle(parsed.title)
       if (parsed.surveyId) setDraftSurveyId(parsed.surveyId)
-      if (parsed.decisionTarget) setDecisionTarget(parsed.decisionTarget)
-      if (parsed.changeType) setChangeType(parsed.changeType)
-      if (parsed.desiredOutcome) setDesiredOutcome(parsed.desiredOutcome)
-      if (parsed.decisionDetail) setDecisionDetail(parsed.decisionDetail)
-      if (!parsed.decisionDetail && parsed.decisionFocus) setDecisionDetail(parsed.decisionFocus)
-      if (parsed.intent) setIntent(parsed.intent)
-      if (parsed.audience) setAudience(parsed.audience)
       if (Array.isArray(parsed.questions) && parsed.questions.length > 0) {
         setQuestions(parsed.questions)
         setSelectedIndex(0)
@@ -464,8 +362,6 @@ export default function QuestionnairesV1Page() {
           survey?: {
             id: string
             title: string
-            decisionFocus?: string | null
-            intent?: string | null
             status?: "draft" | "published"
             questions?: string[]
           }
@@ -475,8 +371,6 @@ export default function QuestionnairesV1Page() {
 
         setDraftSurveyId(survey.id)
         setTitle(survey.title || DEFAULT_SURVEY_TITLE)
-        setIntent(survey.intent || DEFAULT_INTENT)
-        setDecisionDetail(survey.decisionFocus || "")
         if (Array.isArray(survey.questions) && survey.questions.length > 0) {
           setQuestions(survey.questions)
           setSelectedIndex(0)
@@ -504,54 +398,37 @@ export default function QuestionnairesV1Page() {
   if (status === "loading" || draftLoading) return <SurveyLoadingSkeleton label="Loading survey builder..." />
 
   const selected = questions[selectedIndex] || ""
-  const decisionFocus = composeDecisionSentence({
-    target: decisionTarget,
-    changeType,
-    outcome: desiredOutcome,
-    detail: decisionDetail,
-  })
-  // REMOVED: intentAlignedPrompts - Replaced by Question Intelligence System categories
-  // REMOVED: starterDecisionReframes - Replaced by surveyTemplates
   const selectedQuestionQuality = evaluateQuestionQuality(selected)
   const averageQuestionQuality = questions.length > 0
     ? Math.round(questions.reduce((sum, q) => sum + evaluateQuestionQuality(q).score, 0) / questions.length)
     : 0
   const minimumQualityThreshold = 60
-  // REMOVED: applyStarterPack function - Replaced by template application in Question Intelligence
   const readyChecks = {
     hasTitle: title.trim().length > 0,
-    hasDecisionTarget: decisionTarget.trim().length > 0,
-    hasChangeType: changeType.trim().length > 0,
-    hasDesiredOutcome: desiredOutcome.trim().length > 0,
-    hasDecisionSpecificity: decisionFocus.trim().length > 18,
     hasTwoQuestions: questions.filter((q) => q.trim().length > 0).length >= 2,
     hasDepthPrompt: questions.some((q) => q.length > 40),
   }
   const readinessItems = [
     { ok: readyChecks.hasTitle, label: "Title" },
-    { ok: readyChecks.hasDecisionTarget, label: "Change target" },
-    { ok: readyChecks.hasChangeType, label: "Change type" },
-    { ok: readyChecks.hasDesiredOutcome, label: "Desired outcome" },
-    { ok: readyChecks.hasDecisionSpecificity, label: "Decision specificity" },
-    { ok: readyChecks.hasTwoQuestions, label: "Question flow" },
+    { ok: readyChecks.hasTwoQuestions, label: "Question flow (2+ questions)" },
     { ok: readyChecks.hasDepthPrompt, label: "Depth question" },
   ]
   const completionScore =
     readinessItems.reduce((sum, item) => sum + Number(item.ok), 0) / readinessItems.length
   const builderOnboardingChecklist = [
     {
-      id: "decision",
-      label: "Write one decision-focused prompt set",
-      done: readyChecks.hasDecisionSpecificity && readyChecks.hasTwoQuestions,
+      id: "questions",
+      label: "Add 2+ high-quality questions",
+      done: readyChecks.hasTwoQuestions && selectedQuestionQuality.score >= 80,
     },
     {
       id: "quality",
-      label: "Reach 80%+ quality on active prompt",
-      done: selectedQuestionQuality.score >= 80,
+      label: "Reach 80%+ quality on all questions",
+      done: averageQuestionQuality >= 80,
     },
     {
       id: "publish",
-      label: "Publish and copy a share link",
+      label: "Publish and share your survey",
       done: Boolean(publishedSurveyId),
     },
   ]
@@ -579,10 +456,10 @@ export default function QuestionnairesV1Page() {
       <div className="af-panel af-fade-up mx-auto max-w-7xl rounded-[2.2rem] border border-[#cfbea4] p-4 sm:p-6">
         <header className="af-fade-up af-delay-1 flex flex-wrap items-center justify-between gap-3 border-b border-[#cfbea4] pb-5">
           <div>
-            <p className={`font-body text-sm text-[#665746] text-pretty`}>Build-in-public signal composer</p>
-            <h1 className="text-3xl font-semibold text-balance sm:text-4xl">Design the feedback loop, not just the form</h1>
+            <p className={`font-body text-sm text-[#665746] text-pretty`}>Survey Builder</p>
+            <h1 className="text-3xl font-semibold text-balance sm:text-4xl">Create high-quality voice surveys</h1>
             <p className={`font-body mt-1 max-w-2xl text-sm text-[#665746] text-pretty`}>
-              Build one decision-focused survey in three steps: define the decision, pick the truth lens, and ship prompts that create clear next actions.
+              Start with a template or browse categories to build surveys that generate clear, actionable insights from voice responses.
             </p>
           </div>
           <div className="flex gap-2">
@@ -613,12 +490,6 @@ export default function QuestionnairesV1Page() {
                   JSON.stringify({
                     surveyId: draftSurveyId || createSurveyId(title, user?.id || "creator"),
                     title,
-                    decisionTarget,
-                    changeType,
-                    desiredOutcome,
-                    decisionDetail,
-                    intent,
-                    audience,
                     questions,
                     savedAt,
                   }),
@@ -627,12 +498,7 @@ export default function QuestionnairesV1Page() {
                   await saveSurvey("draft")
                   setDraftMessage(`Draft saved at ${new Date(savedAt).toLocaleString()}`)
                   trackEvent("survey_draft_saved", {
-                    intent_type: intent,
                     question_count: questions.length,
-                    decision_focus_present: decisionFocus.trim().length > 0,
-                    change_target: decisionTarget,
-                    change_type: changeType,
-                    desired_outcome: desiredOutcome,
                   })
                 } catch (error) {
                   setDraftMessage(error instanceof Error ? error.message : "Failed to save draft.")
@@ -674,13 +540,13 @@ export default function QuestionnairesV1Page() {
                 <p className="text-sm font-semibold uppercase tracking-wide text-[#7a6146]">🧠 Question Intelligence</p>
               </div>
               <div className="p-5">
-                {/* Survey Templates */}
+                {/* Survey Templates & Categories with Mobile Toggle */}
                 <div className="rounded-2xl border border-[#cfbea4] bg-[#fff7ee] p-4">
-                  <div className="mb-4 flex items-start justify-between gap-2">
+                  <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
-                      <p className="text-sm font-semibold">Pre-built Templates</p>
+                      <p className="text-sm font-semibold">Question Intelligence System</p>
                       <p className={`font-body mt-1 text-xs text-[#665746]`}>
-                        Ready-to-use question sets for common use cases.
+                        Choose from templates or browse categories to build high-quality surveys.
                       </p>
                     </div>
                     {questions.length > 3 && (
@@ -690,74 +556,108 @@ export default function QuestionnairesV1Page() {
                     )}
                   </div>
 
-                  {/* Survey Templates Grid */}
-                  <div className="mt-4">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-[#7a6146]">Pre-built Templates</p>
-                    <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                      {surveyTemplates.map((template) => (
-                        <button
-                          key={template.id}
-                          type="button"
-                          onClick={() => {
-                            commitQuestionChange(template.questions, 0)
-                            setDraftMessage(`Applied ${template.label} template. These questions are optimized for voice responses.`)
-                            trackEvent("prompt_template_applied", {
-                              template_id: template.id,
-                              template_label: template.label,
-                              question_count: template.questions.length,
-                            })
-                          }}
-                          className="rounded-xl border border-[#cfbea4] bg-[#fffdf8] px-3 py-3 text-left hover:border-[#b85e2d] hover:bg-[#fff7ee]"
-                        >
-                          <p className="text-sm font-semibold text-[#6e3316]">{template.label}</p>
-                          <p className={`font-body mt-1 text-xs text-[#665746]`}>{template.description}</p>
-                          <p className={`font-body mt-2 text-xs text-[#8c7f70]`}>
-                            {template.questions.length} question{template.questions.length !== 1 ? "s" : ""}
-                          </p>
-                        </button>
-                      ))}
-                    </div>
+                  {/* Mobile Toggle - Only visible on small screens */}
+                  <div className="mb-4 flex rounded-xl border border-[#cfbea4] bg-[#fffdf8] p-1 sm:hidden">
+                    <button
+                      type="button"
+                      onClick={() => setShowTemplates(true)}
+                      className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition-all ${
+                        showTemplates
+                          ? "bg-[#b85e2d] text-[#fff6ed]"
+                          : "text-[#665746] hover:bg-[#f8efdf]"
+                      }`}
+                    >
+                      📋 Templates
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowTemplates(false)}
+                      className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition-all ${
+                        !showTemplates
+                          ? "bg-[#b85e2d] text-[#fff6ed]"
+                          : "text-[#665746] hover:bg-[#f8efdf]"
+                      }`}
+                    >
+                      🗂️ Categories
+                    </button>
                   </div>
 
-                  {/* Question Categories */}
-                  <div className="mt-6">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-[#7a6146]">Browse by Category</p>
-                    <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                      {questionCategories.map((category) => (
-                        <details key={category.id} className="group rounded-xl border border-[#cfbea4] bg-[#fffdf8] p-3">
-                          <summary className="flex cursor-pointer list-none items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <span className="text-lg">{category.icon}</span>
-                              <div className="text-left">
-                                <p className="text-sm font-semibold text-[#6e3316]">{category.label}</p>
-                                <p className={`font-body text-xs text-[#665746]`}>{category.description}</p>
-                              </div>
-                            </div>
-                            <ChevronRight className="size-4 transition-transform group-open:rotate-90" />
-                          </summary>
-                          <div className="mt-3 space-y-2">
-                            {category.questions.map((question, idx) => (
-                              <button
-                                key={idx}
-                                type="button"
-                                onClick={() => {
-                                  const next = [...questions, question]
-                                  commitQuestionChange(next, questions.length)
-                                  trackEvent("decision_intent_prompt_viewed", {
-                                    category_id: category.id,
-                                    category_label: category.label,
-                                  })
-                                }}
-                                className="w-full rounded-lg border border-[#cfbea4] bg-[#f8efdf] px-3 py-2 text-left text-sm text-[#665746] hover:border-[#b85e2d] hover:bg-[#fff7ee]"
-                              >
-                                {question}
-                              </button>
-                            ))}
-                          </div>
-                        </details>
-                      ))}
+                  {/* Survey Templates Section */}
+                  {(showTemplates || typeof window === 'undefined') && (
+                    <div className={typeof window !== 'undefined' && !showTemplates ? 'hidden' : ''}>
+                      <div className="mb-4 hidden sm:block">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-[#7a6146]">Pre-built Templates</p>
+                      </div>
+                      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                        {surveyTemplates.map((template) => (
+                          <button
+                            key={template.id}
+                            type="button"
+                            onClick={() => {
+                              commitQuestionChange(template.questions, 0)
+                              setDraftMessage(`Applied ${template.label} template. These questions are optimized for voice responses.`)
+                              trackEvent("prompt_template_applied", {
+                                template_id: template.id,
+                                template_label: template.label,
+                                question_count: template.questions.length,
+                              })
+                            }}
+                            className="rounded-xl border border-[#cfbea4] bg-[#fffdf8] px-3 py-3 text-left hover:border-[#b85e2d] hover:bg-[#fff7ee]"
+                          >
+                            <p className="text-sm font-semibold text-[#6e3316]">{template.label}</p>
+                            <p className={`font-body mt-1 text-xs text-[#665746]`}>{template.description}</p>
+                            <p className={`font-body mt-2 text-xs text-[#8c7f70]`}>
+                              {template.questions.length} question{template.questions.length !== 1 ? "s" : ""}
+                            </p>
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  )}
+
+                  {/* Question Categories Section */}
+                  {(!showTemplates || typeof window === 'undefined') && (
+                    <div className={`${typeof window !== 'undefined' && showTemplates ? 'hidden' : ''} mt-6`}>
+                      <div className="mb-4 hidden sm:block">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-[#7a6146]">Browse by Category</p>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        {questionCategories.map((category) => (
+                          <details key={category.id} className="group rounded-xl border border-[#cfbea4] bg-[#fffdf8] p-3">
+                            <summary className="flex cursor-pointer list-none items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="text-lg">{category.icon}</span>
+                                <div className="text-left">
+                                  <p className="text-sm font-semibold text-[#6e3316]">{category.label}</p>
+                                  <p className={`font-body text-xs text-[#665746]`}>{category.description}</p>
+                                </div>
+                              </div>
+                              <ChevronRight className="size-4 transition-transform group-open:rotate-90" />
+                            </summary>
+                            <div className="mt-3 space-y-2">
+                              {category.questions.map((question, idx) => (
+                                <button
+                                  key={idx}
+                                  type="button"
+                                  onClick={() => {
+                                    const next = [...questions, question]
+                                    commitQuestionChange(next, questions.length)
+                                    trackEvent("decision_intent_prompt_viewed", {
+                                      category_id: category.id,
+                                      category_label: category.label,
+                                    })
+                                  }}
+                                  className="w-full rounded-lg border border-[#cfbea4] bg-[#f8efdf] px-3 py-2 text-left text-sm text-[#665746] hover:border-[#b85e2d] hover:bg-[#fff7ee]"
+                                >
+                                  {question}
+                                </button>
+                              ))}
+                            </div>
+                          </details>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Voice Tips */}
                   <div className="mt-6 rounded-xl border border-[#cfbea4] bg-[#fffdf8] p-3">
@@ -1018,12 +918,9 @@ export default function QuestionnairesV1Page() {
             </div>
 
             <div className="mt-4 rounded-2xl border border-[#cfbea4] bg-[#fff7ee] p-3">
-              <p className="inline-flex items-center gap-1 text-sm font-semibold">
-                <Target className="size-4 text-[#b85e2d]" aria-hidden="true" />
-                Outcome target
-              </p>
+              <p className="text-sm font-semibold">Mobile vs Desktop Experience</p>
               <p className={`font-body mt-1 text-sm text-[#665746]`}>
-                Collect the first 5 voice takes quickly, replay the strongest clips, then decide your next product move.
+                On mobile, respondents see a streamlined full-screen interface optimized for voice recording. Desktop users get a wider view with additional context.
               </p>
             </div>
 
@@ -1031,8 +928,8 @@ export default function QuestionnairesV1Page() {
               <Button
                 className="w-full bg-[#b85e2d] text-[#fff6ed] hover:bg-[#a05227]"
                 onClick={async () => {
-                  if (!readyChecks.hasTitle || !readyChecks.hasDecisionSpecificity || !readyChecks.hasTwoQuestions) {
-                    setDraftMessage("Complete title, structured decision context, and at least two prompts before publishing.")
+                  if (!readyChecks.hasTitle || !readyChecks.hasTwoQuestions) {
+                    setDraftMessage("Add a title and at least two questions before publishing.")
                     return
                   }
 
@@ -1053,13 +950,7 @@ export default function QuestionnairesV1Page() {
                     recordSurveyPublished({ surveyId, title })
                     trackEvent("survey_published", {
                       survey_id: surveyId,
-                      intent_type: intent,
-                      template_pack: intent,
                       question_count: questions.length,
-                      decision_focus_present: decisionFocus.trim().length > 0,
-                      change_target: decisionTarget,
-                      change_type: changeType,
-                      desired_outcome: desiredOutcome,
                     })
                     setPublishedSurveyId(surveyId)
                     setDraftMessage("Survey published and visible in Survey Stack.")

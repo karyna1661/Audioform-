@@ -140,21 +140,43 @@ export async function createStoredResponse(input: {
 
   let storagePath = ""
   let publicUrl: string | undefined
-  if (isB2Configured()) {
-    const uploaded = await uploadToB2({
-      buffer,
-      mimeType: input.audioFile.type || "application/octet-stream",
-      originalName: input.audioFile.name || fileName,
-      prefix: "voice-recordings",
-    })
-    storagePath = uploaded.storagePath
-    publicUrl = uploaded.publicUrl
-  } else {
-    if (process.env.NODE_ENV === "production") {
-      throw new Error("B2 storage is not configured in production.")
+  
+  // Determine if we should use B2 storage
+  // Use B2 in production when configured, otherwise use local storage
+  const isProduction = process.env.NODE_ENV === "production"
+  const shouldUseB2 = isProduction && isB2Configured()
+  
+  console.log("Storage decision:", {
+    isProduction,
+    isB2Configured: isB2Configured(),
+    shouldUseB2,
+    nodeEnv: process.env.NODE_ENV,
+  })
+  
+  if (shouldUseB2) {
+    try {
+      console.log("Uploading to B2 storage...")
+      const uploaded = await uploadToB2({
+        buffer,
+        mimeType: input.audioFile.type || "application/octet-stream",
+        originalName: input.audioFile.name || fileName,
+        prefix: "voice-recordings",
+      })
+      storagePath = uploaded.storagePath
+      publicUrl = uploaded.publicUrl
+      console.log("B2 upload successful:", { storagePath, publicUrl })
+    } catch (b2Error) {
+      console.error("B2 upload failed, falling back to local storage:", b2Error)
+      // Fallback to local storage even in production if B2 fails
+      const fullPath = path.join(UPLOAD_DIR, fileName)
+      await writeFile(fullPath, Uint8Array.from(buffer))
+      storagePath = fullPath
     }
+  } else {
+    // Development mode or B2 not configured - use local storage
+    console.log("Using local storage for audio file")
     const fullPath = path.join(UPLOAD_DIR, fileName)
-    await writeFile(fullPath, buffer)
+    await writeFile(fullPath, Uint8Array.from(buffer))
     storagePath = fullPath
   }
 

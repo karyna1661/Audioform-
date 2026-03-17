@@ -3,8 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --webpack",
-    "build": "next build --webpack",
+    "validate:env": "node scripts/validate-env.js",
+    "dev": "npm run validate:env && next dev --webpack",
+    "build": "npm run validate:env && next build --webpack",
     "start": "next start",
     "lint": "next lint",
     "regen:guard": "node regen-engine/checks/runtime-guard.mjs",

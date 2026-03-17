@@ -115,11 +115,27 @@ export async function POST(request: NextRequest) {
     }
 
     const session = await getSessionFromRequest()
+    console.log("Creating response storage:", {
+      questionId: parsed.data.questionId,
+      surveyId: parsed.data.surveyId,
+      userId: session?.sub || "anonymous",
+      audioFileSize: audioFile.size,
+      audioFileType: audioFile.type,
+      nodeEnv: process.env.NODE_ENV,
+      b2Configured: process.env.B2_KEY_ID ? true : false,
+    })
+    
     const stored = await createStoredResponse({
       questionId: parsed.data.questionId,
       surveyId: parsed.data.surveyId,
       userId: session?.sub || "anonymous",
       audioFile,
+    })
+    
+    console.log("Response stored successfully:", {
+      id: stored.id,
+      storagePath: stored.storagePath,
+      publicUrl: stored.publicUrl,
     })
 
     try {
@@ -211,13 +227,23 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Error handling audio upload:", error)
     const message = error instanceof Error ? error.message : "Failed to process audio upload"
+    
+    // More specific error messages
     if (message.includes("B2 storage is not configured")) {
       return NextResponse.json(
-        { error: "Storage is not configured. Please contact support and retry shortly." },
+        { error: "Storage configuration issue. Please try again or contact support." },
         { status: 503, headers: corsHeaders },
       )
     }
-    return NextResponse.json({ error: "Failed to process audio upload" }, { status: 500, headers: corsHeaders })
+    
+    if (message.includes("Supabase") || message.includes("database")) {
+      return NextResponse.json(
+        { error: "Database connection failed. Please retry your response." },
+        { status: 503, headers: corsHeaders },
+      )
+    }
+    
+    return NextResponse.json({ error: message }, { status: 500, headers: corsHeaders })
   }
 }
 

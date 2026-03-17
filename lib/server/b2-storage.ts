@@ -142,7 +142,7 @@ export async function uploadToB2(input: {
       "Content-Type": input.mimeType || "application/octet-stream",
       "X-Bz-Content-Sha1": "do_not_verify",
     },
-    body: input.buffer,
+    body: Uint8Array.from(input.buffer),
     cache: "no-store",
   })
 
