@@ -23,6 +23,7 @@ export type AudioformEventName =
   | "respondent_thank_you_viewed"
   | "respondent_follow_up_action"
   | "creator_conversion_cta_clicked"
+  | "question_deleted"
 
 type EventPayload = Record<string, string | number | boolean | null | undefined>
 
