@@ -654,7 +654,7 @@ export default function QuestionnairesV1Page() {
           <div className="space-y-5">
             <section className="af-accent-card af-fade-up af-delay-1 overflow-hidden rounded-3xl border border-[#cfbea4]">
               <div className="border-b border-[#cfbea4] bg-[#f6ead8] px-5 py-3">
-                <p className="text-sm font-semibold uppercase tracking-wide text-[#7a6146]">Trigger: Decision Context</p>
+                <p className="text-sm font-semibold uppercase tracking-wide text-[#7a6146]">Survey Configuration</p>
               </div>
               <div className="grid gap-4 p-5 sm:grid-cols-[1.2fr_1fr]">
                 <div>
