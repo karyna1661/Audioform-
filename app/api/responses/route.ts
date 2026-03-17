@@ -46,15 +46,15 @@ const moderationSchema = z.object({
 })
 
 export async function POST(request: NextRequest) {
-  try {
-    // Add CORS headers for cross-origin requests from mobile
-    const corsHeaders = {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-      'Access-Control-Allow-Credentials': 'true',
-    }
+  // Add CORS headers for cross-origin requests from mobile
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Credentials': 'true',
+  }
 
+  try {
     // Handle preflight OPTIONS request
     if (request.method === 'OPTIONS') {
       return new NextResponse(null, { status: 204, headers: corsHeaders })
