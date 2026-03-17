@@ -654,171 +654,33 @@ export default function QuestionnairesV1Page() {
           <div className="space-y-5">
             <section className="af-accent-card af-fade-up af-delay-1 overflow-hidden rounded-3xl border border-[#cfbea4]">
               <div className="border-b border-[#cfbea4] bg-[#f6ead8] px-5 py-3">
-                <p className="text-sm font-semibold uppercase tracking-wide text-[#7a6146]">Survey Configuration</p>
+                <p className="text-sm font-semibold uppercase tracking-wide text-[#7a6146]">Survey Details</p>
               </div>
-              <div className="grid gap-4 p-5 sm:grid-cols-[1.2fr_1fr]">
-                <div>
-                  <label className="block text-sm font-semibold" htmlFor="survey-title">
-                    Survey title
-                  </label>
-                  <input
-                    id="survey-title"
-                    className="mt-2 w-full rounded-2xl border border-[#cfbea4] bg-[#fffdf8] px-3 py-2"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                  />
-
-                  <label className="mt-4 block text-sm font-semibold" htmlFor="decision-target">
-                    What are you changing?
-                  </label>
-                  <select
-                    id="decision-target"
-                    value={decisionTarget}
-                    onChange={(e) => setDecisionTarget(e.target.value)}
-                    className="mt-2 w-full rounded-2xl border border-[#cfbea4] bg-[#fffdf8] px-3 py-2 text-sm"
-                  >
-                    {decisionTargetOptions.map((option) => (
-                      <option key={option} value={option}>
-                        {option}
-                      </option>
-                    ))}
-                  </select>
-
-                  <label className="mt-4 block text-sm font-semibold" htmlFor="change-type">
-                    What kind of change?
-                  </label>
-                  <select
-                    id="change-type"
-                    value={changeType}
-                    onChange={(e) => setChangeType(e.target.value)}
-                    className="mt-2 w-full rounded-2xl border border-[#cfbea4] bg-[#fffdf8] px-3 py-2 text-sm"
-                  >
-                    {changeTypeOptions.map((option) => (
-                      <option key={option} value={option}>
-                        {option}
-                      </option>
-                    ))}
-                  </select>
-
-                  <label className="mt-4 block text-sm font-semibold" htmlFor="desired-outcome">
-                    What outcome should improve?
-                  </label>
-                  <select
-                    id="desired-outcome"
-                    value={desiredOutcome}
-                    onChange={(e) => setDesiredOutcome(e.target.value)}
-                    className="mt-2 w-full rounded-2xl border border-[#cfbea4] bg-[#fffdf8] px-3 py-2 text-sm"
-                  >
-                    {desiredOutcomeOptions.map((option) => (
-                      <option key={option} value={option}>
-                        {option}
-                      </option>
-                    ))}
-                  </select>
-
-                  <label className="mt-4 block text-sm font-semibold" htmlFor="decision-detail">
-                    Optional detail (overrides generated sentence)
-                  </label>
-                  <textarea
-                    id="decision-detail"
-                    className={`font-body mt-2 min-h-20 w-full rounded-2xl border border-[#cfbea4] bg-[#fffdf8] px-3 py-2 text-sm text-pretty`}
-                    value={decisionDetail}
-                    onChange={(e) => setDecisionDetail(e.target.value)}
-                    placeholder="Example: Should we remove onboarding step 2 to increase completion?"
-                  />
-                </div>
-                <div className="rounded-2xl border border-[#cfbea4] bg-[#f6ead8] p-4">
-                  <p className="text-sm font-semibold">Decision anchor preview</p>
-                  <p className={`font-body mt-2 rounded-xl border border-[#cfbea4] bg-[#fff7ee] px-3 py-2 text-sm text-[#665746]`}>
-                    {decisionFocus}
-                  </p>
-                  <p className="mt-4 text-sm font-semibold">Pre-built survey templates</p>
-                  <div className="mt-3 grid gap-2">
-                    {surveyTemplates.map((template) => (
-                      <button
-                        key={template.id}
-                        type="button"
-                        onClick={() => {
-                          setDecisionDetail(template.questions[0])
-                          trackEvent("starter_pack_applied", {
-                            template_id: template.id,
-                            template_label: template.label,
-                          })
-                        }}
-                        className={`font-body rounded-xl border border-[#cfbea4] bg-[#fff7ee] px-3 py-2 text-left text-sm text-[#665746] hover:bg-[#fffdf8]`}
-                      >
-                        {template.label}: {template.description}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              <div className="px-5 pb-5">
-                <p className="text-sm font-semibold">Intent mode</p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {intentOptions.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => {
-                        setIntent(item.id)
-                        trackEvent("decision_intent_selected", { intent_type: item.id })
-                      }}
-                      className={`rounded-full border px-3 py-1.5 text-sm ${
-                        intent === item.id
-                          ? "border-[#b85e2d] bg-[#f1ceb9] text-[#6e3316]"
-                          : "border-[#cfbea4] bg-[#fffdf8] text-[#665746]"
-                      }`}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
-                <p className={`font-body mt-2 text-xs text-[#665746]`}>
-                  Intent mode is your truth lens. It changes prompt suggestions based on the decision you are evaluating.
-                </p>
-                <p className="mt-4 text-sm font-semibold">Audience mode</p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {audienceOptions.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => setAudience(item.id)}
-                      className={`rounded-full border px-3 py-1.5 text-sm ${
-                        audience === item.id
-                          ? "border-[#b85e2d] bg-[#f1ceb9] text-[#6e3316]"
-                          : "border-[#cfbea4] bg-[#fffdf8] text-[#665746]"
-                      }`}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
-                <p className={`font-body mt-2 text-xs text-[#665746]`}>
-                  Audience mode adapts prompts to who you are asking so responses are clearer and easier to act on.
-                </p>
+              <div className="p-5">
+                <label className="block text-sm font-semibold" htmlFor="survey-title">
+                  Survey title
+                </label>
+                <input
+                  id="survey-title"
+                  className="mt-2 w-full rounded-2xl border border-[#cfbea4] bg-[#fffdf8] px-3 py-2"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                />
               </div>
             </section>
 
             <section className="af-accent-card af-fade-up af-delay-2 overflow-hidden rounded-3xl border border-[#cfbea4]">
               <div className="border-b border-[#cfbea4] bg-[#f6ead8] px-5 py-3">
-                <p className="text-sm font-semibold uppercase tracking-wide text-[#7a6146]">Action: Prompt Flow</p>
+                <p className="text-sm font-semibold uppercase tracking-wide text-[#7a6146]">🧠 Question Intelligence</p>
               </div>
-              <div className="grid gap-4 p-5">
-                <div className={`font-body rounded-2xl border border-[#cfbea4] bg-[#fffdf8] px-3 py-2 text-sm text-[#665746]`}>
-                  Prompt suggestions are generated from: <span className="font-semibold">{decisionTarget}</span> +{" "}
-                  <span className="font-semibold">{changeType}</span> + <span className="font-semibold">{desiredOutcome}</span> +{" "}
-                  <span className="font-semibold">{intentOptions.find((item) => item.id === intent)?.label ?? "Intent"}</span> +{" "}
-                  <span className="font-semibold">{audienceOptions.find((item) => item.id === audience)?.label ?? "Audience"}</span>.
-                </div>
-
-                {/* Question Intelligence System */}
+              <div className="p-5">
+                {/* Survey Templates */}
                 <div className="rounded-2xl border border-[#cfbea4] bg-[#fff7ee] p-4">
-                  <div className="flex items-start justify-between gap-2">
+                  <div className="mb-4 flex items-start justify-between gap-2">
                     <div>
-                      <p className="text-sm font-semibold">🧠 Question Intelligence</p>
+                      <p className="text-sm font-semibold">Pre-built Templates</p>
                       <p className={`font-body mt-1 text-xs text-[#665746]`}>
-                        Choose a template or browse high-signal question categories.
+                        Ready-to-use question sets for common use cases.
                       </p>
                     </div>
                     {questions.length > 3 && (
@@ -828,7 +690,7 @@ export default function QuestionnairesV1Page() {
                     )}
                   </div>
 
-                  {/* Survey Templates */}
+                  {/* Survey Templates Grid */}
                   <div className="mt-4">
                     <p className="text-xs font-semibold uppercase tracking-wide text-[#7a6146]">Pre-built Templates</p>
                     <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
