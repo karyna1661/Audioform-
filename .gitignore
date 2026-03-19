@@ -24,6 +24,7 @@ yarn-error.log*
 *.out.log
 *.err.log
 tmp-e2e-*
+.tmp/
 uploads/
 data/
 

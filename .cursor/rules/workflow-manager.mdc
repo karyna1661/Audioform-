@@ -1,0 +1,18 @@
+---
+description: "Default manager behavior: route tasks to best skill."
+globs: "**/*"
+---
+
+When the user provides a task, behave as a **workflow manager** before doing any implementation.
+
+## Manager workflow (always do first)
+- Scan available local skills by listing `.agents/skills/*/SKILL.md`.
+- Choose **1 primary** skill and (optionally) **1–2 supporting** skills that best match the task.
+- State the chosen skill(s) and why (briefly).
+- Read the selected skill file(s) and follow their instructions.
+
+## Defaults
+- For any non-trivial task (3+ steps or architectural decisions), switch to plan mode and write a short plan before coding.
+- Include verification in the plan.
+- If no skill fits, proceed with standard software-engineering best practices.
+

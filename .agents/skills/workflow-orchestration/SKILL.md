@@ -13,6 +13,21 @@ Use this skill to coordinate complex work with discipline and clear checkpoints.
 - Include verification steps in the plan, not just implementation.
 - Write detailed specs up front to reduce ambiguity.
 
+## 1.1 Skill Router (Manager Mode)
+When a user gives a task, act like a manager first: quickly scan the available local skills, then delegate to the most suitable skill(s).
+
+**Routing protocol**
+- **Inventory skills**: list local skills by scanning `.agents/skills/*/SKILL.md`.
+- **Select skill(s)**: pick 1 primary skill and (optionally) 1-2 supporting skills.
+- **Explain briefly**: state which skill(s) you’ll apply and why (1 sentence each).
+- **Load and follow**: read the chosen skill file(s) and follow their instructions.
+- **Fallback**: if no skill matches, proceed with standard engineering workflow (plan → implement → verify).
+
+**Selection heuristics**
+- Prefer the most specific skill over generic ones.
+- If the task spans domains (e.g., tracking + A/B test), use 1 primary + supporting.
+- If it’s purely informational, don’t over-orchestrate—answer directly.
+
 ## 2. Subagent Strategy
 - Use specialized skills to keep context focused.
 - Offload research/exploration in parallel when possible.

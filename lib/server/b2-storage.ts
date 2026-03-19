@@ -105,7 +105,7 @@ export async function uploadToB2(input: {
   mimeType: string
   originalName: string
   prefix?: string
-}): Promise<{ storagePath: string; publicUrl?: string }> {
+}): Promise<{ storagePath: string; publicUrl?: string; fileId?: string; fileName?: string }> {
   const auth = await b2Authorize()
   const bucket = await resolveBucket(auth)
 
@@ -151,9 +151,16 @@ export async function uploadToB2(input: {
     throw new Error(`B2 upload failed (${uploadRes.status}): ${text.slice(0, 300)}`)
   }
 
+  const uploadJson = (await uploadRes.json().catch(() => null)) as
+    | null
+    | {
+        fileId?: string
+        fileName?: string
+      }
+
   const storagePath = `b2://${bucket.bucketName}/${objectKey}`
   const publicUrl = `${auth.downloadUrl}/file/${bucket.bucketName}/${objectKey}`
-  return { storagePath, publicUrl }
+  return { storagePath, publicUrl, fileId: uploadJson?.fileId, fileName: uploadJson?.fileName }
 }
 
 export async function downloadFromB2StoragePath(storagePath: string): Promise<Buffer | null> {
@@ -175,6 +182,26 @@ export async function downloadFromB2StoragePath(storagePath: string): Promise<Bu
 
   const arrayBuffer = await response.arrayBuffer()
   return Buffer.from(arrayBuffer)
+}
+
+export async function deleteFromB2(input: { fileId: string; fileName: string }): Promise<void> {
+  const auth = await b2Authorize()
+  const res = await fetch(`${auth.apiUrl}/b2api/v2/b2_delete_file_version`, {
+    method: "POST",
+    headers: {
+      Authorization: auth.authorizationToken,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      fileId: input.fileId,
+      fileName: input.fileName,
+    }),
+    cache: "no-store",
+  })
+  if (!res.ok) {
+    const text = await res.text().catch(() => "")
+    throw new Error(`B2 delete failed (${res.status}): ${text.slice(0, 220)}`)
+  }
 }
 
 export function isB2Configured(): boolean {

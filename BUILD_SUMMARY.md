@@ -207,33 +207,21 @@ Audioform/
 ## Environment Variables Required
 
 ### Critical (Must Configure in Railway)
-```bash
-# App Configuration
-NEXT_PUBLIC_APP_URL=https://your-app.railway.app
-AUTH_SESSION_SECRET=generate-random-32-char-string
 
-# Authentication
-NEXT_PUBLIC_PRIVY_APP_ID=cmf6o0wqr01j7jo0c2f1qfufc
-PRIVY_VERIFICATION_KEY=MIIB... (from Privy dashboard)
+For **secrets**, set them in Railway (do not store in git or docs):
 
-# Database
-SUPABASE_URL=https://xxxxx.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=eyJhbG... (full access key)
+- `AUTH_SESSION_SECRET`: set in Railway
+- `PRIVY_VERIFICATION_KEY`: set in Railway
+- `SUPABASE_SERVICE_ROLE_KEY`: set in Railway
+- `B2_APPLICATION_KEY`: set in Railway
+- `OPENAI_API_KEY`: set in Railway
+- `SMTP_PASSWORD`: set in Railway
 
-# Storage
-B2_KEY_ID=xxxxxxxxxxxx
-B2_APPLICATION_KEY=xxxxxxxxxxxxxxxxxxxxxxxx
-B2_BUCKET_ID=xxxxxxxx
+Non-secret examples:
 
-# Transcription
-OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxx
-
-# Email (for notifications)
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your-email@gmail.com
-SMTP_PASSWORD=your-app-password
-```
+- `NEXT_PUBLIC_APP_URL`: `https://your-app.railway.app`
+- `NEXT_PUBLIC_PRIVY_APP_ID`: `cmf6o0wqr01j7jo0c2f1qfufc`
+- `SUPABASE_URL`: `https://<project-ref>.supabase.co`
 
 ### Optional
 ```bash
@@ -371,11 +359,73 @@ Scale (500+ responses/month): $100+/month
 
 ## Support & Resources
 
-### Documentation
+### Core Documentation
 - 📖 User Flow: `USER_FLOW_WALKTHROUGH.md`
 - 🔒 Security Audit: `SECURITY_AUDIT_COMPLETE.md`
 - 🚀 Quick Start: `QUICK_START_GUIDE.md`
-- 📊 This Summary: `BUILD_SUMMARY.md`
+- 📊 Build Summary: `BUILD_SUMMARY.md`
+
+### Product Strategy (NEW - March 18, 2026)
+- 🎯 **Complete Roadmap:** `future-work/AUDIOFORM_COMPREHENSIVE_ROADMAP.md`
+  - Phase 1-5 product development (AI-optional to AI-amplified)
+  - Question design patterns (Moment, Almost Quit, Magic Wand)
+  - AI pipeline specifications
+  - Success metrics per phase
+  
+- 🚀 **48-Hour Launch Plan:** `future-work/VOP_V1_48HOUR_LAUNCH_PLAN.md`
+  - VOP v1: Voice of the People campaign
+  - Hour-by-hour execution guide
+  - Copywriting templates
+  - Manual insight extraction workflow
+
+- 🌍 **Ecosystem Master Plan:** `future-work/VOXERA_ECOSYSTEM_MASTER_INDEX.md`
+  - Three-layer architecture (Audioform → Civic Lab → Protocol)
+  - Strategic flywheel explanation
+  - Resource allocation guide
+  - Decision framework
+
+### Scalability Infrastructure (NEW - March 18, 2026)
+- 🏗️ **Scalability Blueprint:** `future-work/audioform-production-scalability-blueprint.md`
+  - 10 critical gaps with fixes
+  - Backpressure & queueing (BullMQ + Redis)
+  - Idempotency layer design
+  - Observability stack (Pino + Prometheus + Grafana)
+  
+- 📝 **API Patterns:** `future-work/audioform-scalable-api-patterns.md`
+  - 8 production-ready code templates
+  - Rate limiting, timeouts, circuit breakers
+  - Connection pooling, caching
+  - TypeScript implementations
+
+- 🧪 **Load Testing:** `future-work/audioform-load-testing-strategy.md`
+  - 5 test scenarios (baseline, spike, stress, soak)
+  - k6 scripts ready to run
+  - CI/CD integration examples
+
+- ✅ **Implementation Checklist:** `future-work/SCALABILITY_CHECKLIST.md`
+  - Daily tracking template
+  - Alert configuration
+  - Runbook outlines
+
+### Civic Initiative & Grants (Coming Soon)
+- 🏛️ **Voxera Civic Lab Playbook** (In Progress)
+  - VOP program design
+  - Partnership frameworks
+  - Grant application templates
+  - Fellowship programs
+
+- 🗺️ **Community Signal Mapping** (Planned)
+  - Geospatial visualization specs
+  - Clustering algorithms
+  - Privacy-preserving aggregation
+
+- ⚖️ **Themis Legal Framework** (Planned)
+  - Entity formation guide
+  - Consent forms
+  - Data protection compliance
+  - IP ownership frameworks
+
+---
 
 ### Code Quality
 - ✅ TypeScript strict mode enabled
@@ -383,11 +433,104 @@ Scale (500+ responses/month): $100+/month
 - ✅ Prettier formatting applied
 - ✅ Git hooks for pre-commit checks
 
-### Known Limitations
+### Scalability Roadmap (March 18, 2026)
+
+Following comprehensive API design review, identified 10 critical scalability gaps and created production-grade solutions.
+
+**Phase 1: Foundation (Before Beta)** - CRITICAL
+- ⬜ Backpressure & Queueing System (BullMQ + Redis)
+- ⬜ Idempotency Layer (prevent duplicate transactions)
+- ⬜ Database Connection Pooling (prevent exhaustion)
+- ⬜ Observability Stack (logging + metrics + alerting)
+- ⬜ Timeout Enforcement (prevent hanging requests)
+
+**Phase 2: Optimization (Post-Beta)** - HIGH PRIORITY
+- ⬜ N+1 Query Prevention
+- ⬜ Horizontal Scaling Readiness (multi-instance)
+- ⬜ Cold Start Mitigation
+- ⬜ Caching Layer (Redis for hot endpoints)
+
+**Phase 3: Long-Term Resilience (3-6 Months)** - STRATEGIC
+- ⬜ Data Growth Strategy (archiving + partitioning)
+- ⬜ Security Hardening (rate limiting + WAF)
+- ⬜ Cost Optimization at Scale
+
+**Success Metrics:**
+- Target: Handle 10x traffic spike without crash
+- Target: p99 latency <2s under load
+- Target: Zero data corruption from retries
+- Target: MTTD <1 minute (Mean Time To Detection)
+- Target: Auto-recovery from dependency failures
+
+📄 **See**: `future-work/SCALABILITY_CHECKLIST.md` for detailed implementation tracking
+
+---
+
+## Complete Product Vision (NEW - March 18, 2026)
+
+### Three-Layer Ecosystem
+
+**Audioform (Commercial Product - Launch Now)**
+- Voice survey builder with templates
+- AI-powered insight extraction (Phases 2-5)
+- Best Insight Clips feature
+- Revenue generation through SaaS subscriptions
+
+**Voxera Civic Lab (Public Good Infrastructure - Months 6-24)**
+- VOP: Voice of the People campaigns
+- Community Signal Mapping (geospatial visualization)
+- Grant-funded research programs
+- NGO/foundation partnerships
+- Fellowship programs
+
+**Voxera Protocol (Long-term Vision - Years 2-5)**
+- Decentralized voice marketplace
+- Oral signal trading platform
+- Community governance via voice
+- Token-incentivized participation
+
+### Core Moat: Question Intelligence
+
+**Not AI. Not blockchain. Better questions.**
+
+Three question types that unlock rich responses:
+
+1. **Moment Questions** (Activate Memory)
+   - "Can you describe the exact moment when..."
+   - Triggers episodic memory → produces stories
+
+2. **Almost Quit Questions** (Activate Friction)
+   - "At what point did you almost..."
+   - Reveals dealbreakers, not minor annoyances
+
+3. **Magic Wand Questions** (Activate Imagination)
+   - "If you could magically change one thing..."
+   - Shows highest-priority improvements
+
+### Immediate Action: VOP v1 Launch
+
+**48-Hour Execution Plan:**
+- Day 1: Setup survey + distribution (4 hours)
+- Day 2: Collect 100-300 responses + extract insights manually
+- Output: Simple report + 5-10 best clips
+
+**Question:** "What is the biggest challenge facing your community right now?"
+
+**Goal:** Prove concept before AI investment. Show evidence to partners.
+
+📄 **Full Plan**: `future-work/VOP_V1_48HOUR_LAUNCH_PLAN.md`
+
+---
+
+## Known Limitations
 - Single-user only (no team collaboration yet)
 - Manual response review (no AI summarization yet)
 - Basic analytics (advanced metrics coming)
 - English-only transcription (more languages planned)
+- ⚠️ **No backpressure system** (Phase 1 priority)
+- ⚠️ **No idempotency layer** (retry safety missing)
+- ⚠️ **Limited observability** (need structured logging + alerts)
+- ⚠️ **No AI pipeline yet** (manual-first validation approach)
 
 ---
 

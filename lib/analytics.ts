@@ -56,11 +56,40 @@ export function trackEvent(name: AudioformEventName, payload?: EventPayload): vo
     timestamp: new Date().toISOString(),
   }
 
+  // Store locally for offline resilience
   const storeKey = "audioform_events"
   const current = window.localStorage.getItem(storeKey)
   const parsed: AudioformEvent[] = current ? JSON.parse(current) : []
   parsed.push(event)
   window.localStorage.setItem(storeKey, JSON.stringify(parsed.slice(-500)))
 
+  // Send to backend for persistent storage
+  sendEventToBackend(event).catch(() => {
+    // Silently fail - local storage has backup
+  })
+
   window.dispatchEvent(new CustomEvent("audioform:track", { detail: event }))
+}
+
+async function sendEventToBackend(event: AudioformEvent): Promise<void> {
+  try {
+    const response = await fetch("/api/analytics", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        eventName: event.name,
+        surveyId: (event.payload?.survey_id as string) ?? (event.payload?.surveyId as string),
+        responseId: (event.payload?.response_id as string) ?? (event.payload?.responseId as string),
+        eventData: event.payload,
+      }),
+      credentials: "include",
+    })
+    
+    if (!response.ok) {
+      console.warn("Failed to send analytics event to backend")
+    }
+  } catch (error) {
+    // Non-critical failure - event is still stored locally
+    console.debug("Analytics send failed:", error)
+  }
 }

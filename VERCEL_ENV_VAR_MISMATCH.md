@@ -14,8 +14,8 @@
 ### Your Local `.env` File Shows:
 ```bash
 SUPABASE_URL=https://kzjfvgptagccpkjvguwf.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9... (long key)
-SUPABASE_API=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9... (different key)
+SUPABASE_SERVICE_ROLE_KEY=<REDACTED>
+SUPABASE_API=<REDACTED>
 ```
 
 ### Vercel Has:
@@ -42,12 +42,12 @@ SUPABASE_API=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9... (different key)
 
    **SUPABASE_SERVICE_ROLE_KEY:**
    ```
-   eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt6amZ2Z3B0YWdjY3BranZndXdmIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjQ3NjYxOCwiZXhwIjoyMDg4MDUyNjE4fQ.vIygdvus_iLC3TvZ3OQgIGKZavzAQdNd4kT3QZRFk5A
+   <REDACTED>
    ```
 
    **SUPABASE_API:**
    ```
-   eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt6amZ2Z3B0YWdjY3BranZndXdmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0NzY2MTgsImV4cCI6MjA4ODA1MjYxOH0.9tpigk9FCtC4ik7wRyNQD4baPUmFP9ISOnub00nWebs
+   <REDACTED>
    ```
 
 3. **Click "Save"** on each variable
@@ -76,8 +76,8 @@ vercel env rm SUPABASE_SERVICE_ROLE_KEY production
 vercel env rm SUPABASE_API production
 
 vercel env add SUPABASE_URL "https://kzjfvgptagccpkjvguwf.supabase.co"
-vercel env add SUPABASE_SERVICE_ROLE_KEY "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt6amZ2Z3B0YWdjY3BranZndXdmIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjQ3NjYxOCwiZXhwIjoyMDg4MDUyNjE4fQ.vIygdvus_iLC3TvZ3OQgIGKZavzAQdNd4kT3QZRFk5A"
-vercel env add SUPABASE_API "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt6amZ2Z3B0YWdjY3BranZndXdmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0NzY2MTgsImV4cCI6MjA4ODA1MjYxOH0.9tpigk9FCtC4ik7wRyNQD4baPUmFP9ISOnub00nWebs"
+vercel env add SUPABASE_SERVICE_ROLE_KEY "<REDACTED>"
+vercel env add SUPABASE_API "<REDACTED>"
 
 # Redeploy
 vercel --prod
@@ -154,7 +154,7 @@ NEXT_PUBLIC_APP_URL=https://v0-audio-first-ques-git-2c55f0.vercel.app
 
 For consistent sessions across deployments:
 ```
-AUTH_SESSION_SECRET=4c95ebe7b816bd902c34556d652ca361744441b8be35cb58c9649c645fb3ec85
+AUTH_SESSION_SECRET=<REDACTED>
 ```
 
 (From your .env file)

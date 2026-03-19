@@ -26,25 +26,20 @@ Your Railway deployment needs the SAME environment variables as your local `.env
 
 Copy these EXACTLY from your local `.env`:
 
-```bash
-# Authentication (CRITICAL for login)
-AUTH_SESSION_SECRET=4c95ebe7b816bd902c34556d652ca361744441b8be35cb58c9649c645fb3ec85
-NEXT_PUBLIC_PRIVY_APP_ID=cmf6o0wqr01j7jo0c2f1qfufc
-PRIVY_VERIFICATION_KEY=-----BEGIN PUBLIC KEY-----MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEU+jiAeiqH/WLW8N5MlJN9bXDKl7kt8Ri8I4id4UkPcxP0ViBPobVMh4axgOfx9LshLVL5ZuxrsHGlAgkv4PJ7A==-----END PUBLIC KEY-----
+Set these in Railway (do not paste secret values into docs):
 
-# Database (CRITICAL for user data)
-SUPABASE_URL=https://kzjfvgptagccpkjvguwf.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt6amZ2Z3B0YWdjY3BranZndXdmIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjQ3NjYxOCwiZXhwIjoyMDg4MDUyNjE4fQ.vIygdvus_iLC3TvZ3OQgIGKZavzAQdNd4kT3QZRFk5A
+- `AUTH_SESSION_SECRET`
+- `NEXT_PUBLIC_PRIVY_APP_ID`: `cmf6o0wqr01j7jo0c2f1qfufc`
+- `PRIVY_VERIFICATION_KEY`
+- `SUPABASE_URL`: `https://kzjfvgptagccpkjvguwf.supabase.co`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `NEXT_PUBLIC_APP_URL`: `https://audioform-beta.up.railway.app`
 
-# App URL (Update to production)
-NEXT_PUBLIC_APP_URL=https://audioform-beta.up.railway.app
-
-# Optional: B2 Storage (if you want uploads to work)
-B2_KEY_ID=005025e222e1dd00000000002
-B2_APPLICATION_KEY=K005Cr7soOq+llWfuy7tuabsQIBNaBg
-B2_BUCKET_ID=20f2d54eb202b21e91cd0d10
-B2_BUCKET_NAME=Audioform-pro
-```
+Optional (storage):
+- `B2_KEY_ID`
+- `B2_APPLICATION_KEY`
+- `B2_BUCKET_ID`: `20f2d54eb202b21e91cd0d10`
+- `B2_BUCKET_NAME`: `Audioform-pro`
 
 #### Step 3: Deploy Changes
 After adding variables:

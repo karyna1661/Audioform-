@@ -1,13 +1,19 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { randomUUID } from "node:crypto"
 import { z } from "zod"
 import {
-  createStoredResponse,
+  cleanupStoredFile,
+  finalizeUploadedResponse,
+  initPendingResponse,
+  markResponseFailed,
+  uploadAudioToStorage,
   deleteStoredResponseForSurveyIds,
   getStoredResponseByIdForSurveyIds,
   listStoredResponses,
   updateStoredResponseForSurveyIds,
 } from "@/lib/server/response-store"
 import { getSessionFromRequest } from "@/lib/server/auth-session"
+import { getOrCreateAnonSessionId, setAnonSessionCookie } from "@/lib/server/anon-session"
 import {
   getLatestPublishedSurveyQuestions,
   getPublishedSurveyById,
@@ -24,6 +30,7 @@ import { hasTrustedOrigin } from "@/lib/server/request-guards"
 const uploadSchema = z.object({
   questionId: z.string().min(1),
   surveyId: z.string().min(1).default("audioform-survey"),
+  durationSeconds: z.number().optional(),
 })
 
 const ALLOWED_AUDIO_MIME = new Set([
@@ -44,6 +51,10 @@ const moderationSchema = z.object({
   highSignal: z.boolean().optional(),
   bookmarked: z.boolean().optional(),
 })
+
+function newIdempotencyKey(): string {
+  return `resp_${randomUUID().replaceAll("-", "")}`
+}
 
 export async function POST(request: NextRequest) {
   // Add CORS headers for cross-origin requests from mobile
@@ -78,6 +89,7 @@ export async function POST(request: NextRequest) {
     const parsed = uploadSchema.safeParse({
       questionId: formData.get("questionId"),
       surveyId: formData.get("surveyId"),
+      durationSeconds: formData.get("durationSeconds") ? Number(formData.get("durationSeconds")) : undefined,
     })
 
     if (!audioFile || !parsed.success) {
@@ -115,115 +127,160 @@ export async function POST(request: NextRequest) {
     }
 
     const session = await getSessionFromRequest()
+    const anonSessionId = await getOrCreateAnonSessionId()
     console.log("Creating response storage:", {
       questionId: parsed.data.questionId,
       surveyId: parsed.data.surveyId,
-      userId: session?.sub || "anonymous",
+      userId: session?.sub ?? null,
+      sessionId: anonSessionId,
       audioFileSize: audioFile.size,
       audioFileType: audioFile.type,
+      durationSeconds: parsed.data.durationSeconds,
       nodeEnv: process.env.NODE_ENV,
       b2Configured: process.env.B2_KEY_ID ? true : false,
     })
-    
-    const stored = await createStoredResponse({
+
+    // 2-phase pipeline in a single request (legacy compatibility)
+    const idempotencyKey = request.headers.get("Idempotency-Key")?.trim() || newIdempotencyKey()
+    const pending = await initPendingResponse({
       questionId: parsed.data.questionId,
       surveyId: parsed.data.surveyId,
-      userId: session?.sub || "anonymous",
-      audioFile,
-    })
-    
-    console.log("Response stored successfully:", {
-      id: stored.id,
-      storagePath: stored.storagePath,
-      publicUrl: stored.publicUrl,
+      userId: session?.sub ?? null,
+      sessionId: anonSessionId,
+      idempotencyKey,
     })
 
+    let storagePath: string | null = null
+    let storageFileId: string | null = null
     try {
-      await recordDashboardEvent({
-        type: "response_recorded",
-        surveyId: stored.surveyId,
-        message: `New response recorded for ${publishedSurvey.title}`,
-        metadata: {
-          questionId: stored.questionId,
-          userId: stored.userId,
-          fileSize: stored.size,
-        },
+      const uploaded = await uploadAudioToStorage({
+        responseId: pending.id,
+        audioFile,
       })
-    } catch {
-      // Non-blocking.
-    }
+      storagePath = uploaded.storagePath
+      storageFileId = uploaded.storageFileId ?? null
 
-    // Auto-notify survey creator on new responses when their saved rule is enabled.
-    try {
-      const survey = await getSurveyById(stored.surveyId)
-      if (survey) {
-        const owner = await findUserById(survey.createdBy)
-        const config = await getNotificationConfigByUserId(survey.createdBy)
-        if (owner && config.newResponse) {
-          const responseCount = (
-            await listStoredResponses({
-              surveyId: stored.surveyId,
-            })
-          ).length
-          const recipients = config.recipients.length ? config.recipients : [owner.email]
-          const submissionDate = new Date(stored.createdAt).toLocaleString()
+      const stored = await finalizeUploadedResponse({
+        id: pending.id,
+        fileName: audioFile.name || `${pending.id}.audio`,
+        mimeType: audioFile.type || "application/octet-stream",
+        size: audioFile.size,
+        storagePath,
+        storageFileId,
+        publicUrl: uploaded.publicUrl ?? null,
+        durationSeconds: parsed.data.durationSeconds ?? null,
+      })
 
-          const subject = config.templateSubject
-            .replaceAll("[Questionnaire Name]", survey.title)
-            .replaceAll("[Respondent Name]", stored.userId || "Anonymous responder")
-            .replaceAll("[Submission Date]", submissionDate)
-            .replaceAll("[Response Count]", String(responseCount))
-
-          const text = config.templateBody
-            .replaceAll("[Questionnaire Name]", survey.title)
-            .replaceAll("[Respondent Name]", stored.userId || "Anonymous responder")
-            .replaceAll("[Submission Date]", submissionDate)
-            .replaceAll("[Response Count]", String(responseCount))
-
-          await sendEmail({
-            to: recipients,
-            subject,
-            text,
-            html: `<div style="font-family:sans-serif;max-width:640px;margin:0 auto;">
-              <h1 style="font-size:20px;margin-bottom:12px;">${subject}</h1>
-              <p style="line-height:1.5;white-space:pre-line;">${text}</p>
-            </div>`,
-          })
-
-          await recordDashboardEvent({
-            type: "notification_sent",
-            surveyId: stored.surveyId,
-            message: `New response notification sent to ${recipients.length} recipient${
-              recipients.length === 1 ? "" : "s"
-            }`,
-            metadata: {
-              recipientCount: recipients.length,
-              notificationType: "new_response",
-            },
-          })
-        }
+      if (!stored) {
+        await cleanupStoredFile({ storagePath, storageFileId })
+        await markResponseFailed(pending.id)
+        return NextResponse.json({ error: "Failed to finalize response." }, { status: 503, headers: corsHeaders })
       }
-    } catch {
-      // Non-blocking notification pipeline.
-    }
 
-    return NextResponse.json(
-      {
-        success: true,
-        message: "Audio response saved successfully",
-        data: {
-          id: stored.id,
-          questionId: stored.questionId,
+      console.log("Response stored successfully:", {
+        id: stored.id,
+        storagePath: stored.storagePath,
+        publicUrl: stored.publicUrl,
+      })
+
+      try {
+        await recordDashboardEvent({
+          type: "response_recorded",
           surveyId: stored.surveyId,
-          userId: stored.userId,
-          fileName: stored.fileName,
-          fileSize: stored.size,
-          mimeType: stored.mimeType,
-          timestamp: stored.createdAt,
+          message: `New response recorded for ${publishedSurvey.title}`,
+          metadata: {
+            questionId: stored.questionId,
+            userId: stored.userId,
+            sessionId: stored.sessionId,
+            fileSize: stored.size,
+            durationSeconds: stored.durationSeconds,
+            durationBucket: stored.durationBucket,
+          },
+        })
+      } catch {
+        // Non-blocking.
+      }
+
+      // Auto-notify survey creator on new responses when their saved rule is enabled.
+      try {
+        const survey = await getSurveyById(stored.surveyId)
+        if (survey) {
+          const owner = await findUserById(survey.createdBy)
+          const config = await getNotificationConfigByUserId(survey.createdBy)
+          if (owner && config.newResponse) {
+            const responseCount = (
+              await listStoredResponses({
+                surveyId: stored.surveyId,
+              })
+            ).length
+            const recipients = config.recipients.length ? config.recipients : [owner.email]
+            const submissionDate = new Date(stored.createdAt).toLocaleString()
+
+            const respondentName = stored.userId || "Anonymous responder"
+            const subject = config.templateSubject
+              .replaceAll("[Questionnaire Name]", survey.title)
+              .replaceAll("[Respondent Name]", respondentName)
+              .replaceAll("[Submission Date]", submissionDate)
+              .replaceAll("[Response Count]", String(responseCount))
+
+            const text = config.templateBody
+              .replaceAll("[Questionnaire Name]", survey.title)
+              .replaceAll("[Respondent Name]", respondentName)
+              .replaceAll("[Submission Date]", submissionDate)
+              .replaceAll("[Response Count]", String(responseCount))
+
+            await sendEmail({
+              to: recipients,
+              subject,
+              text,
+              html: `<div style="font-family:sans-serif;max-width:640px;margin:0 auto;">
+                <h1 style="font-size:20px;margin-bottom:12px;">${subject}</h1>
+                <p style="line-height:1.5;white-space:pre-line;">${text}</p>
+              </div>`,
+            })
+
+            await recordDashboardEvent({
+              type: "notification_sent",
+              surveyId: stored.surveyId,
+              message: `New response notification sent to ${recipients.length} recipient${
+                recipients.length === 1 ? "" : "s"
+              }`,
+              metadata: {
+                recipientCount: recipients.length,
+                notificationType: "new_response",
+              },
+            })
+          }
+        }
+      } catch {
+        // Non-blocking notification pipeline.
+      }
+
+      const response = NextResponse.json(
+        {
+          success: true,
+          message: "Audio response saved successfully",
+          data: {
+            id: stored.id,
+            questionId: stored.questionId,
+            surveyId: stored.surveyId,
+            userId: stored.userId,
+            sessionId: stored.sessionId,
+            fileName: stored.fileName,
+            fileSize: stored.size,
+            mimeType: stored.mimeType,
+            timestamp: stored.createdAt,
+          },
         },
-      },
-      { status: 201, headers: corsHeaders },
-    )
+        { status: 201, headers: corsHeaders },
+      )
+      setAnonSessionCookie(response, anonSessionId)
+      return response
+    } catch (inner) {
+      await markResponseFailed(pending.id)
+      await cleanupStoredFile({ storagePath, storageFileId })
+      throw inner
+    }
   } catch (error) {
     console.error("Error handling audio upload:", error)
     const message = error instanceof Error ? error.message : "Failed to process audio upload"
@@ -309,6 +366,8 @@ export async function GET(request: NextRequest) {
       fileName: item.fileName,
       mimeType: item.mimeType,
       fileSize: item.size,
+      durationSeconds: item.durationSeconds,
+      durationBucket: item.durationBucket,
       playbackUrl: `/api/responses/${item.id}/audio`,
       flagged: item.flagged,
       highSignal: item.highSignal,

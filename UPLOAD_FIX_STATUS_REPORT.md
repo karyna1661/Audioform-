@@ -238,7 +238,7 @@ NODE_ENV=production
    ```bash
    # Check .env file
    SUPABASE_URL=https://kzjfvgptagccpkjvguwf.supabase.co
-   SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+   SUPABASE_SERVICE_ROLE_KEY=<set in env>
    ```
 
 3. **Test API Directly**

@@ -16,33 +16,33 @@
 
 Make sure these are set in Railway dashboard:
 
-```bash
-# Database
-SUPABASE_URL=https://kzjfvgptagccpkjvguwf.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=<set_in_railway_dashboard>
-SUPABASE_API=<set_in_railway_dashboard>
+Set these in Railway dashboard:
 
-# Storage
-B2_BUCKET_ID=20f2d54eb202b21e91cd0d10
-B2_BUCKET_NAME=Audioform-pro
-B2_APPLICATION_KEY=<set_in_railway_dashboard>
-B2_KEY_ID=<set_in_railway_dashboard>
+- **Database**
+  - `SUPABASE_URL`: `https://kzjfvgptagccpkjvguwf.supabase.co`
+  - `SUPABASE_SERVICE_ROLE_KEY`
+  - `SUPABASE_API`
 
-# Auth
-AUTH_SESSION_SECRET=<generate_new_secret_for_railway>
+- **Storage**
+  - `B2_BUCKET_ID`: `20f2d54eb202b21e91cd0d10`
+  - `B2_BUCKET_NAME`: `Audioform-pro`
+  - `B2_APPLICATION_KEY`
+  - `B2_KEY_ID`
 
-# App
-NEXT_PUBLIC_APP_URL=<your_railway_domain>
+- **Auth**
+  - `AUTH_SESSION_SECRET`
 
-# External APIs
-APIFY_TOKEN=<set_in_railway_dashboard>
-GOOGLE_CLIENT_ID=<set_in_railway_dashboard>
-GOOGLE_CLIENT_SECRET=<set_in_railway_dashboard>
+- **App**
+  - `NEXT_PUBLIC_APP_URL`: your Railway domain
 
-# Privy (if using)
-NEXT_PUBLIC_PRIVY_APP_ID=cmf6o0wqr01j7jo0c2f1qfufc
-PRIVY_VERIFICATION_KEY=<set_in_railway_dashboard>
-```
+- **External APIs**
+  - `APIFY_TOKEN`
+  - `GOOGLE_CLIENT_ID`
+  - `GOOGLE_CLIENT_SECRET`
+
+- **Privy (if using)**
+  - `NEXT_PUBLIC_PRIVY_APP_ID` (public): `cmf6o0wqr01j7jo0c2f1qfufc`
+  - `PRIVY_VERIFICATION_KEY`
 
 ## Build Settings
 

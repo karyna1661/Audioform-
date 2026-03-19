@@ -1,298 +1,256 @@
 "use client"
 
-import Link from "next/link"
-import { useSearchParams } from "next/navigation"
-import { useEffect, useMemo, useState } from "react"
-import { Button } from "@/components/ui/button"
-import { ArrowLeft, Flag, Mic, Play, Trash2 } from "lucide-react"
-import { trackEvent } from "@/lib/analytics"
+import { useEffect, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useRequireAdmin } from "@/lib/auth-context"
-import { SurveyLoadingSkeleton } from "@/components/survey-loading-skeleton"
+import { ResponseInbox } from "@/components/response-inbox"
+import { Button } from "@/components/ui/button"
+import { ArrowLeft, AudioWaveform, Filter } from "lucide-react"
+import { trackEvent } from "@/lib/analytics"
 import { AdminMobileNav } from "@/components/admin-mobile-nav"
+import { PrivySignOutButton } from "@/components/privy-sign-out-button"
+import { SurveyLoadingSkeleton } from "@/components/survey-loading-skeleton"
 
-
-type ResponseItem = {
+type ResponseWithMetadata = {
   id: string
   surveyId: string
-  surveyTitle?: string
+  surveyTitle: string
   questionId: string
   userId: string
+  fileName: string
+  mimeType: string
   fileSize: number
+  durationSeconds?: number | null
+  durationBucket?: "short" | "medium" | "deep" | null
+  playbackUrl: string
   flagged: boolean
   highSignal: boolean
   bookmarked: boolean
-  publicUrl?: string
-  playbackUrl?: string
+  moderationUpdatedAt: string | null
   timestamp: string
 }
 
 export default function AdminResponsesPage() {
-  const { status } = useRequireAdmin()
+  const router = useRouter()
   const searchParams = useSearchParams()
-  const surveyId = searchParams.get("surveyId")
-  const focus = searchParams.get("focus")
-  const [queue, setQueue] = useState<ResponseItem[]>([])
-  const [queueLoading, setQueueLoading] = useState(true)
-  const [playingId, setPlayingId] = useState<string | null>(null)
-  const [loadError, setLoadError] = useState<string | null>(null)
-  const [savingId, setSavingId] = useState<string | null>(null)
-  const [deletingId, setDeletingId] = useState<string | null>(null)
-  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
+  const { status, signOut } = useRequireAdmin()
+  const [responses, setResponses] = useState<ResponseWithMetadata[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  
+  const surveyIdFilter = searchParams.get("surveyId") || undefined
+  const focusMode = searchParams.get("focus")
 
   useEffect(() => {
     if (status !== "authenticated") return
 
-    const loadQueue = async () => {
-      setQueueLoading(true)
+    const loadResponses = async () => {
       try {
-        const query = surveyId ? `?surveyId=${encodeURIComponent(surveyId)}` : ""
-        const response = await fetch(`/api/responses${query}`, {
+        setLoading(true)
+        const params = new URLSearchParams()
+        if (surveyIdFilter) params.set("surveyId", surveyIdFilter)
+        params.set("limit", "500")
+
+        const responseRes = await fetch(`/api/responses?${params.toString()}`, {
           credentials: "include",
           cache: "no-store",
         })
-        if (!response.ok) {
-          throw new Error("Failed to load moderation queue.")
+
+        if (!responseRes.ok) {
+          throw new Error("Failed to load responses.")
         }
-        const json = (await response.json()) as { responses?: ResponseItem[] }
-        const sorted = [...(json.responses ?? [])].sort(
-          (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
-        )
-        setQueue(sorted)
-      } catch (error) {
-        setLoadError(error instanceof Error ? error.message : "Failed to load moderation queue.")
+
+        const json = await responseRes.json()
+        setResponses(json.responses || [])
+        
+        trackEvent("response_inbox_opened", {
+          survey_id: surveyIdFilter,
+          focus: focusMode,
+        })
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load responses.")
       } finally {
-        setQueueLoading(false)
+        setLoading(false)
       }
     }
 
-    loadQueue()
-  }, [status, surveyId])
+    void loadResponses()
+  }, [status, surveyIdFilter, focusMode])
 
-  const queueView = useMemo(() => {
-    return queue.map((item) => ({
-      ...item,
-      duration: `${Math.max(1, Math.round(item.fileSize / 32000))}s est`,
-      reason: `Prompt ${item.questionId.replace(/^q/i, "") || "1"} | ${new Date(item.timestamp).toLocaleString()}`,
-    }))
-  }, [queue])
+  const handlePlayResponse = (responseId: string) => {
+    // In a real implementation, this would play the audio
+    console.log("Playing response:", responseId)
+    trackEvent("response_replayed", { response_id: responseId })
+  }
 
-  const focusedSurveyTitle = useMemo(() => {
-    if (!surveyId) return null
-    return queue.find((item) => item.surveyId === surveyId)?.surveyTitle || "Selected survey"
-  }, [queue, surveyId])
-
-  const updateModeration = async (
-    item: ResponseItem,
-    patch: Partial<Pick<ResponseItem, "flagged" | "highSignal" | "bookmarked">>,
-  ) => {
-    setSavingId(item.id)
-    setLoadError(null)
-
+  const handleFlagResponse = async (responseId: string, flagged: boolean) => {
     try {
-      const response = await fetch("/api/responses", {
+      const response = await fetch(`/api/responses/${responseId}/moderate`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ id: item.id, ...patch }),
+        body: JSON.stringify({ flagged }),
       })
-      if (!response.ok) throw new Error("Failed to update moderation state.")
 
-      setQueue((prev) => prev.map((entry) => (entry.id === item.id ? { ...entry, ...patch } : entry)))
-    } catch (error) {
-      setLoadError(error instanceof Error ? error.message : "Failed to update moderation state.")
-    } finally {
-      setSavingId(null)
+      if (response.ok) {
+        setResponses((prev) =>
+          prev.map((r) => (r.id === responseId ? { ...r, flagged } : r))
+        )
+        trackEvent("response_moderated", {
+          response_id: responseId,
+          action: flagged ? "flagged" : "unflagged",
+        })
+      }
+    } catch (err) {
+      console.error("Failed to flag response:", err)
     }
   }
 
-  const handleExportClip = async (item: (typeof queueView)[number]) => {
-    const clipNote = `${item.surveyTitle || "Survey"} | ${item.duration} | ${item.reason}`
+  const handleMarkHighSignal = async (responseId: string, highSignal: boolean) => {
     try {
-      await navigator.clipboard.writeText(clipNote)
-      trackEvent("response_bookmarked", {
-        survey_id: item.surveyId ?? surveyId ?? "unknown-survey",
-        bookmark_action: true,
-        source: "moderation_clip_export",
-      })
-      await updateModeration(item, { bookmarked: true })
-    } catch {
-      trackEvent("response_bookmarked", {
-        survey_id: surveyId ?? "unknown-survey",
-        bookmark_action: false,
-        source: "moderation_clip_export_failed",
-      })
-    }
-  }
-
-  const handleDeleteResponse = async (id: string) => {
-    setDeletingId(id)
-    setLoadError(null)
-    try {
-      const response = await fetch(`/api/responses?id=${encodeURIComponent(id)}`, {
-        method: "DELETE",
+      const response = await fetch(`/api/responses/${responseId}/moderate`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
         credentials: "include",
+        body: JSON.stringify({ highSignal }),
       })
-      if (!response.ok) throw new Error("Failed to delete response.")
-      setQueue((prev) => prev.filter((item) => item.id !== id))
-      if (playingId === id) setPlayingId(null)
-      setPendingDeleteId(null)
-    } catch (error) {
-      setLoadError(error instanceof Error ? error.message : "Failed to delete response.")
-    } finally {
-      setDeletingId(null)
+
+      if (response.ok) {
+        setResponses((prev) =>
+          prev.map((r) => (r.id === responseId ? { ...r, highSignal } : r))
+        )
+        trackEvent("response_bookmarked", {
+          response_id: responseId,
+          action: highSignal ? "high_signal" : "normal",
+        })
+      }
+    } catch (err) {
+      console.error("Failed to mark high signal:", err)
     }
   }
 
-  if (status === "loading") {
-    return <SurveyLoadingSkeleton label="Loading moderation queue..." />
+  const handleBookmarkResponse = async (responseId: string, bookmarked: boolean) => {
+    try {
+      const response = await fetch(`/api/responses/${responseId}/moderate`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ bookmarked }),
+      })
+
+      if (response.ok) {
+        setResponses((prev) =>
+          prev.map((r) => (r.id === responseId ? { ...r, bookmarked } : r))
+        )
+        trackEvent("response_bookmarked", {
+          response_id: responseId,
+          action: bookmarked ? "bookmarked" : "unbookmarked",
+        })
+      }
+    } catch (err) {
+      console.error("Failed to bookmark response:", err)
+    }
   }
 
-  if (queueLoading && queue.length === 0) {
-    return <SurveyLoadingSkeleton label="Loading moderation queue..." />
+  if (status === "loading" || loading) {
+    return <SurveyLoadingSkeleton label="Loading responses..." />
   }
+
+  const hasPrivy = Boolean(process.env.NEXT_PUBLIC_PRIVY_APP_ID)
 
   return (
-    <main className={`min-h-dvh bg-[#f3ecdf] p-4 pb-28 sm:p-6 sm:pb-6`}>
-      <section className="mx-auto max-w-5xl rounded-[2rem] border border-[#dbcdb8] bg-[#f9f4ea] p-5 sm:p-6">
+    <main className={`af-shell min-h-dvh p-4 pb-28 sm:p-6 sm:pb-6`}>
+      <div className="af-panel af-fade-up mx-auto max-w-7xl rounded-[1.5rem] border p-4 sm:rounded-[2rem] sm:p-6">
+        {/* Header */}
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#dbcdb8] pb-4">
-          <div>
-            <p className={`font-body text-sm text-[#5c5146]`}>Moderation Queue</p>
-            <h1 className="text-3xl font-semibold text-balance">Review Voice Responses</h1>
-            <p className={`font-body mt-1 text-sm text-[#5c5146]`}>
-              Response-level queue for triage and review. Survey Stack in dashboard stays survey-level.
-            </p>
-            {loadError ? <p className={`font-body mt-1 text-sm text-[#8a3d2b]`}>{loadError}</p> : null}
-            {surveyId ? (
-              <p className={`font-body mt-1 text-xs text-[#5c5146]`}>
-                Focused from Survey Stack: {focusedSurveyTitle} {focus ? `(${focus})` : ""}.
-              </p>
-            ) : null}
-          </div>
-          <Link href="/admin/dashboard/v4">
-            <Button variant="outline" className="border-[#dbcdb8] bg-[#f3ecdf]">
-              <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
-              Back to dashboard
+          <div className="flex items-start gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => router.back()}
+              className="shrink-0"
+            >
+              <ArrowLeft className="h-5 w-5" />
             </Button>
-          </Link>
-        </header>
-
-        <div className="mt-5 space-y-3">
-          {queue.length === 0 ? (
-            <article className="rounded-xl border border-[#dbcdb8] bg-[#fff6ed] p-4">
-              <p className="text-sm font-semibold text-balance">Queue is clear</p>
-              <p className={`font-body mt-1 text-sm text-[#5c5146]`}>
-                No responses need triage right now. Share your survey to collect more signal.
+            <div>
+              <p className={`font-body text-sm text-[#5c5146] text-pretty`}>
+                Signal Inbox
               </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <Link
-                  href="/admin/questionnaires"
-                  className="rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] px-3 py-2 text-sm hover:bg-[#efe4d3]"
-                >
-                  Create survey
-                </Link>
-                <Link
-                  href="/admin/dashboard/v4"
-                  className="rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] px-3 py-2 text-sm hover:bg-[#efe4d3]"
-                >
-                  Return to dashboard
-                </Link>
-              </div>
-            </article>
-          ) : (
-            queueView.map((item) => (
-              <article key={item.id} className="rounded-xl border border-[#dbcdb8] bg-[#fff6ed] p-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="font-semibold text-balance">{item.surveyTitle || "Untitled survey"}</p>
-                  <p className={`font-body text-sm text-[#5c5146]`}>{item.duration}</p>
-                </div>
-                <p className={`font-body mt-2 text-sm text-[#5c5146]`}>{item.reason}</p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Button
-                    variant="outline"
-                    className="border-[#dbcdb8] bg-[#f9f4ea]"
-                    disabled={!item.playbackUrl}
-                    onClick={() => setPlayingId((prev) => (prev === item.id ? null : item.id))}
-                  >
-                    <Play className="mr-2 size-4" aria-hidden="true" />
-                    {playingId === item.id ? "Hide player" : "Replay clip"}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="border-[#dbcdb8] bg-[#f9f4ea]"
-                    disabled={savingId === item.id}
-                    onClick={() => updateModeration(item, { flagged: !item.flagged })}
-                  >
-                    <Flag className="mr-2 size-4" aria-hidden="true" />
-                    {item.flagged ? "Unflag" : "Flag for follow-up"}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="border-[#dbcdb8] bg-[#f9f4ea]"
-                    disabled={savingId === item.id}
-                    onClick={() => updateModeration(item, { highSignal: !item.highSignal })}
-                  >
-                    <Mic className="mr-2 size-4" aria-hidden="true" />
-                    {item.highSignal ? "Remove high signal" : "Mark high signal"}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="border-[#dbcdb8] bg-[#f9f4ea]"
-                    disabled={savingId === item.id}
-                    onClick={() => handleExportClip(item)}
-                  >
-                    Export share clip note
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="border-[#e3c3b5] bg-[#fff0e9] text-[#8a3d2b] hover:bg-[#f7e2d8]"
-                    disabled={deletingId === item.id}
-                    onClick={() => setPendingDeleteId(item.id)}
-                  >
-                    <Trash2 className="mr-2 size-4" aria-hidden="true" />
-                    {deletingId === item.id ? "Deleting..." : "Delete response"}
-                  </Button>
-                </div>
-                {playingId === item.id && item.playbackUrl ? (
-                  <audio
-                    className="mt-3 w-full"
-                    controls
-                    preload="none"
-                    src={item.playbackUrl}
-                  />
-                ) : null}
-                <p className={`font-body mt-2 text-xs text-[#5c5146]`}>
-                  Status: {item.flagged ? "Flagged" : "Clear"} | {item.highSignal ? "High signal" : "Normal"} |{" "}
-                  {item.bookmarked ? "Bookmarked" : "Not bookmarked"}
+              <h1 className="text-3xl font-semibold text-balance">
+                All Responses
+              </h1>
+              {surveyIdFilter ? (
+                <p className={`font-body mt-1 text-sm text-[#5c5146]`}>
+                  Filtering by survey
                 </p>
-              </article>
-            ))
-          )}
-        </div>
-      </section>
-      {pendingDeleteId ? (
-        <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/30 p-4 sm:items-center">
-          <div className="w-full max-w-md rounded-2xl border border-[#dbcdb8] bg-[#fff6ed] p-4 shadow-xl">
-            <h2 className="text-lg font-semibold">Delete response?</h2>
-            <p className="font-body mt-2 text-sm text-[#5c5146]">
-              Delete this response permanently? This cannot be undone.
-            </p>
-            <div className="mt-4 flex justify-end gap-2">
-              <Button variant="outline" className="border-[#dbcdb8] bg-[#f9f4ea]" onClick={() => setPendingDeleteId(null)} disabled={!!deletingId}>
-                Cancel
-              </Button>
-              <Button
-                className="bg-[#8a3d2b] text-[#fff6ed] hover:bg-[#6f2f21]"
-                disabled={!!deletingId}
-                onClick={() => void handleDeleteResponse(pendingDeleteId)}
-              >
-                {deletingId ? "Deleting..." : "Delete permanently"}
-              </Button>
+              ) : (
+                <p className={`font-body mt-1 text-sm text-[#5c5146]`}>
+                  {responses.length} total responses across all surveys
+                </p>
+              )}
+              {error ? (
+                <p className={`font-body mt-1 text-sm text-[#8a3d2b]`}>{error}</p>
+              ) : null}
             </div>
           </div>
-        </div>
-      ) : null}
-      <AdminMobileNav />
+          <div className="flex gap-2">
+            {hasPrivy ? (
+              <PrivySignOutButton redirectTo="/login">
+                {({ onClick }) => (
+                  <Button
+                    variant="outline"
+                    className="w-full border-[#dbcdb8] bg-[#f3ecdf] sm:w-auto"
+                    onClick={onClick}
+                  >
+                    <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
+                    Sign out
+                  </Button>
+                )}
+              </PrivySignOutButton>
+            ) : (
+              <Button
+                variant="outline"
+                className="w-full border-[#dbcdb8] bg-[#f3ecdf] sm:w-auto"
+                onClick={async () => {
+                  await signOut()
+                  router.push("/login")
+                }}
+              >
+                <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
+                Sign out
+              </Button>
+            )}
+          </div>
+        </header>
+
+        {/* Quick Stats */}
+        <section className="af-accent-card af-fade-up af-delay-1 mt-5 rounded-2xl border p-4">
+          <div className="flex items-center gap-3">
+            <AudioWaveform className="h-6 w-6 text-[#b85e2d]" />
+            <div>
+              <h2 className="text-lg font-semibold">Response Overview</h2>
+              <p className="font-body text-sm text-[#5c5146]">
+                {responses.filter(r => r.durationBucket === "deep").length} deep responses (
+                {responses.length > 0 
+                  ? Math.round((responses.filter(r => r.durationBucket === "deep").length / responses.length) * 100) 
+                  : 0}%
+                )
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* Response Inbox */}
+        <section className="af-fade-up af-delay-2 mt-6">
+          <ResponseInbox
+            responses={responses}
+            onPlayResponse={handlePlayResponse}
+            onFlagResponse={handleFlagResponse}
+            onMarkHighSignal={handleMarkHighSignal}
+            onBookmarkResponse={handleBookmarkResponse}
+          />
+        </section>
+      </div>
     </main>
   )
 }
-

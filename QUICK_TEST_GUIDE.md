@@ -76,9 +76,9 @@ npm run dev
 ```bash
 # Check .env file has these lines:
 SUPABASE_URL=https://kzjfvgptagccpkjvguwf.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-B2_KEY_ID=005025e222e1dd00000000002
-B2_APPLICATION_KEY=K005Cr7soOq+llWfuy7tuabsQIBNaBg
+SUPABASE_SERVICE_ROLE_KEY=<set in env>
+B2_KEY_ID=<set in env>
+B2_APPLICATION_KEY=<set in env>
 ```
 
 ---
