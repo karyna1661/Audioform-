@@ -19,6 +19,7 @@ export type AudioformEventName =
   | "response_inbox_opened"
   | "first_response_viewed"
   | "response_replayed"
+  | "response_moderated"
   | "response_bookmarked"
   | "respondent_thank_you_viewed"
   | "respondent_follow_up_action"

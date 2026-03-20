@@ -96,7 +96,8 @@ export async function POST(request: NextRequest) {
     if (error instanceof Error && error.message === "Forbidden survey access.") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
-    return NextResponse.json({ error: "Failed to save survey." }, { status: 500 })
+    const details = error instanceof Error ? error.message : "Unknown survey save error."
+    return NextResponse.json({ error: "Failed to save survey.", details }, { status: 500 })
   }
 }
 

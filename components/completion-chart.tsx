@@ -7,8 +7,14 @@ interface CompletionChartProps {
   period: string
 }
 
+type CompletionDatum = {
+  name: string
+  started: number
+  completed: number
+}
+
 export function CompletionChart({ period }: CompletionChartProps) {
-  const [data, setData] = useState<any[]>([])
+  const [data, setData] = useState<CompletionDatum[]>([])
 
   useEffect(() => {
     // In a real app, this would fetch data from an API based on the period
@@ -19,8 +25,8 @@ export function CompletionChart({ period }: CompletionChartProps) {
     if (period === "90d") days = 90
 
     // Generate data for the selected period
-    const generateData = () => {
-      const result = []
+    const generateData = (): CompletionDatum[] => {
+      const result: CompletionDatum[] = []
       const now = new Date()
 
       // For longer periods, we'll group by weeks or months

@@ -114,7 +114,33 @@ export async function findUserById(id: string): Promise<StoredUser | null> {
   return mapRowToStoredUser(rows[0])
 }
 
-export async function createUser(input: { name: string; email: string; password: string }): Promise<StoredUser> {
+export async function countUsers(): Promise<number> {
+  const { url, key } = resolveSupabaseConfig()
+  const response = await fetch(`${url}/rest/v1/users?select=id`, {
+    method: "HEAD",
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      Prefer: "count=exact",
+      Range: "0-0",
+    },
+    cache: "no-store",
+  })
+
+  if (!response.ok) {
+    const text = await response.text()
+    throw new Error(`Supabase user count failed (${response.status}): ${text.slice(0, 300)}`)
+  }
+
+  const contentRange = response.headers.get("content-range")
+  if (!contentRange) return 0
+
+  const total = contentRange.split("/")[1]
+  const parsed = Number.parseInt(total ?? "0", 10)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+export async function createUser(input: { name: string; email: string; password: string; role?: "admin" | "user" }): Promise<StoredUser> {
   const email = input.email.trim().toLowerCase()
   const existing = await findUserByEmail(email)
   if (existing) {
@@ -136,7 +162,7 @@ export async function createUser(input: { name: string; email: string; password:
         id,
         name: input.name.trim(),
         email,
-        role: "user",
+        role: input.role ?? "user",
         password_hash: passwordHash,
         password_salt: passwordSalt,
         created_at: createdAt,

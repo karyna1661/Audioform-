@@ -1,6 +1,12 @@
 # TODO
 
 ## Active
+- [x] Inspect current survey generator UX and identify the main AI-slop issues.
+- [x] Apply skill-led redesign pass to survey generator using frontend/design skills.
+- [x] Run verification and summarize Railway/staging implications plus survey ID next step.
+- [x] Remove Privy as a deployment blocker while preserving email/password auth.
+- [x] Fix current TypeScript build failures in response moderation and chart components.
+- [x] Re-run type-check and env validation after auth/build fixes.
 - [x] Define Audioform behavioral architecture (JTBD + Trigger/Action/Reward/Reinforcement).
 - [x] Convert behavioral architecture into sprint implementation checklist.
 - [x] Decide dashboard variant to keep (`v1`, `v2`, or `v3`).
@@ -53,6 +59,10 @@
 - [x] Migrate response metadata/moderation persistence from local file store to Supabase (`response_records`).
 
 ## Review
+- Survey generator review: shifted the builder toward an editorial research-desk feel with clearer hierarchy, calmer copy, stronger prompt sequencing, and a less assistant-like interface.
+- Workflow orchestration review: routed this task through `workflow-orchestration`; no more specific local skill fit the TS/build/auth cleanup better than standard engineering workflow.
+- Auth rollback review: login/signup and sign-out flows now use local session auth only; Privy env vars are optional for validation/build.
+- Verification review: `npx tsc --noEmit` passes; `npm run build` clears env validation and compiles without Privy, with the only follow-up being a stale `.next` build lock from an overlapping build process.
 - Verify all dashboard routes return 200 and render correctly.
 - Diff behavior between old and redesigned admin workflows.
 - Confirm no regressions in login/signup/questionnaire flows.

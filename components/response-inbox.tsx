@@ -1,5 +1,6 @@
 "use client"
 
+import type { ReactNode } from "react"
 import { useState, useMemo } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -72,7 +73,7 @@ function getDurationBucketColor(bucket: string): string {
   }
 }
 
-function getDurationBucketIcon(bucket: string): JSX.Element {
+function getDurationBucketIcon(bucket: string): ReactNode {
   switch (bucket) {
     case "short":
       return <Clock className="h-3 w-3" />
@@ -93,7 +94,7 @@ export function ResponseInbox({
   onBookmarkResponse
 }: ResponseInboxProps) {
   const [playingId, setPlayingId] = useState<string | null>(null)
-  const [activeFilter, setActiveFilter] = useState<"all" | "short" | "medium" | "deep" | "flagged" | "bookmarked">("all")
+  const [activeFilter, setActiveFilter] = useState<"all" | "short" | "medium" | "deep" | "flagged" | "bookmarked" | "highsignal">("all")
 
   const filteredResponses = useMemo(() => {
     switch (activeFilter) {
@@ -107,6 +108,8 @@ export function ResponseInbox({
         return responses.filter(r => r.flagged)
       case "bookmarked":
         return responses.filter(r => r.bookmarked)
+      case "highsignal":
+        return responses.filter(r => r.highSignal)
       default:
         return responses
     }
@@ -163,7 +166,13 @@ export function ResponseInbox({
       </div>
 
       {/* Filters */}
-      <Tabs value={activeFilter} onValueChange={(v) => setActiveFilter(v as any)} className="w-full">
+      <Tabs
+        value={activeFilter}
+        onValueChange={(value) =>
+          setActiveFilter(value as "all" | "short" | "medium" | "deep" | "flagged" | "bookmarked" | "highsignal")
+        }
+        className="w-full"
+      >
         <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="all">All</TabsTrigger>
           <TabsTrigger value="deep">Deep</TabsTrigger>

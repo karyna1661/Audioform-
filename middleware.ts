@@ -1,20 +1,9 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-// Critical paths that REQUIRE authentication to work
-const AUTH_REQUIRED_PATHS = [
-  '/login',
-  '/signup',
-  '/admin',
-  '/api/surveys',
-  '/api/responses',
-  '/api/dashboard',
-]
-
 // Minimum required env vars for the app to function
 const MINIMUM_REQUIRED_ENV = [
   'AUTH_SESSION_SECRET',
-  'NEXT_PUBLIC_PRIVY_APP_ID',
   'SUPABASE_URL',
   'SUPABASE_SERVICE_ROLE_KEY',
 ]
@@ -49,7 +38,7 @@ export default function middleware(request: NextRequest) {
 
   // Validate minimum required environment variables
   const missingEnvVars = MINIMUM_REQUIRED_ENV.filter(
-    (envVar) => !process.env[envVar] || process.env[envVar].trim() === ''
+    (envVar) => !(process.env[envVar] ?? '').trim()
   )
 
   if (missingEnvVars.length > 0) {
@@ -86,20 +75,6 @@ export default function middleware(request: NextRequest) {
     
     // In development, just warn but continue
     console.warn('⚠️  Running with missing environment variables. Some features may not work.')
-  }
-
-  // Validate Privy configuration specifically for auth pages
-  if (AUTH_REQUIRED_PATHS.some(path => pathname.startsWith(path))) {
-    const hasPrivyAppId = Boolean(process.env.NEXT_PUBLIC_PRIVY_APP_ID)
-    const hasPrivyKey = Boolean(process.env.PRIVY_VERIFICATION_KEY)
-    
-    if (!hasPrivyAppId || !hasPrivyKey) {
-      console.warn('⚠️  Privy authentication not fully configured. Login/signup may not work.')
-      
-      if (process.env.NODE_ENV === 'production') {
-        console.error('🛑 Production deployment should have Privy configured!')
-      }
-    }
   }
 
   // Add security headers to all responses

@@ -7,8 +7,13 @@ interface ResponseTimeChartProps {
   period: string
 }
 
+type ResponseTimeDatum = {
+  name: string
+  time: number
+}
+
 export function ResponseTimeChart({ period }: ResponseTimeChartProps) {
-  const [data, setData] = useState<any[]>([])
+  const [data, setData] = useState<ResponseTimeDatum[]>([])
 
   useEffect(() => {
     // In a real app, this would fetch data from an API based on the period
@@ -19,8 +24,8 @@ export function ResponseTimeChart({ period }: ResponseTimeChartProps) {
     if (period === "90d") days = 90
 
     // Generate data for the selected period
-    const generateData = () => {
-      const result = []
+    const generateData = (): ResponseTimeDatum[] => {
+      const result: ResponseTimeDatum[] = []
       const now = new Date()
 
       // For longer periods, we'll group by weeks or months

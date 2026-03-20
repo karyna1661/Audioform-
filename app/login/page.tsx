@@ -11,7 +11,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { PrivyAuthActions } from "@/components/privy-auth-actions"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -19,7 +18,6 @@ export default function LoginPage() {
   const requestedCallbackUrl = searchParams.get("callbackUrl")
   const callbackUrl = sanitizeCallbackUrl(requestedCallbackUrl)
   const { signIn, status } = useAuth()
-  const hasPrivy = Boolean(process.env.NEXT_PUBLIC_PRIVY_APP_ID)
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -94,7 +92,6 @@ export default function LoginPage() {
               </Alert>
             )}
             <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-              {hasPrivy ? <PrivyAuthActions callbackUrl={callbackUrl} mode="login" /> : null}
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input

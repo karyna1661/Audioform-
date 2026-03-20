@@ -52,6 +52,18 @@ test("hasTrustedOrigin falls back to referer when origin is absent", () => {
   );
 });
 
+test("hasTrustedOrigin accepts localhost requests even when configured app url differs", () => {
+  assert.equal(
+    hasTrustedOrigin({
+      requestOrigin: "http://localhost:3001",
+      requestReferer: null,
+      requestUrl: "http://localhost:3001/api/auth/login",
+      configuredAppUrl: "https://audioform-production.up.railway.app",
+    }),
+    true,
+  );
+});
+
 test("hasMatchingState only accepts exact oauth state matches", () => {
   assert.equal(hasMatchingState("expected-state", "expected-state"), true);
   assert.equal(hasMatchingState("expected-state", "expected-state-extra"), false);

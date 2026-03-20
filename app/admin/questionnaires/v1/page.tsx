@@ -12,11 +12,7 @@ import { AdminMobileNav } from "@/components/admin-mobile-nav"
 import { SurveyLoadingSkeleton } from "@/components/survey-loading-skeleton"
 
 
-const initialQuestions: string[] = [
-  "What's one specific moment when you experienced this problem recently?",
-  "What have you tried before to solve this, and what frustrated you most?",
-  "What would success look like for you in this situation?",
-]
+const EMPTY_QUESTIONS: string[] = []
 
 // Question Category System
 const questionCategories = [
@@ -143,22 +139,29 @@ const surveyTemplates = [
     ],
   },
 ]
-const DEFAULT_SURVEY_TITLE = "User Insights Survey"
+const DEFAULT_SURVEY_TITLE = ""
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 // REMOVED: starterPackOptions - Replaced by surveyTemplates in Question Intelligence System
 
-function createSurveyId(title: string, creatorId: string): string {
-  const creatorPrefix = creatorId.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 12) || "creator"
-  const titlePrefix =
-    title
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 24) || "survey"
-  const timestamp = Date.now().toString(36)
-  const entropy = Math.random().toString(36).slice(2, 7)
-  return `${creatorPrefix}-${titlePrefix}-${timestamp}-${entropy}`
+function createSurveyId(_title: string, _creatorId: string): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID()
+  }
+
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (char) => {
+    const random = Math.floor(Math.random() * 16)
+    const value = char === "x" ? random : (random & 0x3) | 0x8
+    return value.toString(16)
+  })
+}
+
+function ensureSurveyId(candidate: string | null | undefined, title: string, creatorId: string): string {
+  if (candidate && UUID_PATTERN.test(candidate)) {
+    return candidate
+  }
+
+  return createSurveyId(title, creatorId)
 }
 
 function reorderQuestionList(questions: string[], fromIndex: number, toIndex: number): string[] {
@@ -212,7 +215,7 @@ export default function QuestionnairesV1Page() {
   const { status, user } = useRequireAdmin()
   const searchParams = useSearchParams()
   const requestedSurveyId = searchParams.get("surveyId")
-  const [questions, setQuestions] = useState(initialQuestions)
+  const [questions, setQuestions] = useState(EMPTY_QUESTIONS)
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [questionHistory, setQuestionHistory] = useState<Array<{ questions: string[]; selectedIndex: number }>>([])
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
@@ -225,6 +228,7 @@ export default function QuestionnairesV1Page() {
   const [publishedSurveyId, setPublishedSurveyId] = useState<string | null>(null)
   const [draftLoading, setDraftLoading] = useState(false)
   const [showTemplates, setShowTemplates] = useState(true) // Toggle for mobile: templates vs categories
+  const [mobileStep, setMobileStep] = useState(0)
 
   const commitQuestionChange = useCallback(
     (nextQuestions: string[], nextSelectedIndex: number) => {
@@ -264,7 +268,7 @@ export default function QuestionnairesV1Page() {
     setDraftSurveyId(createSurveyId(DEFAULT_SURVEY_TITLE, user?.id || "creator"))
     setPublishedSurveyId(null)
     setTitle(DEFAULT_SURVEY_TITLE)
-    setQuestions(initialQuestions)
+    setQuestions(EMPTY_QUESTIONS)
     setSelectedIndex(0)
     setQuestionHistory([])
     setDraggedIndex(null)
@@ -288,8 +292,8 @@ export default function QuestionnairesV1Page() {
   }, [undoQuestionChange])
 
   const saveSurvey = async (nextStatus: "draft" | "published") => {
-    const surveyId = draftSurveyId || createSurveyId(title, user?.id || "creator")
-    if (!draftSurveyId) {
+    const surveyId = ensureSurveyId(draftSurveyId, title, user?.id || "creator")
+    if (draftSurveyId !== surveyId) {
       setDraftSurveyId(surveyId)
     }
     const normalizedQuestions = questions.map((q) => q.trim()).filter((q) => q.length > 0)
@@ -309,8 +313,8 @@ export default function QuestionnairesV1Page() {
     })
 
     if (!response.ok) {
-      const body = (await response.json().catch(() => ({}))) as { error?: string }
-      throw new Error(body.error || "Failed to save survey.")
+      const body = (await response.json().catch(() => ({}))) as { error?: string; details?: string }
+      throw new Error(body.details || body.error || "Failed to save survey.")
     }
 
     return surveyId
@@ -328,7 +332,7 @@ export default function QuestionnairesV1Page() {
         savedAt?: string
       }
       if (parsed.title) setTitle(parsed.title)
-      if (parsed.surveyId) setDraftSurveyId(parsed.surveyId)
+      if (parsed.surveyId) setDraftSurveyId(ensureSurveyId(parsed.surveyId, parsed.title || DEFAULT_SURVEY_TITLE, user?.id || "creator"))
       if (Array.isArray(parsed.questions) && parsed.questions.length > 0) {
         setQuestions(parsed.questions)
         setSelectedIndex(0)
@@ -339,7 +343,7 @@ export default function QuestionnairesV1Page() {
     } catch {
       setDraftMessage("Found a corrupted local draft. Save again to overwrite it.")
     }
-  }, [])
+  }, [user?.id])
 
   useEffect(() => {
     if (status === "loading" || draftSurveyId) return
@@ -371,7 +375,7 @@ export default function QuestionnairesV1Page() {
 
         setDraftSurveyId(survey.id)
         setTitle(survey.title || DEFAULT_SURVEY_TITLE)
-        if (Array.isArray(survey.questions) && survey.questions.length > 0) {
+        if (Array.isArray(survey.questions)) {
           setQuestions(survey.questions)
           setSelectedIndex(0)
         }
@@ -434,6 +438,10 @@ export default function QuestionnairesV1Page() {
   ]
 
   const creatorId = user?.id || ""
+  const mobileSteps = ["Brief", "Source", "Sequence", "Refine", "Publish"]
+  const mobileSectionClass = (step: number) => (mobileStep === step ? "block" : "hidden lg:block")
+  const mobileRangeSectionClass = (steps: number[]) => (steps.includes(mobileStep) ? "block" : "hidden lg:block")
+  const mobileGridSectionClass = (step: number) => (mobileStep === step ? "grid" : "hidden lg:grid")
   const surveyLink =
     publishedSurveyId
       ? `${typeof window !== "undefined" ? window.location.origin : ""}/questionnaire/v1?surveyId=${encodeURIComponent(
@@ -454,106 +462,161 @@ export default function QuestionnairesV1Page() {
   return (
     <main className={`af-shell min-h-dvh p-4 pb-28 sm:p-6 sm:pb-6`}>
       <div className="af-panel af-fade-up mx-auto max-w-7xl rounded-[2.2rem] border border-[#cfbea4] p-4 sm:p-6">
-        <header className="af-fade-up af-delay-1 flex flex-wrap items-center justify-between gap-3 border-b border-[#cfbea4] pb-5">
-          <div>
-            <p className={`font-body text-sm text-[#665746] text-pretty`}>Survey Builder</p>
-            <h1 className="text-3xl font-semibold text-balance sm:text-4xl">Create high-quality voice surveys</h1>
-            <p className={`font-body mt-1 max-w-2xl text-sm text-[#665746] text-pretty`}>
-              Start with a template or browse categories to build surveys that generate clear, actionable insights from voice responses.
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Link href="/admin/dashboard/v4">
-              <Button variant="outline" className="border-[#cfbea4] bg-[#efe3cf]">
-                <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
-                Back to dashboard
+        <header className="af-fade-up af-delay-1 border-b border-[#cfbea4] pb-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="max-w-3xl">
+              <p className="font-body text-xs font-semibold uppercase tracking-[0.22em] text-[#7a6146]">Research Desk</p>
+              <h1 className="mt-3 text-4xl font-semibold leading-[0.96] text-balance sm:text-5xl">
+                Build a voice survey that yields decision-grade signal.
+              </h1>
+              <p className="font-body mt-4 max-w-2xl text-sm leading-6 text-[#665746] text-pretty sm:text-[15px]">
+                Start with a proven prompt angle, keep the sequence short, and publish only when every question feels specific enough to earn a real story.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Link href="/admin/dashboard/v4">
+                <Button variant="outline" className="border-[#cfbea4] bg-[#efe3cf]">
+                  <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
+                  Back to dashboard
+                </Button>
+              </Link>
+              <Button
+                variant="outline"
+                className="border-[#cfbea4] bg-[#efe3cf]"
+                onClick={startNewDraft}
+              >
+                New draft
               </Button>
-            </Link>
-            <Button
-              variant="outline"
-              className="border-[#cfbea4] bg-[#efe3cf]"
-              onClick={startNewDraft}
-            >
-              New draft
-            </Button>
-            <Button
-              className="bg-[#b85e2d] text-[#fff6ed] hover:bg-[#a05227]"
-              onClick={async () => {
-                if (!title.trim()) {
-                  setDraftMessage("Add a survey title before saving.")
-                  return
-                }
-                setIsSavingDraft(true)
-                const savedAt = new Date().toISOString()
-                window.localStorage.setItem(
-                  "audioform_survey_draft_v1",
-                  JSON.stringify({
-                    surveyId: draftSurveyId || createSurveyId(title, user?.id || "creator"),
-                    title,
-                    questions,
-                    savedAt,
-                  }),
-                )
-                try {
-                  await saveSurvey("draft")
-                  setDraftMessage(`Draft saved at ${new Date(savedAt).toLocaleString()}`)
-                  trackEvent("survey_draft_saved", {
-                    question_count: questions.length,
-                  })
-                } catch (error) {
-                  setDraftMessage(error instanceof Error ? error.message : "Failed to save draft.")
-                } finally {
-                  setIsSavingDraft(false)
-                }
-              }}
-              disabled={isSavingDraft}
-            >
-              {isSavingDraft ? "Saving..." : "Save draft"}
-            </Button>
+              <Button
+                className="bg-[#b85e2d] text-[#fff6ed] hover:bg-[#a05227]"
+                onClick={async () => {
+                  if (!title.trim()) {
+                    setDraftMessage("Add a survey title before saving.")
+                    return
+                  }
+                  setIsSavingDraft(true)
+                  const savedAt = new Date().toISOString()
+                  window.localStorage.setItem(
+                    "audioform_survey_draft_v1",
+                    JSON.stringify({
+                      surveyId: draftSurveyId || createSurveyId(title, user?.id || "creator"),
+                      title,
+                      questions,
+                      savedAt,
+                    }),
+                  )
+                  try {
+                    await saveSurvey("draft")
+                    setDraftMessage(`Draft saved at ${new Date(savedAt).toLocaleString()}`)
+                    trackEvent("survey_draft_saved", {
+                      question_count: questions.length,
+                    })
+                  } catch (error) {
+                    setDraftMessage(error instanceof Error ? error.message : "Failed to save draft.")
+                  } finally {
+                    setIsSavingDraft(false)
+                  }
+                }}
+                disabled={isSavingDraft}
+              >
+                {isSavingDraft ? "Saving..." : "Save draft"}
+              </Button>
+            </div>
+          </div>
+
+          <div className="mt-5 rounded-[1.4rem] border border-[#d7c6b0] bg-[#fff8f0] px-4 py-3">
+            <p className="font-body text-sm leading-6 text-[#665746]">
+              Working rule: keep this to 2-3 prompts, ask for one concrete moment, and avoid anything that can be answered with yes or no.
+            </p>
           </div>
         </header>
         {draftMessage ? (
-          <p className={`font-body mt-3 text-sm text-[#665746]`}>{draftMessage}</p>
+          <p className="font-body mt-3 rounded-2xl border border-[#cfbea4] bg-[#fff8f0] px-4 py-3 text-sm text-[#665746]">{draftMessage}</p>
         ) : null}
+
+        <section className="mt-4 rounded-[1.6rem] border border-[#cfbea4] bg-[#fff8f0] p-4 lg:hidden">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#7a6146]">Mobile flow</p>
+              <p className="mt-1 text-lg font-semibold text-[#261c14]">Step {mobileStep + 1} of {mobileSteps.length}: {mobileSteps[mobileStep]}</p>
+            </div>
+            <p className="font-body text-sm text-[#665746]">{questions.length} {questions.length === 1 ? "prompt" : "prompts"}</p>
+          </div>
+          <div className="mt-3 grid grid-cols-5 gap-2">
+            {mobileSteps.map((label, index) => (
+              <button
+                key={label}
+                type="button"
+                onClick={() => setMobileStep(index)}
+                className={`rounded-full px-2 py-2 text-[11px] font-semibold transition-colors ${mobileStep === index ? "bg-[#b85e2d] text-[#fff6ed]" : "bg-[#efe3cf] text-[#7a6146]"}`}
+              >
+                {index + 1}
+              </button>
+            ))}
+          </div>
+          <p className="font-body mt-3 text-sm leading-6 text-[#665746]">
+            Focus on one decision at a time: name the survey, choose a source, arrange prompts, refine the wording, then publish.
+          </p>
+        </section>
 
         <section className="mt-6 grid gap-5 lg:grid-cols-[1fr_340px]">
           <div className="space-y-5">
-            <section className="af-accent-card af-fade-up af-delay-1 overflow-hidden rounded-3xl border border-[#cfbea4]">
+            <section className={`af-accent-card af-fade-up af-delay-1 overflow-hidden rounded-3xl border border-[#cfbea4] ${mobileSectionClass(0)}`}>
               <div className="border-b border-[#cfbea4] bg-[#f6ead8] px-5 py-3">
-                <p className="text-sm font-semibold uppercase tracking-wide text-[#7a6146]">Survey Details</p>
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#7a6146]">Builder Brief</p>
               </div>
-              <div className="p-5">
-                <label className="block text-sm font-semibold" htmlFor="survey-title">
-                  Survey title
-                </label>
-                <input
-                  id="survey-title"
-                  className="mt-2 w-full rounded-2xl border border-[#cfbea4] bg-[#fffdf8] px-3 py-2"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                />
+              <div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,1.3fr)_minmax(260px,0.7fr)] lg:items-start">
+                <div>
+                  <label className="block text-sm font-semibold" htmlFor="survey-title">
+                    Survey title
+                  </label>
+                  <input
+                    id="survey-title"
+                    className="mt-2 w-full rounded-2xl border border-[#cfbea4] bg-[#fffdf8] px-4 py-3 text-base"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                  />
+                  <p className="font-body mt-3 max-w-xl text-sm leading-6 text-[#665746]">
+                    Name the conversation after the decision it should inform. A strong title feels like a working brief, not a generic feedback form.
+                  </p>
+                </div>
+                <div className="rounded-[1.6rem] border border-[#cfbea4] bg-[#fff8f0] p-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#7a6146]">Publishing standard</p>
+                  <p className="mt-2 text-lg font-semibold text-[#6e3316]">Short, pointed, replayable.</p>
+                  <p className="font-body mt-2 text-sm leading-6 text-[#665746]">
+                    The best surveys here stay tight: 2-3 prompts, one friction moment, one concrete example, one clear suggestion.
+                  </p>
+                </div>
+              </div>
+              <div className="border-t border-[#cfbea4] bg-[#fff8f0] px-5 py-4 lg:hidden">
+                <div className="flex justify-end">
+                  <Button onClick={() => setMobileStep(1)} className="bg-[#b85e2d] text-[#fff6ed] hover:bg-[#a05227]">
+                    Next: Prompt source
+                  </Button>
+                </div>
               </div>
             </section>
 
-            <section className="af-accent-card af-fade-up af-delay-2 overflow-hidden rounded-3xl border border-[#cfbea4]">
+            <section className={`af-accent-card af-fade-up af-delay-2 overflow-hidden rounded-3xl border border-[#cfbea4] ${mobileRangeSectionClass([1, 2, 3])}`}>
               <div className="border-b border-[#cfbea4] bg-[#f6ead8] px-5 py-3">
-                <p className="text-sm font-semibold uppercase tracking-wide text-[#7a6146]">🧠 Question Intelligence</p>
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#7a6146]">Question Studio</p>
               </div>
               <div className="p-5">
-                {/* Survey Templates & Categories with Mobile Toggle */}
-                <div className="rounded-2xl border border-[#cfbea4] bg-[#fff7ee] p-4">
-                  <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className={`rounded-[1.8rem] border border-[#cfbea4] bg-[#fff7ee] p-4 sm:p-5 ${mobileSectionClass(1)}`}>
+                  <div className="mb-5 grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_280px] lg:items-start">
                     <div>
-                      <p className="text-sm font-semibold">Question Intelligence System</p>
-                      <p className={`font-body mt-1 text-xs text-[#665746]`}>
-                        Choose from templates or browse categories to build high-quality surveys.
+                      <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#7a6146]">Prompt source</p>
+                      <h2 className="mt-2 text-2xl font-semibold text-[#261c14]">Start with a research angle, then shape the sequence.</h2>
+                      <p className="font-body mt-2 max-w-2xl text-sm leading-6 text-[#665746]">
+                        Templates give you a strong opening move. Categories help you add the missing tension, context, or desire without bloating the survey.
                       </p>
                     </div>
-                    {questions.length > 3 && (
-                      <div className="rounded-full border border-[#e0b8ad] bg-[#f9e6e0] px-2 py-1 text-xs font-semibold text-[#8a3d2b]">
-                        ⚠️ Consider reducing to 1-3 questions
-                      </div>
-                    )}
+                    <div className="rounded-[1.4rem] border border-[#d8c7b3] bg-[#fffdf8] p-4">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#7a6146]">Editor note</p>
+                      <p className="mt-2 text-sm leading-6 text-[#665746]">
+                        If the sequence drifts past three prompts, trim it. More questions usually lowers honesty and depth.
+                      </p>
+                    </div>
                   </div>
 
                   {/* Mobile Toggle - Only visible on small screens */}
@@ -586,7 +649,7 @@ export default function QuestionnairesV1Page() {
                   {(showTemplates || typeof window === 'undefined') && (
                     <div className={typeof window !== 'undefined' && !showTemplates ? 'hidden' : ''}>
                       <div className="mb-4 hidden sm:block">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-[#7a6146]">Pre-built Templates</p>
+                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#7a6146]">Template shelf</p>
                       </div>
                       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                         {surveyTemplates.map((template) => (
@@ -595,6 +658,7 @@ export default function QuestionnairesV1Page() {
                             type="button"
                             onClick={() => {
                               commitQuestionChange(template.questions, 0)
+                              setMobileStep(2)
                               setDraftMessage(`Applied ${template.label} template. These questions are optimized for voice responses.`)
                               trackEvent("prompt_template_applied", {
                                 template_id: template.id,
@@ -602,11 +666,11 @@ export default function QuestionnairesV1Page() {
                                 question_count: template.questions.length,
                               })
                             }}
-                            className="rounded-xl border border-[#cfbea4] bg-[#fffdf8] px-3 py-3 text-left hover:border-[#b85e2d] hover:bg-[#fff7ee]"
+                            className="af-glow-hover rounded-[1.25rem] border border-[#cfbea4] bg-[#fffdf8] px-4 py-4 text-left"
                           >
                             <p className="text-sm font-semibold text-[#6e3316]">{template.label}</p>
-                            <p className={`font-body mt-1 text-xs text-[#665746]`}>{template.description}</p>
-                            <p className={`font-body mt-2 text-xs text-[#8c7f70]`}>
+                            <p className="font-body mt-1 text-sm leading-5 text-[#665746]">{template.description}</p>
+                            <p className="font-body mt-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8c7f70]">
                               {template.questions.length} question{template.questions.length !== 1 ? "s" : ""}
                             </p>
                           </button>
@@ -619,17 +683,17 @@ export default function QuestionnairesV1Page() {
                   {(!showTemplates || typeof window === 'undefined') && (
                     <div className={`${typeof window !== 'undefined' && showTemplates ? 'hidden' : ''} mt-6`}>
                       <div className="mb-4 hidden sm:block">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-[#7a6146]">Browse by Category</p>
+                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#7a6146]">Question bank</p>
                       </div>
                       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                         {questionCategories.map((category) => (
-                          <details key={category.id} className="group rounded-xl border border-[#cfbea4] bg-[#fffdf8] p-3">
+                          <details key={category.id} className="group rounded-[1.25rem] border border-[#cfbea4] bg-[#fffdf8] p-4">
                             <summary className="flex cursor-pointer list-none items-center justify-between">
                               <div className="flex items-center gap-2">
-                                <span className="text-lg">{category.icon}</span>
+                                <span className="inline-flex size-9 items-center justify-center rounded-full border border-[#d8c7b3] bg-[#f8efdf] text-base">{category.icon}</span>
                                 <div className="text-left">
                                   <p className="text-sm font-semibold text-[#6e3316]">{category.label}</p>
-                                  <p className={`font-body text-xs text-[#665746]`}>{category.description}</p>
+                                  <p className="font-body text-xs leading-5 text-[#665746]">{category.description}</p>
                                 </div>
                               </div>
                               <ChevronRight className="size-4 transition-transform group-open:rotate-90" />
@@ -642,12 +706,13 @@ export default function QuestionnairesV1Page() {
                                   onClick={() => {
                                     const next = [...questions, question]
                                     commitQuestionChange(next, questions.length)
+                                    setMobileStep(2)
                                     trackEvent("decision_intent_prompt_viewed", {
                                       category_id: category.id,
                                       category_label: category.label,
                                     })
                                   }}
-                                  className="w-full rounded-lg border border-[#cfbea4] bg-[#f8efdf] px-3 py-2 text-left text-sm text-[#665746] hover:border-[#b85e2d] hover:bg-[#fff7ee]"
+                                  className="w-full rounded-xl border border-[#cfbea4] bg-[#f8efdf] px-3 py-3 text-left text-sm leading-6 text-[#665746] hover:border-[#b85e2d] hover:bg-[#fff7ee]"
                                 >
                                   {question}
                                 </button>
@@ -659,10 +724,10 @@ export default function QuestionnairesV1Page() {
                     </div>
                   )}
 
-                  {/* Voice Tips */}
-                  <div className="mt-6 rounded-xl border border-[#cfbea4] bg-[#fffdf8] p-3">
-                    <p className="text-sm font-semibold">💡 Voice Question Tips</p>
-                    <ul className={`font-body mt-2 space-y-1.5 text-xs text-[#665746]`}>
+                  <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(250px,0.9fr)]">
+                    <div className="rounded-[1.4rem] border border-[#cfbea4] bg-[#fffdf8] p-4">
+                      <p className="text-sm font-semibold">Voice interview principles</p>
+                      <ul className="font-body mt-3 space-y-2 text-sm leading-6 text-[#665746]">
                       <li className="flex items-start gap-2">
                         <CheckCircle2 className="mt-0.5 size-3.5 text-[#2d5a17]" />
                         <span>Good voice questions invite <strong>stories</strong>, not opinions</span>
@@ -679,14 +744,50 @@ export default function QuestionnairesV1Page() {
                         <CheckCircle2 className="mt-0.5 size-3.5 text-[#2d5a17]" />
                         <span>Voice surveys work best with <strong>1-3 thoughtful questions</strong></span>
                       </li>
-                    </ul>
+                      </ul>
+                    </div>
+                    <div className="rounded-[1.4rem] border border-[#d8c7b3] bg-[#f7ecde] p-4">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#7a6146]">A good final sequence sounds like</p>
+                      <div className="mt-3 space-y-3">
+                        <p className="text-sm font-semibold text-[#6e3316]">Context to friction to desired future</p>
+                        <p className="font-body text-sm leading-6 text-[#665746]">
+                          That arc keeps respondents grounded in reality, gives you the moment of tension, and ends with a useful direction instead of vague praise.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 flex items-center justify-between gap-3 lg:hidden">
+                    <Button variant="outline" className="border-[#cfbea4] bg-[#fff7ee]" onClick={() => setMobileStep(0)}>
+                      Back
+                    </Button>
+                    <Button className="bg-[#b85e2d] text-[#fff6ed] hover:bg-[#a05227]" onClick={() => setMobileStep(2)}>
+                      Next: Sequence
+                    </Button>
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-[#cfbea4] bg-[#fffdf8] p-4">
-                  <p className="text-sm font-semibold">Question sequence (signal path)</p>
-                  <p className={`font-body mt-1 text-xs text-[#665746]`}>Drag question cards to reorder. Use Undo or Ctrl/Cmd+Z to reverse changes.</p>
+                <div className={`mt-4 rounded-2xl border border-[#cfbea4] bg-[#fffdf8] p-4 ${mobileSectionClass(2)}`}>
+                  <div className="flex flex-wrap items-end justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#7a6146]">Signal path</p>
+                      <h3 className="mt-1 text-2xl font-semibold text-[#261c14]">Order the prompts like an interview.</h3>
+                      <p className="font-body mt-2 text-sm leading-6 text-[#665746]">Drag to reorder. Start broad, move to the hardest friction moment, then close on what would change the decision.</p>
+                    </div>
+                    <Button variant="outline" className="border-[#cfbea4] bg-[#fff7ee]" onClick={undoQuestionChange} disabled={questionHistory.length === 0}>
+                      <Undo2 className="mr-2 size-4" aria-hidden="true" />
+                      Undo change
+                    </Button>
+                  </div>
                   <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {questions.length === 0 ? (
+                      <div className="sm:col-span-2 rounded-[1.25rem] border border-dashed border-[#cfbea4] bg-[#fff8f0] px-4 py-6">
+                        <p className="text-sm font-semibold text-[#6e3316]">No prompts yet.</p>
+                        <p className="font-body mt-2 max-w-2xl text-sm leading-6 text-[#665746]">
+                          Start from a template or add individual prompts from the question bank. The sequence stays blank until you choose what belongs in this survey.
+                        </p>
+                      </div>
+                    ) : null}
                     {questions.map((q, i) => {
                       const questionQuality = evaluateQuestionQuality(q)
                       const isLowQuality = questionQuality.score < minimumQualityThreshold
@@ -721,7 +822,7 @@ export default function QuestionnairesV1Page() {
                             setDraggedIndex(null)
                           }}
                           onClick={() => setSelectedIndex(i)}
-                          className={`rounded-xl border px-3 py-3 text-left ${i === selectedIndex ? "border-[#b85e2d] bg-[#fff7ee]" : "border-[#cfbea4] bg-[#f8efdf]"} ${dragOverIndex === i ? "ring-2 ring-[#b85e2d]/40" : ""} ${isLowQuality ? "border-l-4 border-l-[#e0b8ad]" : ""}`}
+                           className={`rounded-[1.25rem] border px-4 py-4 text-left transition-colors ${i === selectedIndex ? "border-[#b85e2d] bg-[#fff7ee]" : isLowQuality ? "border-[#d8b2a7] bg-[#fcf2ef]" : "border-[#cfbea4] bg-[#f8efdf]"} ${dragOverIndex === i ? "ring-2 ring-[#b85e2d]/40" : ""}`}
                           aria-label={`Edit question ${i + 1}`}
                         >
                           <div className="flex items-center justify-between">
@@ -737,15 +838,16 @@ export default function QuestionnairesV1Page() {
                               {questionQuality.score}%
                             </span>
                           </div>
-                          <p className={`font-body mt-1 line-clamp-2 text-sm text-[#665746]`}>{q}</p>
-                        </button>
-                      )
-                    })}
+                           <p className="font-body mt-2 line-clamp-3 text-sm leading-6 text-[#665746]">{q}</p>
+                         </button>
+                       )
+                     })}
                     <button
                       type="button"
                       onClick={() => {
                         const nextQuestions = [...questions, "New question prompt"]
                         commitQuestionChange(nextQuestions, questions.length)
+                        setMobileStep(3)
                       }}
                       className="inline-flex min-h-20 items-center justify-center gap-2 rounded-xl border border-dashed border-[#c5b296] bg-[#f8efdf] text-sm text-[#665746]"
                     >
@@ -753,109 +855,152 @@ export default function QuestionnairesV1Page() {
                       Add prompt
                     </button>
                   </div>
+                  <div className="mt-6 flex items-center justify-between gap-3 lg:hidden">
+                    <Button variant="outline" className="border-[#cfbea4] bg-[#fff7ee]" onClick={() => setMobileStep(1)}>
+                      Back
+                    </Button>
+                    <Button className="bg-[#b85e2d] text-[#fff6ed] hover:bg-[#a05227]" onClick={() => setMobileStep(3)}>
+                      Next: Refine
+                    </Button>
+                  </div>
                 </div>
 
-                <div className="grid gap-3 sm:grid-cols-[1.3fr_1fr]">
+                <div className={`${mobileGridSectionClass(3)} gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.65fr)] lg:items-start`}>
                   <div>
-                    <label className="block text-sm font-semibold" htmlFor="question-editor">
-                      Edit selected prompt
-                    </label>
-                    <textarea
-                      id="question-editor"
-                      className={`font-body mt-2 min-h-36 w-full rounded-2xl border border-[#cfbea4] bg-[#fffdf8] px-3 py-2 text-sm text-pretty`}
-                      value={selected}
-                      onChange={(e) => {
-                        const next = [...questions]
-                        next[selectedIndex] = e.target.value
-                        commitQuestionChange(next, selectedIndex)
-                      }}
-                    />
-                    <div className="mt-3 rounded-2xl border border-[#cfbea4] bg-[#f8efdf] p-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <p className="text-sm font-semibold">Question quality coach</p>
-                          <p className={`font-body mt-1 text-xs text-[#665746]`}>
-                            Target 80%+ before publish. Strong prompts ask for one concrete moment, not a rating.
-                          </p>
+                     <div className="flex flex-wrap items-start justify-between gap-3">
+                       <div>
+                         <label className="block text-sm font-semibold uppercase tracking-[0.18em] text-[#7a6146]" htmlFor="question-editor">
+                           Prompt editor
+                         </label>
+                         <h3 className="mt-2 text-2xl font-semibold text-[#261c14]">Refine the selected question until it earns a story.</h3>
+                       </div>
+                       <Button
+                         type="button"
+                         variant="outline"
+                         className="border-[#cfbea4] bg-[#fff7ee]"
+                         disabled={questions.length === 0}
+                         onClick={() => {
+                           if (questions.length === 0) return
+                           const nextQuestions = questions.filter((_, index) => index !== selectedIndex)
+                           commitQuestionChange(nextQuestions, Math.max(0, selectedIndex - 1))
+                           setDraftMessage("Prompt removed from the sequence.")
+                         }}
+                       >
+                         <Trash2 className="mr-2 size-4" aria-hidden="true" />
+                         Delete prompt
+                       </Button>
+                     </div>
+                     <textarea
+                       id="question-editor"
+                       className="font-body mt-3 min-h-40 w-full rounded-[1.4rem] border border-[#cfbea4] bg-[#fffdf8] px-4 py-4 text-sm leading-6 text-pretty"
+                       value={selected}
+                       placeholder="Choose a template or add a prompt from the question bank to begin editing."
+                       disabled={questions.length === 0}
+                       onChange={(e) => {
+                         const next = [...questions]
+                         next[selectedIndex] = e.target.value
+                         commitQuestionChange(next, selectedIndex)
+                       }}
+                     />
+                  </div>
+
+                  <div className="rounded-[1.5rem] border border-[#cfbea4] bg-[#f8efdf] p-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-semibold">Quality coach</p>
+                        <p className="font-body mt-1 text-sm leading-6 text-[#665746]">
+                          Target 80%+ before publish. Strong prompts ask for one concrete moment, not a rating.
+                        </p>
+                      </div>
+                      {questions.length > 0 && selectedQuestionQuality.score < minimumQualityThreshold && (
+                        <div className="rounded-full border border-[#e0b8ad] bg-[#f9e6e0] px-2 py-1 text-xs font-semibold text-[#8a3d2b]">
+                          Needs improvement
                         </div>
-                        {selectedQuestionQuality.score < minimumQualityThreshold && (
-                          <div className="rounded-full border border-[#e0b8ad] bg-[#f9e6e0] px-2 py-1 text-xs font-semibold text-[#8a3d2b]">
-                            Needs improvement
-                          </div>
-                        )}
-                      </div>
-                      <div className="mt-2 flex items-center justify-between rounded-lg border border-[#cfbea4] bg-[#fff7ee] px-3 py-2">
-                        <p className="text-xs uppercase tracking-wide text-[#7a6146]">Quality score</p>
-                        <p className="text-sm font-semibold text-[#6e3316]">{selectedQuestionQuality.score}%</p>
-                      </div>
-                      <ul className="mt-2 space-y-1.5">
-                        {selectedQuestionQuality.checks.map((item) => (
-                          <li key={item.label} className="flex items-center gap-2 text-xs">
-                            <CheckCircle2 className={`size-3.5 ${item.ok ? "text-[#2d5a17]" : "text-[#8c7f70]"}`} aria-hidden="true" />
-                            <span className={item.ok ? "text-[#2d5a17]" : "text-[#665746]"}>{item.label}</span>
-                          </li>
-                        ))}
-                      </ul>
-                      <div className="mt-3 grid gap-2">
-                        <Button
-                          variant="outline"
-                          className="w-full border-[#cfbea4] bg-[#fff7ee] text-xs"
-                          onClick={() => {
-                            if (!selected.trim()) return
-                            const next = [...questions]
-                            next[selectedIndex] = /last|week|day|recent|moment/i.test(selected)
-                              ? selected
-                              : `In the last week, ${selected.charAt(0).toLowerCase()}${selected.slice(1)}`
-                            commitQuestionChange(next, selectedIndex)
-                          }}
-                        >
-                          Add timeframe
-                        </Button>
-                        <Button
-                          variant="outline"
-                          className="w-full border-[#cfbea4] bg-[#fff7ee] text-xs"
-                          onClick={() => {
-                            if (!selected.trim()) return
-                            const next = [...questions]
-                            next[selectedIndex] = selected.replace(
-                              /^(is|are|do|did|can|will|would|should|could)\b/i,
-                              "What",
-                            )
-                            commitQuestionChange(next, selectedIndex)
-                          }}
-                        >
-                          Convert to open question
-                        </Button>
-                        <Button
-                          variant="outline"
-                          className="w-full border-[#cfbea4] bg-[#fff7ee] text-xs"
-                          onClick={() => {
-                            if (!selected.trim()) return
-                            const next = [...questions]
-                            next[selectedIndex] = /example|specific|moment/i.test(selected)
-                              ? selected
-                              : `${selected.replace(/\?*$/, "?")} Share one specific moment.`
-                            commitQuestionChange(next, selectedIndex)
-                          }}
-                        >
-                          Add depth cue
-                        </Button>
-                      </div>
+                      )}
+                    </div>
+                    <div className="mt-3 flex items-center justify-between rounded-xl border border-[#cfbea4] bg-[#fff7ee] px-4 py-3">
+                      <p className="text-xs uppercase tracking-[0.18em] text-[#7a6146]">Quality score</p>
+                      <p className="text-lg font-semibold text-[#6e3316]">{selectedQuestionQuality.score}%</p>
+                    </div>
+                    <ul className="mt-2 space-y-1.5">
+                      {selectedQuestionQuality.checks.map((item) => (
+                        <li key={item.label} className="flex items-center gap-2 text-xs">
+                          <CheckCircle2 className={`size-3.5 ${item.ok ? "text-[#2d5a17]" : "text-[#8c7f70]"}`} aria-hidden="true" />
+                          <span className={item.ok ? "text-[#2d5a17]" : "text-[#665746]"}>{item.label}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="mt-3 grid gap-2">
+                      <Button
+                        variant="outline"
+                        className="w-full border-[#cfbea4] bg-[#fff7ee] text-xs"
+                        disabled={questions.length === 0}
+                        onClick={() => {
+                          if (!selected.trim()) return
+                          const next = [...questions]
+                          next[selectedIndex] = /last|week|day|recent|moment/i.test(selected)
+                            ? selected
+                            : `In the last week, ${selected.charAt(0).toLowerCase()}${selected.slice(1)}`
+                          commitQuestionChange(next, selectedIndex)
+                        }}
+                      >
+                        Add timeframe
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="w-full border-[#cfbea4] bg-[#fff7ee] text-xs"
+                        disabled={questions.length === 0}
+                        onClick={() => {
+                          if (!selected.trim()) return
+                          const next = [...questions]
+                          next[selectedIndex] = selected.replace(
+                            /^(is|are|do|did|can|will|would|should|could)\b/i,
+                            "What",
+                          )
+                          commitQuestionChange(next, selectedIndex)
+                        }}
+                      >
+                        Convert to open question
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="w-full border-[#cfbea4] bg-[#fff7ee] text-xs"
+                        disabled={questions.length === 0}
+                        onClick={() => {
+                          if (!selected.trim()) return
+                          const next = [...questions]
+                          next[selectedIndex] = /example|specific|moment/i.test(selected)
+                            ? selected
+                            : `${selected.replace(/\?*$/, "?")} Share one specific moment.`
+                          commitQuestionChange(next, selectedIndex)
+                        }}
+                      >
+                        Add depth cue
+                      </Button>
                     </div>
                   </div>
 
                   {/* REMOVED: Old Depth starters section - Replaced by Question Intelligence categories */}
                 </div>
+
+                <div className={`mt-4 flex items-center justify-between gap-3 lg:hidden ${mobileSectionClass(3)}`}>
+                  <Button variant="outline" className="border-[#cfbea4] bg-[#fff7ee]" onClick={() => setMobileStep(2)}>
+                    Back
+                  </Button>
+                  <Button className="bg-[#b85e2d] text-[#fff6ed] hover:bg-[#a05227]" onClick={() => setMobileStep(4)}>
+                    Next: Publish
+                  </Button>
+                </div>
               </div>
             </section>
 
-            <section className="overflow-hidden rounded-3xl border border-[#cfbea4] bg-[#fff7ee]">
+             <section className={`overflow-hidden rounded-3xl border border-[#cfbea4] bg-[#fff7ee] ${mobileSectionClass(3)}`}>
               <div className="border-b border-[#cfbea4] bg-[#f6ead8] px-5 py-3">
-                <p className="text-sm font-semibold uppercase tracking-wide text-[#7a6146]">Reward: Responder Preview</p>
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#7a6146]">Responder preview</p>
               </div>
               <div className="grid gap-4 p-5 sm:grid-cols-[1.4fr_1fr]">
                 <article className="rounded-2xl border border-[#cfbea4] bg-[#fffdf8] p-4">
-                  <p className={`font-body text-xs uppercase tracking-wide text-[#7a6146]`}>How builders will hear this signal</p>
+                  <p className="font-body text-xs uppercase tracking-[0.18em] text-[#7a6146]">What the respondent hears</p>
                   <h3 className="mt-2 text-xl font-semibold text-balance">
                     {selected || "Select a question to preview the respondent experience."}
                   </h3>
@@ -873,40 +1018,81 @@ export default function QuestionnairesV1Page() {
                 </article>
               </div>
             </section>
+
+            <section className={`overflow-hidden rounded-3xl border border-[#cfbea4] bg-[#fff7ee] lg:hidden ${mobileSectionClass(4)}`}>
+              <div className="border-b border-[#cfbea4] bg-[#f6ead8] px-5 py-3">
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#7a6146]">Release desk</p>
+              </div>
+              <div className="p-5">
+                <p className="font-body text-sm leading-6 text-[#665746]">Publish when the title is clear, the sequence is short, and each prompt asks for a specific moment.</p>
+                <div className="mt-4 rounded-2xl border border-[#cfbea4] bg-[#fffdf8] p-4">
+                  <p className="text-sm font-semibold">Before you publish</p>
+                  <ul className="mt-3 space-y-2">
+                    {readinessItems.map((item) => (
+                      <li key={item.label} className="flex items-center gap-2 text-sm">
+                        <CheckCircle2 className={`size-4 ${item.ok ? "text-[#2d5a17]" : "text-[#8c7f70]"}`} aria-hidden="true" />
+                        <span className={item.ok ? "text-[#2d5a17]" : "text-[#665746]"}>{item.label}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="font-body mt-4 text-sm leading-6 text-[#665746]">
+                    Current draft: {questions.length} {questions.length === 1 ? "prompt" : "prompts"} at {averageQuestionQuality}% average quality.
+                  </p>
+                </div>
+                <div className="mt-4 flex items-center justify-between gap-3">
+                  <Button variant="outline" className="border-[#cfbea4] bg-[#fff7ee]" onClick={() => setMobileStep(3)}>
+                    Back
+                  </Button>
+                  <Button
+                    className="bg-[#b85e2d] text-[#fff6ed] hover:bg-[#a05227]"
+                    onClick={async () => {
+                      if (!readyChecks.hasTitle || !readyChecks.hasTwoQuestions) {
+                        setDraftMessage("Add a title and at least two questions before publishing.")
+                        return
+                      }
+
+                      const allQuestionScores = questions.map((q) => evaluateQuestionQuality(q).score)
+                      const lowQualityQuestions = allQuestionScores.filter((score) => score < minimumQualityThreshold)
+
+                      if (lowQualityQuestions.length > 0) {
+                        setDraftMessage(
+                          `Improve question quality first. ${lowQualityQuestions.length} question(s) below ${minimumQualityThreshold}% threshold. Use the quality coach to reach 80%+.`,
+                        )
+                        return
+                      }
+
+                      setIsPublishing(true)
+                      try {
+                        const surveyId = await saveSurvey("published")
+                        recordSurveyPublished({ surveyId, title })
+                        trackEvent("survey_published", {
+                          survey_id: surveyId,
+                          question_count: questions.length,
+                        })
+                        setPublishedSurveyId(surveyId)
+                        setDraftMessage("Survey published and visible in Survey Stack.")
+                      } catch (error) {
+                        setDraftMessage(error instanceof Error ? error.message : "Failed to publish survey.")
+                      } finally {
+                        setIsPublishing(false)
+                      }
+                    }}
+                    disabled={isPublishing}
+                  >
+                    <Rocket className="mr-2 size-4" aria-hidden="true" />
+                    {isPublishing ? "Publishing..." : "Publish survey"}
+                  </Button>
+                </div>
+              </div>
+            </section>
           </div>
 
-          <aside className="af-accent-card af-fade-up af-delay-2 h-fit rounded-3xl border border-[#cfbea4] p-4 lg:sticky lg:top-6">
-            <h2 className="text-xl font-semibold text-balance">Launch Console</h2>
-            <p className={`font-body mt-1 text-sm text-[#665746]`}>Release when quality is credible, not just complete.</p>
+            <aside className="af-accent-card af-fade-up af-delay-2 hidden h-fit rounded-3xl border border-[#cfbea4] p-4 lg:sticky lg:top-6 lg:block">
+            <h2 className="text-xl font-semibold text-balance">Release desk</h2>
+            <p className="font-body mt-1 text-sm leading-6 text-[#665746]">Publish when the title is clear, the sequence is short, and each prompt asks for a specific moment.</p>
 
-            <div className="mt-4 rounded-2xl border border-[#cfbea4] bg-[#fff7ee] p-3">
-              <p className="text-sm font-semibold">Builder onboarding</p>
-              <p className="font-body mt-1 text-xs text-[#665746] text-pretty">
-                Move through this path to get your first decision-ready response set.
-              </p>
-              <ul className="mt-2 space-y-2">
-                {builderOnboardingChecklist.map((item) => (
-                  <li key={item.id} className="flex items-center gap-2 text-sm">
-                    <CheckCircle2 className={`size-4 ${item.done ? "text-[#2d5a17]" : "text-[#8c7f70]"}`} aria-hidden="true" />
-                    <span className={item.done ? "text-[#2d5a17]" : "text-[#665746]"}>{item.label}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="mt-4 rounded-2xl border border-[#cfbea4] bg-[#fff7ee] p-3">
-              <p className="text-sm font-semibold">Readiness index</p>
-              <p className="mt-1 text-3xl font-semibold text-[#6e3316]">{Math.round(completionScore * 100)}%</p>
-              <div className="mt-2 grid grid-cols-7 gap-1">
-                {Array.from({ length: readinessItems.length }).map((_, step) => (
-                  <div
-                    key={step}
-                    className={`h-1.5 rounded-full ${
-                      step < Math.round(completionScore * readinessItems.length) ? "bg-[#b85e2d]" : "bg-[#dfcfb8]"
-                    }`}
-                  />
-                ))}
-              </div>
+            <div className="mt-4 rounded-2xl border border-[#cfbea4] bg-[#fff7ee] p-4">
+              <p className="text-sm font-semibold">Before you publish</p>
               <ul className="mt-3 space-y-2">
                 {readinessItems.map((item) => (
                   <li key={item.label} className="flex items-center gap-2 text-sm">
@@ -915,12 +1101,8 @@ export default function QuestionnairesV1Page() {
                   </li>
                 ))}
               </ul>
-            </div>
-
-            <div className="mt-4 rounded-2xl border border-[#cfbea4] bg-[#fff7ee] p-3">
-              <p className="text-sm font-semibold">Mobile vs Desktop Experience</p>
-              <p className={`font-body mt-1 text-sm text-[#665746]`}>
-                On mobile, respondents see a streamlined full-screen interface optimized for voice recording. Desktop users get a wider view with additional context.
+              <p className="font-body mt-4 text-sm leading-6 text-[#665746]">
+                Current draft: {questions.length} {questions.length === 1 ? "prompt" : "prompts"} at {averageQuestionQuality}% average quality.
               </p>
             </div>
 
@@ -1068,7 +1250,7 @@ export default function QuestionnairesV1Page() {
             <div className={`font-body mt-4 rounded-2xl border border-[#cfbea4] bg-[#fff7ee] p-3 text-xs text-[#665746]`}>
               <p className="inline-flex items-center gap-1 font-semibold">
                 <Sparkles className="size-3.5" aria-hidden="true" />
-                Behavioral cue
+                Editorial cue
               </p>
               <p className="mt-1">Strong prompts ask for one lived moment, one friction point, and one clear suggestion.</p>
             </div>

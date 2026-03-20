@@ -2,13 +2,12 @@
 
 import { useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useRequireAdmin } from "@/lib/auth-context"
+import { useAuth, useRequireAdmin } from "@/lib/auth-context"
 import { ResponseInbox } from "@/components/response-inbox"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, AudioWaveform, Filter } from "lucide-react"
 import { trackEvent } from "@/lib/analytics"
 import { AdminMobileNav } from "@/components/admin-mobile-nav"
-import { PrivySignOutButton } from "@/components/privy-sign-out-button"
 import { SurveyLoadingSkeleton } from "@/components/survey-loading-skeleton"
 
 type ResponseWithMetadata = {
@@ -33,7 +32,8 @@ type ResponseWithMetadata = {
 export default function AdminResponsesPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { status, signOut } = useRequireAdmin()
+  const { status } = useRequireAdmin()
+  const { signOut } = useAuth()
   const [responses, setResponses] = useState<ResponseWithMetadata[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -156,8 +156,6 @@ export default function AdminResponsesPage() {
     return <SurveyLoadingSkeleton label="Loading responses..." />
   }
 
-  const hasPrivy = Boolean(process.env.NEXT_PUBLIC_PRIVY_APP_ID)
-
   return (
     <main className={`af-shell min-h-dvh p-4 pb-28 sm:p-6 sm:pb-6`}>
       <div className="af-panel af-fade-up mx-auto max-w-7xl rounded-[1.5rem] border p-4 sm:rounded-[2rem] sm:p-6">
@@ -194,32 +192,17 @@ export default function AdminResponsesPage() {
             </div>
           </div>
           <div className="flex gap-2">
-            {hasPrivy ? (
-              <PrivySignOutButton redirectTo="/login">
-                {({ onClick }) => (
-                  <Button
-                    variant="outline"
-                    className="w-full border-[#dbcdb8] bg-[#f3ecdf] sm:w-auto"
-                    onClick={onClick}
-                  >
-                    <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
-                    Sign out
-                  </Button>
-                )}
-              </PrivySignOutButton>
-            ) : (
-              <Button
-                variant="outline"
-                className="w-full border-[#dbcdb8] bg-[#f3ecdf] sm:w-auto"
-                onClick={async () => {
-                  await signOut()
-                  router.push("/login")
-                }}
-              >
-                <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
-                Sign out
-              </Button>
-            )}
+            <Button
+              variant="outline"
+              className="w-full border-[#dbcdb8] bg-[#f3ecdf] sm:w-auto"
+              onClick={async () => {
+                await signOut()
+                router.push("/login")
+              }}
+            >
+              <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
+              Sign out
+            </Button>
           </div>
         </header>
 

@@ -10,12 +10,10 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { PrivyAuthActions } from "@/components/privy-auth-actions"
 
 export default function SignupPage() {
   const router = useRouter()
   const { signUp, status } = useAuth()
-  const hasPrivy = Boolean(process.env.NEXT_PUBLIC_PRIVY_APP_ID)
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -87,7 +85,6 @@ export default function SignupPage() {
             )}
 
             <form onSubmit={handleSubmit} className="mt-10 space-y-4">
-              {hasPrivy ? <PrivyAuthActions callbackUrl="/admin/dashboard/v4" mode="signup" /> : null}
               <div className="space-y-2">
                 <Label htmlFor="name">Name</Label>
                 <Input

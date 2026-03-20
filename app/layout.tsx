@@ -2,7 +2,6 @@ import type React from "react"
 import "./globals.css"
 import { AuthProvider } from "@/lib/auth-context"
 import { ThemeProvider } from "@/components/theme-provider"
-import { PrivyAppProvider } from "@/components/privy-app-provider"
 
 export default function RootLayout({
   children,
@@ -12,13 +11,11 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="font-body" suppressHydrationWarning>
-        <PrivyAppProvider>
-          <AuthProvider>
-            <ThemeProvider attribute="class" defaultTheme="light" forcedTheme="light" enableSystem={false} disableTransitionOnChange>
-              {children}
-            </ThemeProvider>
-          </AuthProvider>
-        </PrivyAppProvider>
+        <AuthProvider>
+          <ThemeProvider attribute="class" defaultTheme="light" forcedTheme="light" enableSystem={false} disableTransitionOnChange>
+            {children}
+          </ThemeProvider>
+        </AuthProvider>
       </body>
     </html>
   )

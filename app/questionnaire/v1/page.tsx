@@ -41,9 +41,10 @@ export default function QuestionnaireV1Page() {
   const [permissionGranted, setPermissionGranted] = useState<boolean | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [pendingUploads, setPendingUploads] = useState(0)
-  const [failedQueue, setFailedQueue] = useState<Array<{ questionId: string; blob: Blob }>>([])
+  const [failedQueue, setFailedQueue] = useState<Array<{ questionId: string; blob: Blob; durationSeconds: number | null }>>([])
   const [isSubmittingAnswer, setIsSubmittingAnswer] = useState(false)
   const [lastDurationSeconds, setLastDurationSeconds] = useState<number | null>(null)
+  const [recordingDurations, setRecordingDurations] = useState<Record<string, number>>({})
   const [surveyLoading, setSurveyLoading] = useState(true)
   const [surveyError, setSurveyError] = useState<string | null>(null)
   const [questionList, setQuestionList] = useState<Array<{ id: string; text: string }>>([])
@@ -131,7 +132,7 @@ export default function QuestionnaireV1Page() {
     }
   }, [resolvedSurveyId])
 
-  const uploadResponse = async (questionId: string, blob: Blob, attempt = 1): Promise<boolean> => {
+  const uploadResponse = async (questionId: string, blob: Blob, durationSeconds: number | null, attempt = 1): Promise<boolean> => {
     if (!resolvedSurveyId) {
       if (isMountedRef.current) {
         setUploadError("Survey id missing. Re-open the creator's survey link.")
@@ -142,20 +143,50 @@ export default function QuestionnaireV1Page() {
       setPendingUploads((value) => value + 1)
     }
     try {
+      const initController = new AbortController()
+      const initTimeout = window.setTimeout(() => initController.abort(), 15000)
+      const initResponse = await fetch("/api/responses/init", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          surveyId: resolvedSurveyId,
+          questionId,
+        }),
+        credentials: "include",
+        signal: initController.signal,
+      }).finally(() => window.clearTimeout(initTimeout))
+
+      if (!initResponse.ok) {
+        throw new Error("Failed to initialize response upload.")
+      }
+
+      const initPayload = (await initResponse.json()) as {
+        responseId?: string
+        idempotencyKey?: string
+        uploadUrl?: string
+      }
+
+      if (!initPayload.responseId || !initPayload.idempotencyKey || !initPayload.uploadUrl) {
+        throw new Error("Upload session payload missing.")
+      }
+
       const formData = new FormData()
       formData.append("audio", blob, `${questionId}-${Date.now()}.webm`)
-      formData.append("questionId", questionId)
-      formData.append("surveyId", resolvedSurveyId)
+      formData.append("responseId", initPayload.responseId)
+      formData.append("idempotencyKey", initPayload.idempotencyKey)
+      if (typeof durationSeconds === "number") {
+        formData.append("durationSeconds", String(durationSeconds))
+      }
 
-      const controller = new AbortController()
-      const timeout = window.setTimeout(() => controller.abort(), 15000)
-      const response = await fetch("/api/responses", {
+      const uploadController = new AbortController()
+      const uploadTimeout = window.setTimeout(() => uploadController.abort(), 15000)
+      const response = await fetch(initPayload.uploadUrl, {
         method: "POST",
         body: formData,
         credentials: "include",
         keepalive: true,
-        signal: controller.signal,
-      }).finally(() => window.clearTimeout(timeout))
+        signal: uploadController.signal,
+      }).finally(() => window.clearTimeout(uploadTimeout))
 
       if (!response.ok) {
         throw new Error("Failed to save response.")
@@ -167,11 +198,11 @@ export default function QuestionnaireV1Page() {
       if (attempt < 4) {
         const delayMs = 500 * Math.pow(2, attempt - 1)
         await new Promise((resolve) => window.setTimeout(resolve, delayMs))
-        return uploadResponse(questionId, blob, attempt + 1)
+        return uploadResponse(questionId, blob, durationSeconds, attempt + 1)
       } else {
         if (isMountedRef.current) {
           setUploadError(error instanceof Error ? error.message : "Failed to save response.")
-          setFailedQueue((items) => [...items, { questionId, blob }])
+          setFailedQueue((items) => [...items, { questionId, blob, durationSeconds }])
         }
         return false
       }
@@ -196,7 +227,7 @@ export default function QuestionnaireV1Page() {
     setIsSubmittingAnswer(true)
 
     setUploadError(null)
-    const uploaded = await uploadResponse(questionId, blob)
+    const uploaded = await uploadResponse(questionId, blob, recordingDurations[questionId] ?? null)
     if (!isMountedRef.current) return
     if (!uploaded) {
       setIsSubmittingAnswer(false)
@@ -222,7 +253,7 @@ export default function QuestionnaireV1Page() {
     const queued = [...failedQueue]
     setFailedQueue([])
     setUploadError(null)
-    await Promise.all(queued.map((item) => uploadResponse(item.questionId, item.blob)))
+    await Promise.all(queued.map((item) => uploadResponse(item.questionId, item.blob, item.durationSeconds)))
   }
 
   if (surveyLoading) return <SurveyLoadingSkeleton />
@@ -307,6 +338,7 @@ export default function QuestionnaireV1Page() {
                 onRecordingStart={() => trackEvent("response_recording_started", { question_id: current.id })}
                 onRecordingSubmit={({ questionId, durationSeconds }) => {
                   setLastDurationSeconds(durationSeconds)
+                  setRecordingDurations((prev) => ({ ...prev, [questionId]: durationSeconds }))
                   trackEvent("response_recording_submitted", {
                     survey_id: resolvedSurveyId,
                     question_id: questionId,

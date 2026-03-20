@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
-import { createUser, toSafeUser } from "@/lib/server/auth-store"
+import { countUsers, createUser, toSafeUser } from "@/lib/server/auth-store"
 import { issueSessionToken, setSessionCookie } from "@/lib/server/auth-session"
 import { applyRateLimit, getRequestClientIp } from "@/lib/server/rate-limit"
 import { hasTrustedOrigin } from "@/lib/server/request-guards"
@@ -10,6 +10,20 @@ const signupSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8).max(128),
 })
+
+function isLocalDevelopmentRequest(request: Request): boolean {
+  const candidates = [request.url, request.headers.get("origin"), request.headers.get("referer")]
+
+  return candidates.some((value) => {
+    if (!value) return false
+    try {
+      const { hostname } = new URL(value)
+      return hostname === "localhost" || hostname === "127.0.0.1"
+    } catch {
+      return false
+    }
+  })
+}
 
 export async function POST(request: Request) {
   try {
@@ -43,7 +57,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid signup input", details: parsed.error.flatten() }, { status: 400 })
     }
 
-    const user = await createUser(parsed.data)
+    const shouldBootstrapAdmin = process.env.NODE_ENV !== "production" && isLocalDevelopmentRequest(request) && (await countUsers()) === 0
+    const user = await createUser({
+      ...parsed.data,
+      role: shouldBootstrapAdmin ? "admin" : "user",
+    })
     const safeUser = toSafeUser(user)
     const token = issueSessionToken({
       userId: safeUser.id,

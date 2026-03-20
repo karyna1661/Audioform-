@@ -1,11 +1,8 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
 import { getSessionFromRequest } from "@/lib/server/auth-session"
-import { 
-  getStoredResponseById,
-  updateStoredResponseForSurveyIds,
-  listSurveys,
-} from "@/lib/server"
+import { getStoredResponseById, updateStoredResponseForSurveyIds } from "@/lib/server/response-store"
+import { listSurveys } from "@/lib/server/survey-store"
 
 const moderateSchema = z.object({
   flagged: z.boolean().optional(),
@@ -52,7 +49,6 @@ export async function PATCH(
 
     const updated = await updateStoredResponseForSurveyIds(id, ownedSurveyIds, {
       ...updates,
-      moderationUpdatedAt: new Date().toISOString(),
     })
 
     if (!updated) {

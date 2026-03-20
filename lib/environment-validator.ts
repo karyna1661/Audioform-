@@ -11,9 +11,7 @@
 const requiredEnvVars = [
   // Authentication (CRITICAL - login won't work without these)
   'AUTH_SESSION_SECRET',
-  'NEXT_PUBLIC_PRIVY_APP_ID',
-  'PRIVY_VERIFICATION_KEY',
-  
+
   // Database (CRITICAL - no data access without these)
   'SUPABASE_URL',
   'SUPABASE_SERVICE_ROLE_KEY',
@@ -34,6 +32,10 @@ const optionalEnvVars = [
   'APIFY_TOKEN',
   'GOOGLE_CLIENT_ID',
   'GOOGLE_CLIENT_SECRET',
+
+  // Optional auth providers
+  'NEXT_PUBLIC_PRIVY_APP_ID',
+  'PRIVY_VERIFICATION_KEY',
   
   // Features
   'NEXT_PUBLIC_AUDIOFORM_FEEDBACK_SURVEY_ID',
@@ -67,7 +69,7 @@ function validateEnvironment(): {
 
   // Check required variables
   for (const envVar of requiredEnvVars) {
-    const value = process.env[envVar];
+    const value = process.env[envVar] ?? '';
     const isSet = Boolean(value) && value.trim() !== '';
     
     if (!isSet) {
@@ -82,7 +84,7 @@ function validateEnvironment(): {
 
   // Check optional variables (warnings only)
   for (const envVar of optionalEnvVars) {
-    const value = process.env[envVar];
+    const value = process.env[envVar] ?? '';
     const isSet = Boolean(value) && value.trim() !== '';
     
     if (!isSet) {
