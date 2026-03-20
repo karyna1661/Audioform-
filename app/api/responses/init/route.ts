@@ -18,6 +18,10 @@ function newIdempotencyKey(): string {
   return `resp_${randomUUID().replaceAll("-", "")}`
 }
 
+function logInit(event: string, payload: Record<string, unknown>) {
+  console.log(`[responses:init] ${event}`, payload)
+}
+
 export async function POST(request: NextRequest) {
   const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -34,6 +38,7 @@ export async function POST(request: NextRequest) {
       max: 60,
     })
     if (!rate.allowed) {
+      logInit("rate_limited", { ip, retryAfterSeconds: rate.retryAfterSeconds })
       return NextResponse.json(
         { error: "Too many requests. Please retry shortly." },
         { status: 429, headers: { ...corsHeaders, "Retry-After": String(rate.retryAfterSeconds) } },
@@ -43,17 +48,20 @@ export async function POST(request: NextRequest) {
     const json = await request.json().catch(() => null)
     const parsed = initSchema.safeParse(json)
     if (!parsed.success) {
+      logInit("invalid_payload", { ip })
       return NextResponse.json({ error: "Invalid payload", details: parsed.error.flatten() }, { status: 400, headers: corsHeaders })
     }
 
     const publishedSurvey = await getPublishedSurveyById(parsed.data.surveyId)
     if (!publishedSurvey) {
+      logInit("survey_missing", { ip, surveyId: parsed.data.surveyId, questionId: parsed.data.questionId })
       return NextResponse.json({ error: "Survey is unavailable or unpublished." }, { status: 404, headers: corsHeaders })
     }
 
     const publishedQuestions = await getLatestPublishedSurveyQuestions(parsed.data.surveyId)
     const allowedQuestionIds = new Set(publishedQuestions.map((_, index) => `q${index + 1}`))
     if (!allowedQuestionIds.has(parsed.data.questionId)) {
+      logInit("question_mismatch", { ip, surveyId: parsed.data.surveyId, questionId: parsed.data.questionId })
       return NextResponse.json({ error: "Question does not belong to this published survey." }, { status: 400, headers: corsHeaders })
     }
 
@@ -67,6 +75,14 @@ export async function POST(request: NextRequest) {
       userId: authSession?.sub ?? null,
       sessionId: anonSessionId,
       idempotencyKey,
+    })
+    logInit("created", {
+      ip,
+      surveyId: pending.surveyId,
+      questionId: pending.questionId,
+      responseId: pending.id,
+      sessionId: pending.sessionId,
+      authUser: authSession?.sub ?? null,
     })
 
     const response = NextResponse.json(
@@ -82,6 +98,7 @@ export async function POST(request: NextRequest) {
     return response
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to init response."
+    logInit("error", { message })
     return NextResponse.json({ error: message }, { status: 500, headers: corsHeaders })
   }
 }

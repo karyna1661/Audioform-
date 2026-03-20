@@ -45,6 +45,7 @@ export default function QuestionnaireV1Page() {
   const [isSubmittingAnswer, setIsSubmittingAnswer] = useState(false)
   const [lastDurationSeconds, setLastDurationSeconds] = useState<number | null>(null)
   const [recordingDurations, setRecordingDurations] = useState<Record<string, number>>({})
+  const [recorderSubmitState, setRecorderSubmitState] = useState<"idle" | "uploading" | "error" | "success">("idle")
   const [surveyLoading, setSurveyLoading] = useState(true)
   const [surveyError, setSurveyError] = useState<string | null>(null)
   const [questionList, setQuestionList] = useState<Array<{ id: string; text: string }>>([])
@@ -163,10 +164,11 @@ export default function QuestionnaireV1Page() {
       const initPayload = (await initResponse.json()) as {
         responseId?: string
         idempotencyKey?: string
+        sessionId?: string
         uploadUrl?: string
       }
 
-      if (!initPayload.responseId || !initPayload.idempotencyKey || !initPayload.uploadUrl) {
+      if (!initPayload.responseId || !initPayload.idempotencyKey || !initPayload.sessionId || !initPayload.uploadUrl) {
         throw new Error("Upload session payload missing.")
       }
 
@@ -174,12 +176,13 @@ export default function QuestionnaireV1Page() {
       formData.append("audio", blob, `${questionId}-${Date.now()}.webm`)
       formData.append("responseId", initPayload.responseId)
       formData.append("idempotencyKey", initPayload.idempotencyKey)
+      formData.append("sessionId", initPayload.sessionId)
       if (typeof durationSeconds === "number") {
         formData.append("durationSeconds", String(durationSeconds))
       }
 
       const uploadController = new AbortController()
-      const uploadTimeout = window.setTimeout(() => uploadController.abort(), 15000)
+      const uploadTimeout = window.setTimeout(() => uploadController.abort(), 45000)
       const response = await fetch(initPayload.uploadUrl, {
         method: "POST",
         body: formData,
@@ -189,7 +192,8 @@ export default function QuestionnaireV1Page() {
       }).finally(() => window.clearTimeout(uploadTimeout))
 
       if (!response.ok) {
-        throw new Error("Failed to save response.")
+        const errorPayload = (await response.json().catch(() => null)) as { error?: string } | null
+        throw new Error(errorPayload?.error || "Failed to save response.")
       }
 
       recordFirstResponseForActiveSurvey()
@@ -227,17 +231,22 @@ export default function QuestionnaireV1Page() {
     setIsSubmittingAnswer(true)
 
     setUploadError(null)
+    setRecorderSubmitState("uploading")
     const uploaded = await uploadResponse(questionId, blob, recordingDurations[questionId] ?? null)
     if (!isMountedRef.current) return
     if (!uploaded) {
+      setRecorderSubmitState("error")
       setIsSubmittingAnswer(false)
       return
     }
+
+    setRecorderSubmitState("success")
 
     setAnswers((prev) => ({ ...prev, [questionId]: blob }))
 
     if (currentIndex < questionList.length - 1) {
       setIndex((prev) => prev + 1)
+      setRecorderSubmitState("idle")
       setIsSubmittingAnswer(false)
       return
     }
@@ -331,10 +340,12 @@ export default function QuestionnaireV1Page() {
             </p>
             <div className="mt-6 rounded-2xl border border-[#dbcdb8] bg-[#fff6ed] p-4">
               <AudioRecorder
+                key={current.id}
                 onSubmit={onSubmit}
                 questionId={current.id}
                 isMobile={isMobile}
                 isUploading={isSubmittingAnswer || pendingUploads > 0}
+                submitState={recorderSubmitState}
                 onRecordingStart={() => trackEvent("response_recording_started", { question_id: current.id })}
                 onRecordingSubmit={({ questionId, durationSeconds }) => {
                   setLastDurationSeconds(durationSeconds)

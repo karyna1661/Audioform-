@@ -9,6 +9,7 @@ interface AudioRecorderProps {
   questionId: string
   isMobile: boolean
   isUploading?: boolean
+  submitState?: "idle" | "uploading" | "error" | "success"
   onRecordingStart?: () => void
   onRecordingSubmit?: (meta: { questionId: string; durationSeconds: number }) => void
 }
@@ -18,6 +19,7 @@ export function AudioRecorder({
   questionId,
   isMobile,
   isUploading = false,
+  submitState = "idle",
   onRecordingStart,
   onRecordingSubmit,
 }: AudioRecorderProps) {
@@ -41,6 +43,12 @@ export function AudioRecorder({
   const analyserRef = useRef<AnalyserNode | null>(null)
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
+
+  useEffect(() => {
+    if (submitState === "success") {
+      resetRecorder()
+    }
+  }, [submitState])
 
   // Initialize audio element
   useEffect(() => {
@@ -250,7 +258,6 @@ export function AudioRecorder({
     if (audioBlob) {
       onRecordingSubmit?.({ questionId, durationSeconds: recordingTime })
       onSubmit(audioBlob)
-      resetRecorder()
     }
   }
 
@@ -386,11 +393,17 @@ export function AudioRecorder({
         <div className="text-center text-sm text-muted-foreground">
           {isPlaying
             ? `Playing preview ${formatTime(Math.floor(playbackTime))} / ${formatTime(Math.floor(playbackDuration || recordingTime))}`
-            : "Ready to submit this take"}
+            : submitState === "error"
+              ? "Upload stalled. You can retry this exact take or re-record."
+              : "Ready to submit this take"}
         </div>
       )}
 
-      {isUploading && <div className="text-center text-sm text-muted-foreground">Uploading your voice take...</div>}
+      {isUploading && (
+        <div className="text-center text-sm text-muted-foreground">
+          Uploading your voice take. Keeping this recording here so you do not need to repeat it.
+        </div>
+      )}
     </div>
   )
 }

@@ -21,6 +21,24 @@
 - [x] Resolve pre-existing type issues (`nodemailer` types, `useIsMobile` import mismatch).
 - [x] Implement analytics tracking layer and first-batch event wiring.
 - [ ] Final browser QA on desktop/mobile.
+- [ ] Scalability Phase 1: add Railway Redis and replace process-local rate limiting in `lib/server/rate-limit.ts` with shared limits across auth, upload, survey, notification, analytics, and email endpoints.
+- [ ] Scalability Phase 1: add `/health` and `/ready` endpoints plus structured request logging and core failure metrics for Railway production monitoring.
+- [ ] Scalability Phase 1: move email, notification fan-out, transcription, and non-critical analytics from request handlers into a BullMQ worker service on Railway.
+- [ ] Scalability Phase 1: remove production reliance on local durable storage paths and keep response media/state on Supabase, B2, and Redis only.
+- [ ] Scalability Phase 1: expand idempotency beyond response upload to other write-sensitive endpoints and persist idempotency state in Redis with TTLs.
+- [ ] Scalability Phase 1: add server-side timeout and retry wrappers for Supabase, B2, SMTP, and transcription providers.
+- [ ] Scalability Phase 1: review and tighten hot query paths in `app/api/responses/route.ts`, `lib/server/response-store.ts`, and dashboard analytics reads; add any missing indexes in Supabase.
+- [ ] Scalability Phase 1: harden production CORS/auth abuse controls on response and auth endpoints and audit service-role access assumptions.
+- [ ] Scalability Phase 1: improve file/media ingestion with streaming or signed direct-to-storage uploads while preserving the current two-step submission flow.
+- [ ] Scalability Phase 2: add Redis/API/CDN caching policy for hot survey, dashboard, and public asset paths with explicit TTLs and invalidation rules.
+- [ ] Scalability Phase 2: define Supabase connection/pooling strategy and monitor saturation under load.
+- [ ] Scalability Phase 2: add graceful degradation controls with feature flags, deferred processing, and partial fallbacks for heavy features.
+- [ ] Scalability Phase 2: standardize schema validation and payload limits across all write endpoints, including `app/api/email/route.ts`.
+- [ ] Scalability Phase 2: improve CDN/static delivery for widget/assets/audio paths and revisit Next.js image optimization strategy.
+- [ ] Scalability Phase 2: create `k6` or Artillery suites for signup, publish, response upload, dashboard reads, and queue spikes; run baseline/spike/soak tests.
+- [ ] Scalability Phase 3: eliminate remaining process-local production assumptions and document any intentional in-memory exceptions.
+- [ ] Scalability Phase 3: introduce API versioning policy and start routing contract-sensitive endpoints under `/api/v1`.
+- [ ] Scalability Phase 3: add cost governance for Supabase usage, B2 egress, transcription spend, Redis memory, and feature-level kill switches.
 - [x] Implement Phase 1 behavioral features (decision framing, depth cues, TTFR visibility).
 - [x] Implement TTFR publish/first-response capture and dashboard visibility.
 - [x] Workflow-orchestrated copy clarity pass (home, survey builder, respondent flow, dashboard).
@@ -87,3 +105,7 @@
 - Response-store migration review: `lib/server/response-store.ts` now persists to Supabase `response_records` instead of local `responses.json`.
 - Local content scheduler review: added `/local/content-scheduler` with 30 seeded pre-beta posts, copy-to-clipboard actions, and persistent completion tracking via local storage; production route returns 404.
 - Local X signal dashboard review: added `/local/x-signal` to surface the latest Apify X analysis file, summarize posting patterns, and recommend the strongest next scheduler cards; production route returns 404.
+- Scalability checklist review: added `future-work/SCALABLE_API_CHECKLIST_PRODUCTION_READY.md` as the condensed production-readiness bundle and linked it from `future-work/README_SCALABILITY_INITIATIVE.md` for future backend/platform work.
+- Scalability execution-plan review: mapped all 20 checklist items to the current codebase in `future-work/AUDIOFORM_SCALABILITY_EXECUTION_PLAN_RAILWAY_SUPABASE_REDIS.md` with priority, owner role, and Phase 1/2/3 rollout for Railway, Supabase, Redis, and B2.
+- First-response loop review: response inbox now plays stored audio, labels each response with the actual survey question text when available, and both dashboard/inbox poll for fresh responses so new recordings surface without a manual reload.
+- Upload-loop hardening review: recorder now keeps the recorded take visible during slow uploads, embedded survey pages now use the same init/upload pipeline as the main questionnaire instead of the heavier legacy single-request path, upload timeouts were raised for slow mobile networks, and the inbox now surfaces a simple "Start Here" listen-first digest.

@@ -59,6 +59,35 @@ The review identified **10 critical gaps** that could cause outages, data corrup
 
 ---
 
+### 2b. [Scalable API Checklist (Production-Ready)](./SCALABLE_API_CHECKLIST_PRODUCTION_READY.md) ✅
+**What:** condensed production-readiness checklist  
+**Why:** gives the team an execution-first rubric for future API hardening  
+**When:** review before beta launch work, infra changes, and traffic-facing releases
+
+**Checklist Includes:**
+1. Rate limiting and burst protection
+2. Query/index discipline at scale
+3. Multi-tier caching rules
+4. Stateless and horizontal-safe API design
+5. Background jobs, idempotency, and observability
+6. CDN/media handling for Audioform audio workloads
+7. Deployment, load testing, and cost controls
+
+---
+
+### 2c. [Audioform Scalability Execution Plan (Railway + Supabase + Redis)](./AUDIOFORM_SCALABILITY_EXECUTION_PLAN_RAILWAY_SUPABASE_REDIS.md) 🧭
+**What:** codebase-mapped remediation plan with owners and phases  
+**Why:** turns the checklist into a prioritized execution program against the current repo  
+**When:** use to scope implementation tickets and assign backend/platform work
+
+**Plan Includes:**
+1. Current-state mapping for all 20 checklist items
+2. Priority and owner recommendations per item
+3. Phase 1/2/3 rollout for Railway, Supabase, Redis, and B2
+4. Exit criteria and first-build order
+
+---
+
 ### 3. [Load Testing Strategy](./audioform-load-testing-strategy.md) 🧪
 **What:** 703-line testing playbook  
 **Why:** Prove it works before users find the bugs  

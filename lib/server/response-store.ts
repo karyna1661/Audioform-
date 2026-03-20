@@ -334,6 +334,7 @@ export async function listStoredResponses(filters?: {
   surveyIds?: string[]
   questionId?: string
   userId?: string
+  limit?: number
 }): Promise<StoredResponse[]> {
   const params: string[] = [
     "select=id,survey_id,question_id,user_id,session_id,status,idempotency_key,upload_attempts,file_name,mime_type,size,storage_path,storage_file_id,public_url,duration_seconds,duration_bucket,flagged,high_signal,bookmarked,moderation_updated_at,created_at",
@@ -344,6 +345,9 @@ export async function listStoredResponses(filters?: {
   if (filters?.surveyIds?.length) params.push(`survey_id=in.(${filters.surveyIds.map((id) => encodeURIComponent(id)).join(",")})`)
   if (filters?.questionId) params.push(`question_id=eq.${encodeURIComponent(filters.questionId)}`)
   if (filters?.userId) params.push(`user_id=eq.${encodeURIComponent(filters.userId)}`)
+  if (filters?.limit && Number.isFinite(filters.limit) && filters.limit > 0) {
+    params.push(`limit=${Math.min(Math.trunc(filters.limit), 500)}`)
+  }
 
   const rows = await supabaseRequest<ResponseRow[]>(`/rest/v1/response_records?${params.join("&")}`)
   return rows.map(mapRow)

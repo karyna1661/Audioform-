@@ -1,7 +1,7 @@
 "use client"
 
 import type { ReactNode } from "react"
-import { useState, useMemo } from "react"
+import { useState, useMemo, useRef, useEffect } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -24,7 +24,8 @@ type ResponseWithMetadata = {
   surveyId: string
   surveyTitle: string
   questionId: string
-  userId: string
+  questionText?: string | null
+  userId: string | null
   fileName: string
   mimeType: string
   fileSize: number
@@ -94,7 +95,32 @@ export function ResponseInbox({
   onBookmarkResponse
 }: ResponseInboxProps) {
   const [playingId, setPlayingId] = useState<string | null>(null)
+  const [audioErrorById, setAudioErrorById] = useState<Record<string, string>>({})
   const [activeFilter, setActiveFilter] = useState<"all" | "short" | "medium" | "deep" | "flagged" | "bookmarked" | "highsignal">("all")
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+
+  useEffect(() => {
+    const audio = new Audio()
+    audioRef.current = audio
+
+    const handleEnded = () => {
+      setPlayingId(null)
+    }
+
+    const handlePause = () => {
+      setPlayingId(null)
+    }
+
+    audio.addEventListener("ended", handleEnded)
+    audio.addEventListener("pause", handlePause)
+
+    return () => {
+      audio.pause()
+      audio.src = ""
+      audio.removeEventListener("ended", handleEnded)
+      audio.removeEventListener("pause", handlePause)
+    }
+  }, [])
 
   const filteredResponses = useMemo(() => {
     switch (activeFilter) {
@@ -125,14 +151,56 @@ export function ResponseInbox({
     highSignal: responses.filter(r => r.highSignal).length,
   }), [responses])
 
-  const handlePlayToggle = (responseId: string) => {
-    if (playingId === responseId) {
-      setPlayingId(null)
-      // Stop playback logic would go here
-    } else {
-      setPlayingId(responseId)
-      onPlayResponse?.(responseId)
+  const featuredResponse = useMemo(() => {
+    return responses.find((response) => response.highSignal)
+      ?? responses.find((response) => response.bookmarked)
+      ?? responses.find((response) => response.durationBucket === "deep")
+      ?? responses[0]
+      ?? null
+  }, [responses])
+
+  const digestLabel = useMemo(() => {
+    if (!featuredResponse) return null
+    if (featuredResponse.questionText) {
+      return `Start with the ${formatDuration(featuredResponse.durationSeconds)} take on "${featuredResponse.questionText}".`
     }
+    return `Start with the ${formatDuration(featuredResponse.durationSeconds)} take from ${featuredResponse.surveyTitle}.`
+  }, [featuredResponse])
+
+  const handlePlayToggle = async (response: ResponseWithMetadata) => {
+    const audio = audioRef.current
+    if (!audio) return
+
+    if (playingId === response.id) {
+      audio.pause()
+      audio.currentTime = 0
+      setPlayingId(null)
+      return
+    }
+
+    try {
+      setAudioErrorById((current) => ({ ...current, [response.id]: "" }))
+      audio.pause()
+      audio.src = response.playbackUrl
+      audio.load()
+      await audio.play()
+      setPlayingId(response.id)
+      onPlayResponse?.(response.id)
+    } catch {
+      setPlayingId(null)
+      setAudioErrorById((current) => ({
+        ...current,
+        [response.id]: "Playback failed. Refresh and try again.",
+      }))
+    }
+  }
+
+  const buildResponseHeading = (response: ResponseWithMetadata): string => {
+    const duration = formatDuration(response.durationSeconds)
+    if (response.questionText) {
+      return `${duration} voice response`
+    }
+    return `${duration} response to ${response.questionId.toUpperCase()}`
   }
 
   return (
@@ -164,6 +232,20 @@ export function ResponseInbox({
           </CardContent>
         </Card>
       </div>
+
+      {featuredResponse ? (
+        <Card className="border-[#dbcdb8] bg-[#fff6ed]">
+          <CardContent className="pt-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-[#8a431f]">Start Here</p>
+            <p className="mt-2 text-base font-semibold text-foreground">{digestLabel}</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {stats.deep > 0
+                ? `${stats.deep} deeper response${stats.deep === 1 ? " is" : "s are"} already in the inbox, so creators can scan where to listen first.`
+                : "This is the first lightweight insight layer before full AI summaries."}
+            </p>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {/* Filters */}
       <Tabs
@@ -233,11 +315,14 @@ export function ResponseInbox({
                       )}
                     </div>
                     
-                    <div className="text-sm text-muted-foreground">
-                      Question: {response.questionId}
-                    </div>
-                    
-                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                     <div>
+                       <p className="text-sm font-medium text-foreground">{buildResponseHeading(response)}</p>
+                       <p className="text-sm text-muted-foreground">
+                         {response.questionText || `Question ${response.questionId.toUpperCase()}`}
+                       </p>
+                     </div>
+                     
+                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1">
                         <Clock className="h-3 w-3" />
                         {formatDuration(response.durationSeconds)}
@@ -249,15 +334,19 @@ export function ResponseInbox({
                       <span>
                         {new Date(response.timestamp).toLocaleDateString()}
                       </span>
-                    </div>
-                  </div>
+                     </div>
+
+                     {audioErrorById[response.id] ? (
+                       <p className="text-xs text-[#8a3d2b]">{audioErrorById[response.id]}</p>
+                     ) : null}
+                   </div>
 
                   {/* Right Section - Actions */}
                   <div className="flex items-center gap-2">
                     <Button
                       variant="outline"
                       size="icon"
-                      onClick={() => handlePlayToggle(response.id)}
+                      onClick={() => void handlePlayToggle(response)}
                       title={playingId === response.id ? "Pause" : "Play"}
                     >
                       {playingId === response.id ? (

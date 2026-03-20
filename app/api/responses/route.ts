@@ -353,15 +353,25 @@ export async function GET(request: NextRequest) {
     surveyIds: surveyId ? undefined : scopedSurveyIds,
     questionId,
     userId: userId || undefined,
+    limit,
   })
-  const limitedResponses = limit ? responses.slice(0, limit) : responses
+  const surveyQuestionEntries = await Promise.all(
+    scopedSurveyIds.map(async (id) => [id, await getLatestPublishedSurveyQuestions(id)] as const),
+  )
+  const surveyQuestionsById = new Map(surveyQuestionEntries)
 
   return NextResponse.json({
-    responses: limitedResponses.map((item) => ({
+    responses: responses.map((item) => {
+      const questionList = surveyQuestionsById.get(item.surveyId) ?? []
+      const questionIndex = Number.parseInt(item.questionId.replace(/^q/i, ""), 10) - 1
+      const questionText = Number.isFinite(questionIndex) && questionIndex >= 0 ? questionList[questionIndex] ?? null : null
+
+      return {
       id: item.id,
       surveyId: item.surveyId,
       surveyTitle: surveyTitleById.get(item.surveyId) || "Untitled survey",
       questionId: item.questionId,
+      questionText,
       userId: item.userId,
       fileName: item.fileName,
       mimeType: item.mimeType,
@@ -374,7 +384,8 @@ export async function GET(request: NextRequest) {
       bookmarked: item.bookmarked,
       moderationUpdatedAt: item.moderationUpdatedAt,
       timestamp: item.createdAt,
-    })),
+      }
+    }),
   }, { headers: corsHeaders })
 }
 

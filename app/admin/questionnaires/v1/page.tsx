@@ -414,20 +414,20 @@ export default function QuestionnairesV1Page() {
   }
   const readinessItems = [
     { ok: readyChecks.hasTitle, label: "Title" },
-    { ok: readyChecks.hasTwoQuestions, label: "Question flow (2+ questions)" },
-    { ok: readyChecks.hasDepthPrompt, label: "Depth question" },
+    { ok: readyChecks.hasTwoQuestions, label: "Prompt flow (2+ prompts)" },
+    { ok: readyChecks.hasDepthPrompt, label: "Depth prompt" },
   ]
   const completionScore =
     readinessItems.reduce((sum, item) => sum + Number(item.ok), 0) / readinessItems.length
   const builderOnboardingChecklist = [
     {
       id: "questions",
-      label: "Add 2+ high-quality questions",
+      label: "Add 2+ high-quality prompts",
       done: readyChecks.hasTwoQuestions && selectedQuestionQuality.score >= 80,
     },
     {
       id: "quality",
-      label: "Reach 80%+ quality on all questions",
+      label: "Reach 80%+ quality on all prompts",
       done: averageQuestionQuality >= 80,
     },
     {
@@ -458,12 +458,15 @@ export default function QuestionnairesV1Page() {
   const scriptSnippet = publishedSurveyId
     ? `<div id="audioform-embed"></div>\n<script src="${typeof window !== "undefined" ? window.location.origin : ""}/embed/widget.js" data-survey-id="${publishedSurveyId}" data-creator-id="${creatorId}" data-target="audioform-embed" data-height="760"></script>`
     : ""
+  const workingRuleCopy = "Keep this to 2-3 prompts, ask for one concrete moment, and avoid anything that can be answered with yes or no."
+  const qualityCoachCopy = "Target 80%+ before publish. Ask for one concrete moment, not a rating or yes/no answer."
+  const releaseDeskCopy = "Publish when the title is clear, the sequence is short, and each prompt asks for one concrete moment."
 
   return (
     <main className={`af-shell min-h-dvh p-4 pb-28 sm:p-6 sm:pb-6`}>
       <div className="af-panel af-fade-up mx-auto max-w-7xl rounded-[2.2rem] border border-[#cfbea4] p-4 sm:p-6">
         <header className="af-fade-up af-delay-1 border-b border-[#cfbea4] pb-5">
-          <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
             <div className="max-w-3xl">
               <p className="font-body text-xs font-semibold uppercase tracking-[0.22em] text-[#7a6146]">Research Desk</p>
               <h1 className="mt-3 text-4xl font-semibold leading-[0.96] text-balance sm:text-5xl">
@@ -473,7 +476,7 @@ export default function QuestionnairesV1Page() {
                 Start with a proven prompt angle, keep the sequence short, and publish only when every question feels specific enough to earn a real story.
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 lg:justify-self-end lg:justify-end lg:self-start">
               <Link href="/admin/dashboard/v4">
                 <Button variant="outline" className="border-[#cfbea4] bg-[#efe3cf]">
                   <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
@@ -526,7 +529,7 @@ export default function QuestionnairesV1Page() {
 
           <div className="mt-5 rounded-[1.4rem] border border-[#d7c6b0] bg-[#fff8f0] px-4 py-3">
             <p className="font-body text-sm leading-6 text-[#665746]">
-              Working rule: keep this to 2-3 prompts, ask for one concrete moment, and avoid anything that can be answered with yes or no.
+              Working rule: {workingRuleCopy}
             </p>
           </div>
         </header>
@@ -599,7 +602,7 @@ export default function QuestionnairesV1Page() {
 
             <section className={`af-accent-card af-fade-up af-delay-2 overflow-hidden rounded-3xl border border-[#cfbea4] ${mobileRangeSectionClass([1, 2, 3])}`}>
               <div className="border-b border-[#cfbea4] bg-[#f6ead8] px-5 py-3">
-                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#7a6146]">Question Studio</p>
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#7a6146]">Prompt Studio</p>
               </div>
               <div className="p-5">
                 <div className={`rounded-[1.8rem] border border-[#cfbea4] bg-[#fff7ee] p-4 sm:p-5 ${mobileSectionClass(1)}`}>
@@ -671,7 +674,7 @@ export default function QuestionnairesV1Page() {
                             <p className="text-sm font-semibold text-[#6e3316]">{template.label}</p>
                             <p className="font-body mt-1 text-sm leading-5 text-[#665746]">{template.description}</p>
                             <p className="font-body mt-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8c7f70]">
-                              {template.questions.length} question{template.questions.length !== 1 ? "s" : ""}
+                              {template.questions.length} prompt{template.questions.length !== 1 ? "s" : ""}
                             </p>
                           </button>
                         ))}
@@ -734,7 +737,7 @@ export default function QuestionnairesV1Page() {
                       </li>
                       <li className="flex items-start gap-2">
                         <CheckCircle2 className="mt-0.5 size-3.5 text-[#2d5a17]" />
-                        <span>Ask about <strong>specific moments</strong>: "What confused you the most..." vs "Did you like it?"</span>
+                        <span>Ask about <strong>concrete moments</strong>: "What confused you the most..." vs "Did you like it?"</span>
                       </li>
                       <li className="flex items-start gap-2">
                         <CheckCircle2 className="mt-0.5 size-3.5 text-[#2d5a17]" />
@@ -828,7 +831,7 @@ export default function QuestionnairesV1Page() {
                           <div className="flex items-center justify-between">
                             <p className="flex items-center gap-1 text-xs uppercase tracking-wide text-[#7a6146]">
                               <GripVertical className="size-3.5" aria-hidden="true" />
-                              Question {i + 1}
+                              Prompt {i + 1}
                             </p>
                             <span
                               className={`text-xs font-semibold ${
@@ -845,7 +848,7 @@ export default function QuestionnairesV1Page() {
                     <button
                       type="button"
                       onClick={() => {
-                        const nextQuestions = [...questions, "New question prompt"]
+                        const nextQuestions = [...questions, "New prompt"]
                         commitQuestionChange(nextQuestions, questions.length)
                         setMobileStep(3)
                       }}
@@ -865,14 +868,14 @@ export default function QuestionnairesV1Page() {
                   </div>
                 </div>
 
-                <div className={`${mobileGridSectionClass(3)} gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.65fr)] lg:items-start`}>
+                <div className={`mt-4 ${mobileGridSectionClass(3)} gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.65fr)] lg:items-start`}>
                   <div>
                      <div className="flex flex-wrap items-start justify-between gap-3">
                        <div>
                          <label className="block text-sm font-semibold uppercase tracking-[0.18em] text-[#7a6146]" htmlFor="question-editor">
                            Prompt editor
                          </label>
-                         <h3 className="mt-2 text-2xl font-semibold text-[#261c14]">Refine the selected question until it earns a story.</h3>
+                          <h3 className="mt-2 text-2xl font-semibold text-[#261c14]">Refine the selected prompt until it earns a story.</h3>
                        </div>
                        <Button
                          type="button"
@@ -909,7 +912,7 @@ export default function QuestionnairesV1Page() {
                       <div>
                         <p className="text-sm font-semibold">Quality coach</p>
                         <p className="font-body mt-1 text-sm leading-6 text-[#665746]">
-                          Target 80%+ before publish. Strong prompts ask for one concrete moment, not a rating.
+                          {qualityCoachCopy}
                         </p>
                       </div>
                       {questions.length > 0 && selectedQuestionQuality.score < minimumQualityThreshold && (
@@ -971,7 +974,7 @@ export default function QuestionnairesV1Page() {
                           const next = [...questions]
                           next[selectedIndex] = /example|specific|moment/i.test(selected)
                             ? selected
-                            : `${selected.replace(/\?*$/, "?")} Share one specific moment.`
+                            : `${selected.replace(/\?*$/, "?")} Share one concrete moment.`
                           commitQuestionChange(next, selectedIndex)
                         }}
                       >
@@ -1024,7 +1027,7 @@ export default function QuestionnairesV1Page() {
                 <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#7a6146]">Release desk</p>
               </div>
               <div className="p-5">
-                <p className="font-body text-sm leading-6 text-[#665746]">Publish when the title is clear, the sequence is short, and each prompt asks for a specific moment.</p>
+                <p className="font-body text-sm leading-6 text-[#665746]">{releaseDeskCopy}</p>
                 <div className="mt-4 rounded-2xl border border-[#cfbea4] bg-[#fffdf8] p-4">
                   <p className="text-sm font-semibold">Before you publish</p>
                   <ul className="mt-3 space-y-2">
@@ -1047,7 +1050,7 @@ export default function QuestionnairesV1Page() {
                     className="bg-[#b85e2d] text-[#fff6ed] hover:bg-[#a05227]"
                     onClick={async () => {
                       if (!readyChecks.hasTitle || !readyChecks.hasTwoQuestions) {
-                        setDraftMessage("Add a title and at least two questions before publishing.")
+                        setDraftMessage("Add a title and at least two prompts before publishing.")
                         return
                       }
 
@@ -1056,7 +1059,7 @@ export default function QuestionnairesV1Page() {
 
                       if (lowQualityQuestions.length > 0) {
                         setDraftMessage(
-                          `Improve question quality first. ${lowQualityQuestions.length} question(s) below ${minimumQualityThreshold}% threshold. Use the quality coach to reach 80%+.`,
+                          `Improve prompt quality first. ${lowQualityQuestions.length} prompt(s) below ${minimumQualityThreshold}% threshold. Use the quality coach to reach 80%+.`,
                         )
                         return
                       }
@@ -1089,7 +1092,7 @@ export default function QuestionnairesV1Page() {
 
             <aside className="af-accent-card af-fade-up af-delay-2 hidden h-fit rounded-3xl border border-[#cfbea4] p-4 lg:sticky lg:top-6 lg:block">
             <h2 className="text-xl font-semibold text-balance">Release desk</h2>
-            <p className="font-body mt-1 text-sm leading-6 text-[#665746]">Publish when the title is clear, the sequence is short, and each prompt asks for a specific moment.</p>
+            <p className="font-body mt-1 text-sm leading-6 text-[#665746]">{releaseDeskCopy}</p>
 
             <div className="mt-4 rounded-2xl border border-[#cfbea4] bg-[#fff7ee] p-4">
               <p className="text-sm font-semibold">Before you publish</p>
@@ -1111,7 +1114,7 @@ export default function QuestionnairesV1Page() {
                 className="w-full bg-[#b85e2d] text-[#fff6ed] hover:bg-[#a05227]"
                 onClick={async () => {
                   if (!readyChecks.hasTitle || !readyChecks.hasTwoQuestions) {
-                    setDraftMessage("Add a title and at least two questions before publishing.")
+                        setDraftMessage("Add a title and at least two prompts before publishing.")
                     return
                   }
 
@@ -1121,7 +1124,7 @@ export default function QuestionnairesV1Page() {
                   
                   if (lowQualityQuestions.length > 0) {
                     setDraftMessage(
-                      `Improve question quality first. ${lowQualityQuestions.length} question(s) below ${minimumQualityThreshold}% threshold. Use the quality coach to reach 80%+.`,
+                      `Improve prompt quality first. ${lowQualityQuestions.length} prompt(s) below ${minimumQualityThreshold}% threshold. Use the quality coach to reach 80%+.`,
                     )
                     return
                   }
@@ -1206,7 +1209,7 @@ export default function QuestionnairesV1Page() {
                         trackEvent("share_link_copied", { share_link: embedLink, share_type: "embed" })
                         setDraftMessage("Embed link copied.")
                       } catch {
-                        setDraftMessage("Could not copy embed link. Copy it manually from the field.")
+                        setDraftMessage("Could not copy embed link. Please try again.")
                       }
                     }}
                   >
@@ -1221,7 +1224,7 @@ export default function QuestionnairesV1Page() {
                         await navigator.clipboard.writeText(iframeSnippet)
                         setDraftMessage("Iframe embed code copied.")
                       } catch {
-                        setDraftMessage("Could not copy iframe code. Copy it manually from this panel.")
+                        setDraftMessage("Could not copy iframe code. Please try again.")
                       }
                     }}
                   >
@@ -1236,7 +1239,7 @@ export default function QuestionnairesV1Page() {
                         await navigator.clipboard.writeText(scriptSnippet)
                         setDraftMessage("Script embed code copied.")
                       } catch {
-                        setDraftMessage("Could not copy script code. Copy it manually from this panel.")
+                        setDraftMessage("Could not copy script code. Please try again.")
                       }
                     }}
                   >

@@ -34,7 +34,7 @@ type SurveyItem = {
 type ResponseItem = {
   id: string
   surveyId: string
-  userId: string
+  userId: string | null
   timestamp: string
 }
 
@@ -72,6 +72,8 @@ export default function AdminDashboardV4Page() {
   useEffect(() => {
     if (status !== "authenticated") return
 
+    let cancelled = false
+
     const loadData = async () => {
       try {
         const [surveyRes, activityRes] = await Promise.all([
@@ -87,8 +89,10 @@ export default function AdminDashboardV4Page() {
         const activityJson = (await activityRes.json()) as { events?: DashboardEventItem[] }
 
         const loadedSurveys = surveyJson.surveys ?? []
-        setSurveys(loadedSurveys)
-        setTimeline(activityJson.events ?? [])
+        if (!cancelled) {
+          setSurveys(loadedSurveys)
+          setTimeline(activityJson.events ?? [])
+        }
 
         trackEvent("response_inbox_opened")
         const firstPublished = loadedSurveys.find((survey) => survey.status === "published")
@@ -96,7 +100,9 @@ export default function AdminDashboardV4Page() {
           trackEvent("first_response_viewed", { survey_id: firstPublished.id })
         }
       } catch (error) {
-        setLoadError(error instanceof Error ? error.message : "Failed to load dashboard.")
+        if (!cancelled) {
+          setLoadError(error instanceof Error ? error.message : "Failed to load dashboard.")
+        }
       }
     }
 
@@ -108,7 +114,9 @@ export default function AdminDashboardV4Page() {
         })
         if (!responseRes.ok) return
         const responseJson = (await responseRes.json()) as { responses?: ResponseItem[] }
-        setResponses(responseJson.responses ?? [])
+        if (!cancelled) {
+          setResponses(responseJson.responses ?? [])
+        }
       } catch {
         // Non-blocking.
       }
@@ -121,10 +129,20 @@ export default function AdminDashboardV4Page() {
     }
 
     void loadBoot()
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void loadResponses()
+      }
+    }, 10000)
+
     router.prefetch("/admin/questionnaires/v1")
     router.prefetch("/admin/responses")
     router.prefetch("/admin/notifications")
-  }, [status])
+    return () => {
+      cancelled = true
+      window.clearInterval(intervalId)
+    }
+  }, [status, router])
 
   const responsesBySurvey = useMemo(() => {
     return responses.reduce<Record<string, number>>((acc, item) => {
@@ -229,7 +247,7 @@ export default function AdminDashboardV4Page() {
   return (
     <main className={`af-shell min-h-dvh p-4 pb-28 sm:p-6 sm:pb-6`}>
       <div className="af-panel af-fade-up mx-auto max-w-7xl rounded-[1.5rem] border p-4 sm:rounded-[2rem] sm:p-6">
-        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#dbcdb8] pb-4">
+        <header className="flex flex-wrap items-start justify-between gap-3 border-b border-[#dbcdb8] pb-4">
           <div>
             <p className={`font-body text-sm text-[#5c5146] text-pretty`}>Builder workspace</p>
             <h1 className="text-3xl font-semibold text-balance">Signal Inbox</h1>
@@ -237,7 +255,7 @@ export default function AdminDashboardV4Page() {
             {uiMessage ? <p className={`font-body mt-1 text-sm text-[#5c5146]`}>{uiMessage}</p> : null}
             {loadError ? <p className={`font-body mt-1 text-sm text-[#8a3d2b]`}>{loadError}</p> : null}
           </div>
-          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-start sm:self-start">
             <Button
               variant="outline"
               className="w-full border-[#dbcdb8] bg-[#f3ecdf] sm:w-auto"
@@ -249,12 +267,13 @@ export default function AdminDashboardV4Page() {
               <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
               Sign out
             </Button>
-            <Link href="/admin/questionnaires" className="hidden sm:inline-flex">
-              <Button className="w-full bg-[#b85e2d] text-[#fff6ed] hover:bg-[#a05227] sm:w-auto">
-                <Mic className="mr-2 size-4" aria-hidden="true" />
-                Create new survey
-              </Button>
-            </Link>
+            <a
+              href="/admin/questionnaires/v1"
+              className="hidden h-10 w-full items-center justify-center rounded-md bg-[#b85e2d] px-4 py-2 text-sm font-medium text-[#fff6ed] transition-colors hover:bg-[#a05227] sm:inline-flex sm:w-auto"
+            >
+              <Mic className="mr-2 size-4" aria-hidden="true" />
+              Create new survey
+            </a>
           </div>
         </header>
 
@@ -349,9 +368,12 @@ export default function AdminDashboardV4Page() {
                     <li>3. Collect and review first responses.</li>
                   </ol>
                   <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-                    <Link href="/admin/questionnaires" className="inline-flex items-center justify-center rounded-lg bg-[#b85e2d] px-3 py-2 text-sm text-[#fff6ed] hover:bg-[#a05227]">
+                    <a
+                      href="/admin/questionnaires/v1"
+                      className="inline-flex items-center justify-center rounded-lg bg-[#b85e2d] px-3 py-2 text-sm text-[#fff6ed] transition-colors hover:bg-[#a05227]"
+                    >
                       Create first survey
-                    </Link>
+                    </a>
                   </div>
                 </article>
               ) : (
@@ -435,11 +457,11 @@ export default function AdminDashboardV4Page() {
                               share_type: "survey_stack_embed_iframe",
                             })
                           } catch {
-                            setUiMessage("Could not copy embed code. Copy it manually from your site.")
+                            setUiMessage("Could not copy iframe code. Please try again.")
                           }
                         }}
                       >
-                        Copy embed code
+                        Copy iframe code
                       </Button>
                     ) : null}
                     {survey.status === "draft" ? (

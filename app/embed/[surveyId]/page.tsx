@@ -44,8 +44,10 @@ export default function EmbedSurveyPage() {
   const [index, setIndex] = useState(0)
   const [submittedCount, setSubmittedCount] = useState(0)
   const [pendingUploads, setPendingUploads] = useState(0)
-  const [failedQueue, setFailedQueue] = useState<Array<{ questionId: string; blob: Blob }>>([])
+  const [failedQueue, setFailedQueue] = useState<Array<{ questionId: string; blob: Blob; durationSeconds: number | null }>>([])
   const [isSubmittingAnswer, setIsSubmittingAnswer] = useState(false)
+  const [recordingDurations, setRecordingDurations] = useState<Record<string, number>>({})
+  const [recorderSubmitState, setRecorderSubmitState] = useState<"idle" | "uploading" | "error" | "success">("idle")
   const isMountedRef = useRef(true)
 
   useEffect(() => {
@@ -79,35 +81,69 @@ export default function EmbedSurveyPage() {
   const prompts = useMemo(() => (survey ? buildPrompts(survey) : []), [survey])
   const currentPrompt = prompts[index]
 
-  const uploadResponse = async (questionId: string, blob: Blob, attempt = 1): Promise<boolean> => {
+  const uploadResponse = async (questionId: string, blob: Blob, durationSeconds: number | null, attempt = 1): Promise<boolean> => {
     if (isMountedRef.current) {
       setPendingUploads((value) => value + 1)
     }
     try {
+      const initController = new AbortController()
+      const initTimeout = window.setTimeout(() => initController.abort(), 15000)
+      const initResponse = await fetch("/api/responses/init", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ surveyId, questionId }),
+        credentials: "include",
+        signal: initController.signal,
+      }).finally(() => window.clearTimeout(initTimeout))
+
+      if (!initResponse.ok) {
+        const errorPayload = (await initResponse.json().catch(() => null)) as { error?: string } | null
+        throw new Error(errorPayload?.error || "Failed to initialize your upload.")
+      }
+
+      const initPayload = (await initResponse.json()) as {
+        responseId?: string
+        idempotencyKey?: string
+        sessionId?: string
+        uploadUrl?: string
+      }
+
+      if (!initPayload.responseId || !initPayload.idempotencyKey || !initPayload.sessionId || !initPayload.uploadUrl) {
+        throw new Error("Upload session payload missing.")
+      }
+
       const formData = new FormData()
       formData.append("audio", blob, `${questionId}-${Date.now()}.webm`)
-      formData.append("questionId", questionId)
-      formData.append("surveyId", surveyId)
+      formData.append("responseId", initPayload.responseId)
+      formData.append("idempotencyKey", initPayload.idempotencyKey)
+      formData.append("sessionId", initPayload.sessionId)
+      if (typeof durationSeconds === "number") {
+        formData.append("durationSeconds", String(durationSeconds))
+      }
 
       const controller = new AbortController()
-      const timeout = window.setTimeout(() => controller.abort(), 15000)
-      const response = await fetch("/api/responses", {
+      const timeout = window.setTimeout(() => controller.abort(), 45000)
+      const response = await fetch(initPayload.uploadUrl, {
         method: "POST",
         body: formData,
+        credentials: "include",
         keepalive: true,
         signal: controller.signal,
       }).finally(() => window.clearTimeout(timeout))
-      if (!response.ok) throw new Error("Failed to submit your voice take.")
+      if (!response.ok) {
+        const errorPayload = (await response.json().catch(() => null)) as { error?: string } | null
+        throw new Error(errorPayload?.error || "Failed to submit your voice take.")
+      }
       return true
     } catch (err) {
       if (attempt < 4) {
         const delayMs = 500 * Math.pow(2, attempt - 1)
         await new Promise((resolve) => window.setTimeout(resolve, delayMs))
-        return uploadResponse(questionId, blob, attempt + 1)
+        return uploadResponse(questionId, blob, durationSeconds, attempt + 1)
       } else {
         if (isMountedRef.current) {
           setUploadError(err instanceof Error ? err.message : "Failed to submit your voice take.")
-          setFailedQueue((items) => [...items, { questionId, blob }])
+          setFailedQueue((items) => [...items, { questionId, blob, durationSeconds }])
         }
         return false
       }
@@ -132,15 +168,19 @@ export default function EmbedSurveyPage() {
     setIsSubmittingAnswer(true)
 
     if (isMountedRef.current) setUploadError(null)
-    const uploaded = await uploadResponse(questionId, blob)
+    setRecorderSubmitState("uploading")
+    const uploaded = await uploadResponse(questionId, blob, recordingDurations[questionId] ?? null)
     if (!isMountedRef.current) return
     if (!uploaded) {
+      setRecorderSubmitState("error")
       setIsSubmittingAnswer(false)
       return
     }
+    setRecorderSubmitState("success")
     setSubmittedCount((value) => value + 1)
     if (currentIndex < prompts.length - 1) {
       setIndex((prev) => prev + 1)
+      setRecorderSubmitState("idle")
       setIsSubmittingAnswer(false)
       return
     }
@@ -151,7 +191,7 @@ export default function EmbedSurveyPage() {
     const queued = [...failedQueue]
     setFailedQueue([])
     setUploadError(null)
-    await Promise.all(queued.map((item) => uploadResponse(item.questionId, item.blob)))
+    await Promise.all(queued.map((item) => uploadResponse(item.questionId, item.blob, item.durationSeconds)))
   }
 
   if (loading) {
@@ -209,10 +249,15 @@ export default function EmbedSurveyPage() {
           </p>
           <div className="mt-4 rounded-2xl border border-[#dbcdb8] bg-[#fff6ed] p-4">
             <AudioRecorder
+              key={currentPrompt?.id || "q1"}
               onSubmit={onSubmit}
               questionId={currentPrompt?.id || "q1"}
               isMobile={isMobile}
               isUploading={isSubmittingAnswer || pendingUploads > 0}
+              submitState={recorderSubmitState}
+              onRecordingSubmit={({ questionId, durationSeconds }) => {
+                setRecordingDurations((prev) => ({ ...prev, [questionId]: durationSeconds }))
+              }}
             />
           </div>
           {uploadError ? (

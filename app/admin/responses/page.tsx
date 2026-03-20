@@ -15,7 +15,8 @@ type ResponseWithMetadata = {
   surveyId: string
   surveyTitle: string
   questionId: string
-  userId: string
+   questionText?: string | null
+   userId: string | null
   fileName: string
   mimeType: string
   fileSize: number
@@ -44,9 +45,11 @@ export default function AdminResponsesPage() {
   useEffect(() => {
     if (status !== "authenticated") return
 
+    let cancelled = false
+    let hasTrackedOpen = false
+
     const loadResponses = async () => {
       try {
-        setLoading(true)
         const params = new URLSearchParams()
         if (surveyIdFilter) params.set("surveyId", surveyIdFilter)
         params.set("limit", "500")
@@ -61,20 +64,40 @@ export default function AdminResponsesPage() {
         }
 
         const json = await responseRes.json()
-        setResponses(json.responses || [])
-        
-        trackEvent("response_inbox_opened", {
-          survey_id: surveyIdFilter,
-          focus: focusMode,
-        })
+        if (!cancelled) {
+          setResponses(json.responses || [])
+          setError(null)
+        }
+
+        if (!hasTrackedOpen) {
+          hasTrackedOpen = true
+          trackEvent("response_inbox_opened", {
+            survey_id: surveyIdFilter,
+            focus: focusMode,
+          })
+        }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load responses.")
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Failed to load responses.")
+        }
       } finally {
-        setLoading(false)
+        if (!cancelled) {
+          setLoading(false)
+        }
       }
     }
 
     void loadResponses()
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void loadResponses()
+      }
+    }, 10000)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(intervalId)
+    }
   }, [status, surveyIdFilter, focusMode])
 
   const handlePlayResponse = (responseId: string) => {
@@ -160,7 +183,7 @@ export default function AdminResponsesPage() {
     <main className={`af-shell min-h-dvh p-4 pb-28 sm:p-6 sm:pb-6`}>
       <div className="af-panel af-fade-up mx-auto max-w-7xl rounded-[1.5rem] border p-4 sm:rounded-[2rem] sm:p-6">
         {/* Header */}
-        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#dbcdb8] pb-4">
+        <header className="flex flex-wrap items-start justify-between gap-3 border-b border-[#dbcdb8] pb-4">
           <div className="flex items-start gap-3">
             <Button
               variant="ghost"
@@ -191,7 +214,7 @@ export default function AdminResponsesPage() {
               ) : null}
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-start sm:self-start">
             <Button
               variant="outline"
               className="w-full border-[#dbcdb8] bg-[#f3ecdf] sm:w-auto"
