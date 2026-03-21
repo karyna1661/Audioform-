@@ -3,7 +3,7 @@ import { z } from "zod"
 import { getSessionFromRequest } from "@/lib/server/auth-session"
 import { getCorsHeaders, hasAllowedApiOrigin } from "@/lib/server/cors"
 import { recordDashboardEvent } from "@/lib/server/survey-store"
-import { sendEmail } from "@/lib/server/email-sender"
+import { sendOrQueueEmail } from "@/lib/server/queued-email"
 import { applyRateLimit, getRequestClientIp } from "@/lib/server/rate-limit"
 
 const emailSchema = z.object({
@@ -58,15 +58,19 @@ export async function POST(request: NextRequest) {
           .split(",")
           .map((entry) => entry.trim())
           .filter(Boolean)
-    const sent = await sendEmail({ to: toList, subject, html, text })
+    const result = await sendOrQueueEmail({ to: toList, subject, html, text })
 
     try {
       await recordDashboardEvent({
-        type: "reminder_sent",
-        message: `Reminder sent to ${toList.length} participant${toList.length === 1 ? "" : "s"}`,
+        type: result.mode === "queued" ? "notification_sent" : "reminder_sent",
+        message:
+          result.mode === "queued"
+            ? `Reminder queued for ${toList.length} participant${toList.length === 1 ? "" : "s"}`
+            : `Reminder sent to ${toList.length} participant${toList.length === 1 ? "" : "s"}`,
         metadata: {
           recipientCount: toList.length,
           subject,
+          deliveryMode: result.mode,
         },
       })
     } catch {
@@ -75,8 +79,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      messageId: sent.messageId,
-      previewUrl: sent.previewUrl,
+      deliveryMode: result.mode,
+      messageId: result.mode === "inline" ? result.messageId : null,
+      previewUrl: result.mode === "inline" ? result.previewUrl : null,
+      jobId: result.mode === "queued" ? result.jobId : null,
     }, { headers: corsHeaders })
   } catch (error: any) {
     console.error("Error sending email:", error)

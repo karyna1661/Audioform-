@@ -196,6 +196,10 @@ export function isRedisConfigured(): boolean {
   return Boolean(process.env.REDIS_URL?.trim())
 }
 
+export async function runRedisCommand(parts: string[]): Promise<RedisValue> {
+  return sendCommand(parts)
+}
+
 export async function evalRedis(script: string, keys: string[], args: string[]): Promise<RedisValue> {
   const command = ["EVAL", script, String(keys.length), ...keys, ...args]
   return sendCommand(command)

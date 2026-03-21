@@ -23,7 +23,7 @@ import {
 } from "@/lib/server/survey-store"
 import { getNotificationConfigByUserId } from "@/lib/server/notification-store"
 import { findUserById } from "@/lib/server/auth-store"
-import { sendEmail } from "@/lib/server/email-sender"
+import { sendOrQueueEmail } from "@/lib/server/queued-email"
 import { getCorsHeaders, hasAllowedApiOrigin } from "@/lib/server/cors"
 import { applyRateLimit, getRequestClientIp } from "@/lib/server/rate-limit"
 import { hasTrustedOrigin } from "@/lib/server/request-guards"
@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
     }
 
     const ip = getRequestClientIp(request.headers)
-    const rate = applyRateLimit({
+    const rate = await applyRateLimit({
       key: `responses:post:${ip}`,
       windowMs: 60_000,
       max: 20,
@@ -223,7 +223,7 @@ export async function POST(request: NextRequest) {
               .replaceAll("[Submission Date]", submissionDate)
               .replaceAll("[Response Count]", String(responseCount))
 
-            await sendEmail({
+            const emailResult = await sendOrQueueEmail({
               to: recipients,
               subject,
               text,
@@ -236,12 +236,14 @@ export async function POST(request: NextRequest) {
             await recordDashboardEvent({
               type: "notification_sent",
               surveyId: stored.surveyId,
-              message: `New response notification sent to ${recipients.length} recipient${
-                recipients.length === 1 ? "" : "s"
-              }`,
+              message:
+                emailResult.mode === "queued"
+                  ? `New response notification queued for ${recipients.length} recipient${recipients.length === 1 ? "" : "s"}`
+                  : `New response notification sent to ${recipients.length} recipient${recipients.length === 1 ? "" : "s"}`,
               metadata: {
                 recipientCount: recipients.length,
                 notificationType: "new_response",
+                deliveryMode: emailResult.mode,
               },
             })
           }

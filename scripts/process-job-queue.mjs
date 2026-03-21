@@ -1,0 +1,182 @@
+#!/usr/bin/env node
+
+import { Socket } from "node:net"
+import { connect as connectTls } from "node:tls"
+import nodemailer from "nodemailer"
+
+function parseRedisUrl() {
+  const redisUrl = process.env.REDIS_URL?.trim()
+  if (!redisUrl) throw new Error("REDIS_URL is required for queue worker")
+
+  const parsed = new URL(redisUrl)
+  return {
+    host: parsed.hostname,
+    port: parsed.port ? Number.parseInt(parsed.port, 10) : parsed.protocol === "rediss:" ? 6380 : 6379,
+    password: parsed.password || undefined,
+    username: parsed.username || undefined,
+    tls: parsed.protocol === "rediss:",
+  }
+}
+
+function encodeCommand(parts) {
+  let output = `*${parts.length}\r\n`
+  for (const part of parts) {
+    output += `$${Buffer.byteLength(part)}\r\n${part}\r\n`
+  }
+  return output
+}
+
+function parseValue(input, index = 0) {
+  const prefix = input[index]
+  const lineEnd = input.indexOf("\r\n", index)
+  if (lineEnd === -1) throw new Error("Incomplete Redis response.")
+
+  if (prefix === "+") return { value: input.slice(index + 1, lineEnd), nextIndex: lineEnd + 2 }
+  if (prefix === ":") return { value: Number.parseInt(input.slice(index + 1, lineEnd), 10), nextIndex: lineEnd + 2 }
+  if (prefix === "$") {
+    const length = Number.parseInt(input.slice(index + 1, lineEnd), 10)
+    if (length === -1) return { value: null, nextIndex: lineEnd + 2 }
+    const start = lineEnd + 2
+    const end = start + length
+    return { value: input.slice(start, end), nextIndex: end + 2 }
+  }
+  if (prefix === "*") {
+    const count = Number.parseInt(input.slice(index + 1, lineEnd), 10)
+    if (count === -1) return { value: null, nextIndex: lineEnd + 2 }
+    const values = []
+    let nextIndex = lineEnd + 2
+    for (let i = 0; i < count; i += 1) {
+      const parsed = parseValue(input, nextIndex)
+      values.push(parsed.value)
+      nextIndex = parsed.nextIndex
+    }
+    return { value: values, nextIndex }
+  }
+  if (prefix === "-") throw new Error(input.slice(index + 1, lineEnd))
+  throw new Error(`Unsupported Redis response prefix: ${prefix}`)
+}
+
+async function runRedisCommand(parts) {
+  const options = parseRedisUrl()
+  const socket = options.tls
+    ? connectTls({ host: options.host, port: options.port, servername: options.host })
+    : new Socket()
+
+  if (!options.tls) socket.connect(options.port, options.host)
+  socket.setTimeout(10000)
+
+  return await new Promise((resolve, reject) => {
+    let buffer = ""
+    let authenticated = false
+
+    const cleanup = () => {
+      socket.removeAllListeners()
+      socket.end()
+      socket.destroy()
+    }
+
+    const fail = (error) => {
+      cleanup()
+      reject(error)
+    }
+
+    socket.on("data", (chunk) => {
+      buffer += chunk.toString("utf8")
+      try {
+        const parsed = parseValue(buffer)
+        const authParts = options.username
+          ? ["AUTH", options.username, options.password || ""]
+          : options.password
+            ? ["AUTH", options.password]
+            : null
+
+        if (authParts && !authenticated) {
+          authenticated = true
+          buffer = buffer.slice(parsed.nextIndex)
+          socket.write(encodeCommand(parts))
+          return
+        }
+
+        cleanup()
+        resolve(parsed.value)
+      } catch (error) {
+        if (error instanceof Error && error.message === "Incomplete Redis response.") return
+        fail(error)
+      }
+    })
+
+    socket.once("error", fail)
+    socket.once("timeout", () => fail(new Error("Redis command timed out.")))
+
+    const authParts = options.username
+      ? ["AUTH", options.username, options.password || ""]
+      : options.password
+        ? ["AUTH", options.password]
+        : null
+
+    if (authParts) {
+      socket.write(encodeCommand(authParts))
+    } else {
+      socket.write(encodeCommand(parts))
+    }
+  })
+}
+
+async function createTransporter() {
+  if (process.env.SMTP_HOST && process.env.SMTP_PORT && process.env.SMTP_USER && process.env.SMTP_PASSWORD) {
+    return nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: Number.parseInt(process.env.SMTP_PORT, 10),
+      secure: process.env.SMTP_SECURE === "true",
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASSWORD,
+      },
+    })
+  }
+
+  throw new Error("SMTP credentials are required for queue worker")
+}
+
+async function processEmailJob(payload) {
+  const transporter = await createTransporter()
+  await transporter.sendMail({
+    from: '"AudioForm" <notifications@audioform.example.com>',
+    to: payload.to.join(", "),
+    subject: payload.subject,
+    text: payload.text,
+    html: payload.html,
+  })
+}
+
+async function processNext() {
+  const result = await runRedisCommand(["BLPOP", "audioform:jobs", "5"])
+  if (!Array.isArray(result) || result.length < 2 || typeof result[1] !== "string") return false
+
+  const envelope = JSON.parse(result[1])
+  if (envelope.type === "email.send") {
+    await processEmailJob(envelope.payload)
+    console.log(`[queue-worker] processed ${envelope.type}`, { id: envelope.id })
+    return true
+  }
+
+  console.warn(`[queue-worker] unknown job type`, envelope.type)
+  return false
+}
+
+async function main() {
+  console.log("[queue-worker] started")
+  while (true) {
+    try {
+      await processNext()
+    } catch (error) {
+      console.error("[queue-worker] failed", error)
+      await new Promise((resolve) => setTimeout(resolve, 3000))
+    }
+  }
+}
+
+main().catch((error) => {
+  console.error("[queue-worker] fatal", error)
+  process.exit(1)
+})

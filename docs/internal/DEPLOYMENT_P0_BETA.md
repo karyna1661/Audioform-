@@ -31,6 +31,7 @@ Recommended:
 - `B2_APPLICATION_KEY`
 - `B2_BUCKET_ID` or `B2_BUCKET_NAME`
 - `REDIS_URL`
+- `ENABLE_BACKGROUND_JOBS=true` (only when a queue worker is deployed)
 - SMTP vars for notifications (optional)
 
 ## Step 3 — Deploy
@@ -49,6 +50,20 @@ git push origin main
 railway link --project <project-id>
 railway up
 ```
+
+### Optional queue worker
+
+When Redis is configured and background jobs are enabled, run a separate worker service with:
+
+```bash
+npm run worker:queue
+```
+
+Use this only after setting:
+
+- `REDIS_URL`
+- `ENABLE_BACKGROUND_JOBS=true`
+- SMTP credentials
 
 ## Step 4 — Smoke test (10 minutes)
 
