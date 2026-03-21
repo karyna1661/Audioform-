@@ -293,8 +293,8 @@ export default function QuestionnaireClientPage() {
 
   if (surveyError) {
     return (
-      <main className="min-h-dvh bg-[#f3ecdf] p-4 sm:p-6">
-        <section className="mx-auto max-w-2xl rounded-[1.5rem] border border-[#dbcdb8] bg-[#f9f4ea] p-6">
+      <main className="min-h-dvh overflow-x-hidden bg-[#f3ecdf] p-4 sm:p-6">
+        <section className="mx-auto w-full max-w-2xl overflow-hidden rounded-[1.5rem] border border-[#dbcdb8] bg-[#f9f4ea] p-6">
           <Alert className="border-[#e3c3b5] bg-[#fff0e9] text-[#8a3d2b]">
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Survey unavailable</AlertTitle>
@@ -307,8 +307,8 @@ export default function QuestionnaireClientPage() {
 
   if (permissionGranted === false) {
     return (
-      <main className="min-h-dvh bg-[#f3ecdf] p-4 sm:p-6">
-        <div className="mx-auto max-w-2xl rounded-[1.5rem] border border-[#dbcdb8] bg-[#f9f4ea] p-6">
+      <main className="min-h-dvh overflow-x-hidden bg-[#f3ecdf] p-4 sm:p-6">
+        <div className="mx-auto w-full max-w-2xl overflow-hidden rounded-[1.5rem] border border-[#dbcdb8] bg-[#f9f4ea] p-6">
           <Alert className="border-[#e3c3b5] bg-[#fff0e9] text-[#8a3d2b]">
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Microphone access needed</AlertTitle>
@@ -325,8 +325,8 @@ export default function QuestionnaireClientPage() {
   }
 
   return (
-    <main className="min-h-dvh bg-[#f3ecdf] p-4 sm:p-6">
-      <section className="mx-auto max-w-3xl rounded-[1.5rem] border border-[#dbcdb8] bg-[#f9f4ea] p-4 sm:rounded-[2rem] sm:p-6">
+    <main className="min-h-dvh overflow-x-hidden bg-[#f3ecdf] px-3 py-4 sm:p-6">
+      <section className="mx-auto w-full max-w-3xl overflow-hidden rounded-[1.35rem] border border-[#dbcdb8] bg-[#f9f4ea] p-4 sm:rounded-[2rem] sm:p-6">
         {authStatus === "authenticated" && user?.role === "admin" ? (
           <div className="mb-4">
             <Link href="/admin/dashboard/v4" className="font-body text-sm text-[#8a431f] underline">
@@ -334,28 +334,28 @@ export default function QuestionnaireClientPage() {
             </Link>
           </div>
         ) : null}
-        <p className="font-body text-sm text-[#5c5146] text-pretty">
+        <p className="font-body text-[13px] leading-6 text-[#5c5146] text-pretty sm:text-sm">
           Give one clear 30-second response so the builder can decide what to improve next.
         </p>
-        <div className="mt-3 flex items-center justify-between">
-          <p className="font-body text-sm text-[#5c5146]">
+        <div className="mt-3 flex items-center justify-between gap-3">
+          <p className="min-w-0 font-body text-[13px] leading-5 text-[#5c5146] sm:text-sm">
             Question {Math.min(index + 1, questionList.length)} of {questionList.length}
           </p>
-          <p className="font-body text-sm tabular-nums text-[#5c5146]">{Math.round((Object.keys(answers).length / questionList.length) * 100)}%</p>
+          <p className="shrink-0 font-body text-[13px] tabular-nums text-[#5c5146] sm:text-sm">{Math.round((Object.keys(answers).length / questionList.length) * 100)}%</p>
         </div>
 
         <div className="mt-2 h-2 rounded-full bg-[#e8dcc9]">
           <div className="h-2 rounded-full bg-[#b85e2d]" style={{ width: `${(Object.keys(answers).length / questionList.length) * 100}%` }} />
         </div>
 
-        <div className="mt-8">
-          <h1 className="text-2xl font-semibold text-balance sm:text-3xl">{current.text}</h1>
-          <p className="font-body mt-2 text-sm text-[#5c5146] text-pretty">
+        <div className="mt-6 min-w-0 sm:mt-8">
+          <h1 className="text-[1.65rem] font-semibold leading-[1.15] text-balance break-words sm:text-3xl">{current.text}</h1>
+          <p className="font-body mt-2 text-[13px] leading-6 text-[#5c5146] text-pretty sm:text-sm">
             Speak directly. One concrete moment in 20-45 seconds is ideal.
           </p>
         </div>
 
-        <div className="mt-6">
+        <div className="mt-5 sm:mt-6">
           <AudioRecorder
             key={current.id}
             onSubmit={(blob) => void submitAndAdvance(blob, current.id, index)}
@@ -382,16 +382,16 @@ export default function QuestionnaireClientPage() {
           </Alert>
         ) : null}
 
-        <div className="mt-8 flex items-center justify-between gap-3">
+        <div className="mt-6 flex items-center justify-between gap-3 sm:mt-8">
           <Button
             variant="outline"
-            className="border-[#dbcdb8] bg-[#fff6ed]"
+            className="border-[#dbcdb8] bg-[#fff6ed] px-4"
             disabled={index === 0 || isSubmittingAnswer}
             onClick={() => setIndex((value) => Math.max(0, value - 1))}
           >
             Previous
           </Button>
-          <p className="font-body text-xs text-[#5c5146]">
+          <p className="min-w-0 text-right font-body text-[11px] leading-5 text-[#5c5146] sm:text-xs">
             {Object.keys(answers).length} answered so far
           </p>
         </div>

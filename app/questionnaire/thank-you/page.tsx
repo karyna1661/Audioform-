@@ -2,10 +2,9 @@
 
 import Link from "next/link"
 import { useEffect } from "react"
-import type { ReactNode } from "react"
 import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { CheckCircle2, Home, Mic, MessagesSquare } from "lucide-react"
+import { ArrowRight, CheckCircle2, Sparkles } from "lucide-react"
 import { trackEvent } from "@/lib/analytics"
 
 
@@ -28,46 +27,45 @@ export default function ThankYouPage() {
 
   return (
     <main className={`min-h-dvh bg-[#f3ecdf] p-4 sm:p-6`}>
-      <section className="mx-auto max-w-4xl rounded-[1.5rem] border border-[#dbcdb8] bg-[#f9f4ea] p-5 sm:rounded-[2rem] sm:p-8">
+      <section className="mx-auto max-w-3xl rounded-[1.5rem] border border-[#dbcdb8] bg-[#f9f4ea] p-5 sm:rounded-[2rem] sm:p-8">
         <div className="text-center">
           <CheckCircle2 className="mx-auto size-16 text-[#2d5a17]" aria-hidden="true" />
-          <p className={`font-body mt-3 text-sm text-[#5c5146] text-pretty`}>Response Session Complete</p>
-          <h1 className="mt-1 text-3xl font-semibold text-balance sm:text-4xl">You just helped shape our roadmap.</h1>
+          <p className={`font-body mt-3 text-sm text-[#5c5146] text-pretty`}>Response sent</p>
+          <h1 className="mt-1 text-3xl font-semibold text-balance sm:text-4xl">Curious what your own users would say?</h1>
           <p className={`font-body mx-auto mt-3 max-w-2xl text-[#5c5146] text-pretty`}>
-            Want to collect voice feedback like this on your own site?
+            Create your own voice survey in under a minute and collect the kind of feedback people actually explain out loud.
           </p>
         </div>
 
-        <div className="mt-8 grid gap-4 md:grid-cols-3">
-          <InfoCard
-            icon={<Mic className="size-4 text-[#8a431f]" aria-hidden="true" />}
-            title="Captured"
-            text="Audio responses were stored successfully and linked to this session."
-          />
-          <InfoCard
-            icon={<MessagesSquare className="size-4 text-[#8a431f]" aria-hidden="true" />}
-            title="Reviewed"
-            text="The survey owner can now review responses and generate insights."
-          />
-          <InfoCard
-            icon={<Home className="size-4 text-[#8a431f]" aria-hidden="true" />}
-            title="Next"
-            text="You can return home, create your own survey, or continue with another survey."
-          />
+        <div className="mt-8 rounded-[1.5rem] border border-[#dbcdb8] bg-[#fff6ed] p-5">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 inline-flex size-10 shrink-0 items-center justify-center rounded-full border border-[#dbcdb8] bg-[#f3ecdf]">
+              <Sparkles className="size-4 text-[#8a431f]" aria-hidden="true" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-[#261c14]">Powered by Audioform</p>
+              <p className="font-body mt-2 text-sm leading-6 text-[#5c5146] text-pretty">
+                Ask one sharp question, collect voice answers in under a minute, and hear what people mean instead of guessing from short text replies.
+              </p>
+            </div>
+          </div>
         </div>
 
         <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row sm:flex-wrap">
-          <Link href="/" onClick={() => handleFollowUpAction("return_home")}>
-            <Button variant="outline" className="w-full border-[#dbcdb8] bg-[#f3ecdf] sm:w-auto">
-              Return Home
-            </Button>
-          </Link>
           <Link href="/signup" onClick={() => handleFollowUpAction("create_survey")}>
-            <Button className="w-full bg-[#b85e2d] text-[#fff6ed] hover:bg-[#a05227] sm:w-auto">Create Your Own Survey</Button>
+            <Button className="w-full bg-[#b85e2d] text-[#fff6ed] hover:bg-[#a05227] sm:w-auto">
+              Create your own survey
+              <ArrowRight className="ml-2 size-4" aria-hidden="true" />
+            </Button>
           </Link>
           <Link href={backToSurveyHref} onClick={() => handleFollowUpAction("answer_another")}>
             <Button variant="outline" className="w-full border-[#dbcdb8] bg-[#f3ecdf] sm:w-auto">
-              Back to Survey
+              Answer another prompt
+            </Button>
+          </Link>
+          <Link href="/" onClick={() => handleFollowUpAction("return_home")}>
+            <Button variant="outline" className="w-full border-[#dbcdb8] bg-[#f3ecdf] sm:w-auto">
+              Return home
             </Button>
           </Link>
         </div>
@@ -87,18 +85,6 @@ export default function ThankYouPage() {
         </p>
       </section>
     </main>
-  )
-}
-
-function InfoCard({ icon, title, text }: { icon: ReactNode; title: string; text: string }) {
-  return (
-    <article className="rounded-xl border border-[#dbcdb8] bg-[#fff6ed] p-4">
-      <div className="inline-flex items-center gap-2">
-        {icon}
-        <h2 className="text-lg font-semibold text-balance">{title}</h2>
-      </div>
-      <p className="mt-2 text-sm text-[#5c5146] text-pretty">{text}</p>
-    </article>
   )
 }
 
