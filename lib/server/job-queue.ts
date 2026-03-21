@@ -79,3 +79,24 @@ export async function getJobResult(jobId: string): Promise<unknown | null> {
   const result = await runRedisCommand(["GET", `audioform:job-result:${jobId}`])
   return typeof result === "string" ? JSON.parse(result) : null
 }
+
+export async function incrementQueueMetric(metric: string): Promise<void> {
+  await runRedisCommand(["INCR", `audioform:queue-metric:${metric}`])
+}
+
+export async function getQueueObservability() {
+  const queueLength = await runRedisCommand(["LLEN", DEFAULT_QUEUE])
+  const metrics = ["processed", "failed", "analytics", "emails", "digests", "transcriptions"] as const
+  const metricValues = await Promise.all(
+    metrics.map(async (metric) => {
+      const value = await runRedisCommand(["GET", `audioform:queue-metric:${metric}`])
+      return [metric, typeof value === "string" ? Number.parseInt(value, 10) || 0 : 0] as const
+    }),
+  )
+
+  return {
+    enabled: isBackgroundJobsEnabled(),
+    queueLength: typeof queueLength === "number" ? queueLength : Number.parseInt(String(queueLength), 10) || 0,
+    metrics: Object.fromEntries(metricValues),
+  }
+}

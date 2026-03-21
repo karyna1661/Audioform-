@@ -50,6 +50,10 @@ async function setJobResult(jobId, value, ttlSeconds = 3600) {
   await runRedisCommand(["SETEX", `audioform:job-result:${jobId}`, String(ttlSeconds), JSON.stringify(value)])
 }
 
+async function incrementQueueMetric(metric) {
+  await runRedisCommand(["INCR", `audioform:queue-metric:${metric}`])
+}
+
 function parseRedisUrl() {
   const redisUrl = process.env.REDIS_URL?.trim()
   if (!redisUrl) throw new Error("REDIS_URL is required for queue worker")
@@ -193,6 +197,7 @@ async function processEmailJob(payload) {
     text: payload.text,
     html: payload.html,
   })
+  await incrementQueueMetric("emails")
 }
 
 async function processAnalyticsJob(payload) {
@@ -211,6 +216,7 @@ async function processAnalyticsJob(payload) {
       },
     ]),
   })
+  await incrementQueueMetric("analytics")
 }
 
 async function processNotificationDigestJob(payload) {
@@ -302,6 +308,7 @@ async function processNotificationDigestJob(payload) {
       <p style="line-height:1.6;">Open your dashboard to review the latest voice feedback.</p>
     </div>`,
   })
+  await incrementQueueMetric("digests")
 }
 
 async function transcribeAudioPayload(payload) {
@@ -346,6 +353,7 @@ async function processNext() {
   const envelope = JSON.parse(result[1])
   if (envelope.type === "email.send") {
     await processEmailJob(envelope.payload)
+    await incrementQueueMetric("processed")
     console.log(`[queue-worker] processed ${envelope.type}`, { id: envelope.id })
     return true
   }
@@ -358,18 +366,22 @@ async function processNext() {
       questionId: envelope.payload.questionId,
       completedAt: new Date().toISOString(),
     })
+    await incrementQueueMetric("transcriptions")
+    await incrementQueueMetric("processed")
     console.log(`[queue-worker] processed ${envelope.type}`, { id: envelope.id })
     return true
   }
 
   if (envelope.type === "analytics.record") {
     await processAnalyticsJob(envelope.payload)
+    await incrementQueueMetric("processed")
     console.log(`[queue-worker] processed ${envelope.type}`, { id: envelope.id })
     return true
   }
 
   if (envelope.type === "notification.digest") {
     await processNotificationDigestJob(envelope.payload)
+    await incrementQueueMetric("processed")
     console.log(`[queue-worker] processed ${envelope.type}`, { id: envelope.id })
     return true
   }
@@ -384,6 +396,7 @@ async function main() {
     try {
       await processNext()
     } catch (error) {
+      await incrementQueueMetric("failed").catch(() => {})
       console.error("[queue-worker] failed", error)
       await new Promise((resolve) => setTimeout(resolve, 3000))
     }
