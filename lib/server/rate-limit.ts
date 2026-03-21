@@ -1,16 +1,23 @@
+import { evalRedis, isRedisConfigured } from "@/lib/server/redis-client"
+
 const windows = new Map<string, { count: number; resetAt: number }>()
+
+const RATE_LIMIT_LUA = [
+  'local current = redis.call("INCR", KEYS[1])',
+  'if current == 1 then redis.call("PEXPIRE", KEYS[1], ARGV[1]) end',
+  'local ttl = redis.call("PTTL", KEYS[1])',
+  'if ttl < 0 then ttl = tonumber(ARGV[1]) redis.call("PEXPIRE", KEYS[1], ARGV[1]) end',
+  'return {current, ttl}',
+].join("\n")
 
 export type RateLimitResult = {
   allowed: boolean
   retryAfterSeconds: number
   remaining: number
+  backend: "memory" | "redis"
 }
 
-export function applyRateLimit(input: {
-  key: string
-  windowMs: number
-  max: number
-}): RateLimitResult {
+function applyMemoryRateLimit(input: { key: string; windowMs: number; max: number }): RateLimitResult {
   const now = Date.now()
   const existing = windows.get(input.key)
   if (!existing || now >= existing.resetAt) {
@@ -19,6 +26,7 @@ export function applyRateLimit(input: {
       allowed: true,
       retryAfterSeconds: Math.ceil(input.windowMs / 1000),
       remaining: Math.max(0, input.max - 1),
+      backend: "memory",
     }
   }
 
@@ -27,6 +35,7 @@ export function applyRateLimit(input: {
       allowed: false,
       retryAfterSeconds: Math.max(1, Math.ceil((existing.resetAt - now) / 1000)),
       remaining: 0,
+      backend: "memory",
     }
   }
 
@@ -36,7 +45,45 @@ export function applyRateLimit(input: {
     allowed: true,
     retryAfterSeconds: Math.max(1, Math.ceil((existing.resetAt - now) / 1000)),
     remaining: Math.max(0, input.max - existing.count),
+    backend: "memory",
   }
+}
+
+async function applyRedisRateLimit(input: { key: string; windowMs: number; max: number }): Promise<RateLimitResult> {
+  const namespacedKey = `rate-limit:${input.key}`
+  const result = await evalRedis(RATE_LIMIT_LUA, [namespacedKey], [String(input.windowMs)])
+  if (!Array.isArray(result) || result.length < 2) {
+    throw new Error("Unexpected Redis rate limit response.")
+  }
+
+  const count = Number(result[0])
+  const ttlMs = Number(result[1])
+  if (!Number.isFinite(count) || !Number.isFinite(ttlMs)) {
+    throw new Error("Redis rate limit values were not numeric.")
+  }
+
+  return {
+    allowed: count <= input.max,
+    retryAfterSeconds: Math.max(1, Math.ceil(ttlMs / 1000)),
+    remaining: Math.max(0, input.max - count),
+    backend: "redis",
+  }
+}
+
+export async function applyRateLimit(input: {
+  key: string
+  windowMs: number
+  max: number
+}): Promise<RateLimitResult> {
+  if (isRedisConfigured()) {
+    try {
+      return await applyRedisRateLimit(input)
+    } catch (error) {
+      console.error("Redis rate limit failed, falling back to memory:", error)
+    }
+  }
+
+  return applyMemoryRateLimit(input)
 }
 
 export function getRequestClientIp(headers: Headers): string {
@@ -46,4 +93,3 @@ export function getRequestClientIp(headers: Headers): string {
   if (realIp) return realIp.trim()
   return "unknown"
 }
-

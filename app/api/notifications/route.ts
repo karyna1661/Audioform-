@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { getSessionFromRequest } from "@/lib/server/auth-session"
+import { getCorsHeaders, hasAllowedApiOrigin } from "@/lib/server/cors"
 import {
   getNotificationConfigByUserId,
   upsertNotificationConfig,
 } from "@/lib/server/notification-store"
-import { hasTrustedOrigin } from "@/lib/server/request-guards"
+import { applyRateLimit, getRequestClientIp } from "@/lib/server/rate-limit"
 
 const configSchema = z.object({
   newResponse: z.boolean(),
@@ -32,21 +33,28 @@ export async function GET() {
 }
 
 export async function PUT(request: NextRequest) {
+  const corsHeaders = getCorsHeaders(request, { methods: "PUT, OPTIONS" })
   const session = await getSessionFromRequest()
   if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: corsHeaders })
   }
 
   try {
-    if (
-      !hasTrustedOrigin({
-        requestOrigin: request.headers.get("origin"),
-        requestReferer: request.headers.get("referer"),
-        requestUrl: request.url,
-        configuredAppUrl: process.env.NEXT_PUBLIC_APP_URL,
-      })
-    ) {
-      return NextResponse.json({ error: "Invalid request origin." }, { status: 403 })
+    if (!hasAllowedApiOrigin(request)) {
+      return NextResponse.json({ error: "Invalid request origin." }, { status: 403, headers: corsHeaders })
+    }
+
+    const ip = getRequestClientIp(request.headers)
+    const rate = await applyRateLimit({
+      key: `notifications:update:${session.sub}:${ip}`,
+      windowMs: 60_000,
+      max: 20,
+    })
+    if (!rate.allowed) {
+      return NextResponse.json(
+        { error: "Too many notification updates. Please retry shortly." },
+        { status: 429, headers: { ...corsHeaders, "Retry-After": String(rate.retryAfterSeconds) } },
+      )
     }
 
     const json = await request.json()
@@ -54,7 +62,7 @@ export async function PUT(request: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json(
         { error: "Invalid notification config payload", details: parsed.error.flatten() },
-        { status: 400 },
+        { status: 400, headers: corsHeaders },
       )
     }
 
@@ -63,8 +71,15 @@ export async function PUT(request: NextRequest) {
       ...parsed.data,
     })
 
-    return NextResponse.json({ success: true, config })
+    return NextResponse.json({ success: true, config }, { headers: corsHeaders })
   } catch {
-    return NextResponse.json({ error: "Failed to save notification settings." }, { status: 500 })
+    return NextResponse.json({ error: "Failed to save notification settings." }, { status: 500, headers: corsHeaders })
   }
+}
+
+export async function OPTIONS(request: NextRequest) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: getCorsHeaders(request, { methods: "PUT, OPTIONS" }),
+  })
 }

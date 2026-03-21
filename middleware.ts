@@ -31,6 +31,9 @@ export default function middleware(request: NextRequest) {
     pathname.startsWith('/_next') ||
     pathname === '/favicon.ico' ||
     pathname === '/health' ||
+    pathname === '/api/health' ||
+    pathname === '/ready' ||
+    pathname === '/api/ready' ||
     pathname.match(/\.(ico|png|jpg|jpeg|gif|svg|webp)$/i)
   ) {
     return NextResponse.next()
