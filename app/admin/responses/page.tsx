@@ -61,6 +61,7 @@ export default function AdminResponsesPage() {
   
   const surveyIdFilter = searchParams.get("surveyId") || undefined
   const focusMode = searchParams.get("focus")
+  const hasPendingExtraction = responses.some((response) => !response.insight && response.transcript?.status === "pending")
 
   useEffect(() => {
     if (status !== "authenticated") return
@@ -115,13 +116,13 @@ export default function AdminResponsesPage() {
       if (document.visibilityState === "visible") {
         void loadResponses()
       }
-    }, 10000)
+    }, hasPendingExtraction || extractingInsightId ? 4000 : 10000)
 
     return () => {
       cancelled = true
       window.clearInterval(intervalId)
     }
-  }, [status, surveyIdFilter, focusMode, user?.id])
+  }, [status, surveyIdFilter, focusMode, user?.id, hasPendingExtraction, extractingInsightId])
 
   const handlePlayResponse = (responseId: string) => {
     trackEvent("response_replayed", { response_id: responseId })
@@ -208,14 +209,27 @@ export default function AdminResponsesPage() {
         throw new Error("Failed to enqueue insight extraction.")
       }
 
+      setResponses((prev) =>
+        prev.map((item) =>
+          item.id === responseId
+            ? {
+                ...item,
+                transcript: item.transcript ?? {
+                  id: `pending-${responseId}`,
+                  status: "pending",
+                  text: null,
+                  provider: "openai",
+                  errorMessage: null,
+                },
+              }
+            : item,
+        ),
+      )
+
       trackEvent("response_bookmarked", {
         response_id: responseId,
         action: "extract_insight",
       })
-
-      window.setTimeout(() => {
-        window.location.reload()
-      }, 1500)
     } catch (err) {
       console.error("Failed to extract insight:", err)
       setError(err instanceof Error ? err.message : "Failed to extract insight.")
