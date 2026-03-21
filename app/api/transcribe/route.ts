@@ -2,7 +2,8 @@ import { type NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { getSessionFromRequest } from "@/lib/server/auth-session"
 import { getCorsHeaders, hasAllowedApiOrigin } from "@/lib/server/cors"
-import { enqueueTranscriptionJob, isBackgroundJobsEnabled } from "@/lib/server/job-queue"
+import { enqueueTranscriptionJob, isTranscriptionJobsEnabled } from "@/lib/server/job-queue"
+import { getRequestId, logServerError } from "@/lib/server/observability"
 import { applyRateLimit, getRequestClientIp } from "@/lib/server/rate-limit"
 import { transcribeAudioFile } from "@/lib/server/transcription-provider"
 
@@ -78,7 +79,7 @@ export async function POST(request: NextRequest) {
     }
 
     const asyncModeRequested = request.nextUrl.searchParams.get("mode") === "async"
-    if (asyncModeRequested && isBackgroundJobsEnabled()) {
+    if (asyncModeRequested && isTranscriptionJobsEnabled()) {
       if (audioFile.size > MAX_QUEUED_TRANSCRIPTION_BYTES) {
         return NextResponse.json(
           { error: `Queued transcription currently supports files up to ${Math.floor(MAX_QUEUED_TRANSCRIPTION_BYTES / (1024 * 1024))}MB.` },
@@ -109,7 +110,9 @@ export async function POST(request: NextRequest) {
       questionId: parsed.data.questionId,
     }, { headers: corsHeaders })
   } catch (error: any) {
-    console.error("Error transcribing audio:", error)
+    logServerError("api.transcribe", "transcription_failed", error, {
+      requestId: getRequestId(request.headers),
+    })
 
     return NextResponse.json(
       {

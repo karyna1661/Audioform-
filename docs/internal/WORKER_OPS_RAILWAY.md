@@ -10,15 +10,19 @@ Current queued workloads:
 
 - outbound email
 - optional async transcription
-- placeholder notification digests
+- notification digests
 - optional analytics fan-out
 
 ## Required environment variables
 
 - `REDIS_URL`
-- `ENABLE_BACKGROUND_JOBS=true`
-- SMTP credentials for email jobs
-- `OPENAI_API_KEY` if async transcription is enabled in production
+- one or more feature flags:
+  - `ENABLE_TRANSCRIPTION_JOBS=true`
+  - `ENABLE_EMAIL_JOBS=true`
+  - `ENABLE_ANALYTICS_JOBS=true`
+  - `ENABLE_NOTIFICATION_DIGEST_JOBS=true`
+- SMTP credentials only if email jobs are enabled
+- `OPENAI_API_KEY` only if transcription jobs are enabled
 - all standard app env vars already used by the web service
 
 ## Worker command
@@ -39,25 +43,31 @@ npm run worker:queue
 
 4. Copy the same env vars used by the web service
 5. Add `REDIS_URL`
-6. Set `ENABLE_BACKGROUND_JOBS=true`
+6. Set only the feature flags you actually want live
+
+Recommended safe first rollout:
+
+- `ENABLE_TRANSCRIPTION_JOBS=true`
+- leave email/digest flags off until SMTP/domain is ready
 
 ## Rollout checklist
 
 - Redis provisioned and reachable from Railway
 - Worker service deployed successfully
-- Web service has `ENABLE_BACKGROUND_JOBS=true`
+- Web service has the intended queue feature flags enabled
 - `/api/health` returns healthy
 - `/api/ready` returns ready
-- Email route returns `deliveryMode: queued`
 - Async transcription route returns `202` and `jobId` when called with `?mode=async`
+- Queue health shows transcription enabled
+- Enable email jobs only after SMTP is verified
 - Worker logs show job processing events
 
 ## Rollback
 
 If background jobs misbehave:
 
-1. Set `ENABLE_BACKGROUND_JOBS=false` on the web service
+1. Turn off the relevant feature flags on the web service
 2. Redeploy the web service
 3. Leave the worker idle or scale it down
 
-This returns email and transcription behavior to inline execution paths.
+This returns queued features to their inline or disabled execution paths.

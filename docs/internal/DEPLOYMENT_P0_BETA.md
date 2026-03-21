@@ -31,7 +31,9 @@ Recommended:
 - `B2_APPLICATION_KEY`
 - `B2_BUCKET_ID` or `B2_BUCKET_NAME`
 - `REDIS_URL`
-- `ENABLE_BACKGROUND_JOBS=true` (only when a queue worker is deployed)
+- queue feature flags as needed, for example:
+  - `ENABLE_TRANSCRIPTION_JOBS=true`
+  - `ENABLE_EMAIL_JOBS=true`
 - SMTP vars for notifications (optional)
 
 ## Step 3 — Deploy
@@ -62,13 +64,18 @@ npm run worker:queue
 Use this only after setting:
 
 - `REDIS_URL`
-- `ENABLE_BACKGROUND_JOBS=true`
+- optional feature flags such as `ENABLE_TRANSCRIPTION_JOBS=true`
 - SMTP credentials
 
 Current queue-backed jobs:
 
 - outbound email
 - optional async transcription via `/api/transcribe?mode=async`
+
+Safe first queue rollout recommendation:
+
+- enable transcription jobs first
+- leave email jobs off until SMTP/domain setup is complete
 
 ## Step 4 — Smoke test (10 minutes)
 

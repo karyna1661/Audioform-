@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { getSessionFromRequest } from "@/lib/server/auth-session"
 import { getCorsHeaders, hasAllowedApiOrigin } from "@/lib/server/cors"
-import { getJobResult, isBackgroundJobsEnabled } from "@/lib/server/job-queue"
+import { getJobResult, isTranscriptionJobsEnabled } from "@/lib/server/job-queue"
 
 export async function GET(request: NextRequest, context: { params: Promise<{ jobId: string }> }) {
   const corsHeaders = getCorsHeaders(request, { methods: "GET, OPTIONS" })
@@ -15,8 +15,8 @@ export async function GET(request: NextRequest, context: { params: Promise<{ job
     return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: corsHeaders })
   }
 
-  if (!isBackgroundJobsEnabled()) {
-    return NextResponse.json({ error: "Background jobs are not enabled." }, { status: 503, headers: corsHeaders })
+  if (!isTranscriptionJobsEnabled()) {
+    return NextResponse.json({ error: "Transcription jobs are not enabled." }, { status: 503, headers: corsHeaders })
   }
 
   const { jobId } = await context.params

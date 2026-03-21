@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto"
-import { enqueueAnalyticsJob, isBackgroundJobsEnabled } from "@/lib/server/job-queue"
+import { enqueueAnalyticsJob, isAnalyticsJobsEnabled } from "@/lib/server/job-queue"
+import { logServerError, retryAsync } from "@/lib/server/observability"
 
 export type AnalyticsEvent = {
   id: string
@@ -58,18 +59,34 @@ function resolveSupabaseConfig(): { url: string; key: string } {
 
 async function supabaseRequest<T>(pathValue: string, init?: RequestInit): Promise<T> {
   const { url, key } = resolveSupabaseConfig()
-  const response = await fetch(`${url}${pathValue}`, {
-    ...init,
-    headers: {
-      apikey: key,
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/json",
-      ...(init?.headers || {}),
+  const response = await retryAsync(
+    async () =>
+      fetch(`${url}${pathValue}`, {
+        ...init,
+        headers: {
+          apikey: key,
+          Authorization: `Bearer ${key}`,
+          "Content-Type": "application/json",
+          ...(init?.headers || {}),
+        },
+        cache: "no-store",
+      }),
+    {
+      attempts: 3,
+      timeoutMs: 8_000,
+      initialDelayMs: 250,
+      shouldRetry: (error) => error instanceof Error && /timed out|fetch failed/i.test(error.message),
     },
-    cache: "no-store",
-  })
+  )
+
   if (!response.ok) {
     const text = await response.text()
+    if (response.status >= 500 || response.status === 429) {
+      logServerError("server.analytics", "supabase_request_failed", new Error(`Supabase analytics request failed (${response.status})`), {
+        path: pathValue,
+        status: response.status,
+      })
+    }
     throw new Error(`Supabase analytics request failed (${response.status}): ${text.slice(0, 280)}`)
   }
   if (response.status === 204) return undefined as T
@@ -131,7 +148,7 @@ export async function recordOrQueueAnalyticsEvent(input: {
   | { mode: "queued"; jobId: string }
   | { mode: "inline"; event: AnalyticsEvent }
 > {
-  if (isBackgroundJobsEnabled()) {
+  if (isAnalyticsJobsEnabled()) {
     const job = await enqueueAnalyticsJob(input)
     return { mode: "queued", jobId: job.id }
   }

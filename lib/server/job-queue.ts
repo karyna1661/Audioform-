@@ -37,8 +37,34 @@ export type NotificationDigestJobPayload = {
   digestType: "daily" | "weekly"
 }
 
+function isQueueFeatureEnabled(flagName: string): boolean {
+  return isRedisConfigured() && process.env[flagName] === "true"
+}
+
 export function isBackgroundJobsEnabled(): boolean {
-  return isRedisConfigured() && process.env.ENABLE_BACKGROUND_JOBS === "true"
+  return isRedisConfigured() && [
+    process.env.ENABLE_BACKGROUND_JOBS === "true",
+    process.env.ENABLE_EMAIL_JOBS === "true",
+    process.env.ENABLE_TRANSCRIPTION_JOBS === "true",
+    process.env.ENABLE_ANALYTICS_JOBS === "true",
+    process.env.ENABLE_NOTIFICATION_DIGEST_JOBS === "true",
+  ].some(Boolean)
+}
+
+export function isEmailJobsEnabled(): boolean {
+  return isQueueFeatureEnabled("ENABLE_BACKGROUND_JOBS") || isQueueFeatureEnabled("ENABLE_EMAIL_JOBS")
+}
+
+export function isTranscriptionJobsEnabled(): boolean {
+  return isQueueFeatureEnabled("ENABLE_BACKGROUND_JOBS") || isQueueFeatureEnabled("ENABLE_TRANSCRIPTION_JOBS")
+}
+
+export function isAnalyticsJobsEnabled(): boolean {
+  return isQueueFeatureEnabled("ENABLE_BACKGROUND_JOBS") || isQueueFeatureEnabled("ENABLE_ANALYTICS_JOBS")
+}
+
+export function isNotificationDigestJobsEnabled(): boolean {
+  return isQueueFeatureEnabled("ENABLE_BACKGROUND_JOBS") || isQueueFeatureEnabled("ENABLE_NOTIFICATION_DIGEST_JOBS")
 }
 
 export async function enqueueJob<TPayload>(type: string, payload: TPayload, queueName = DEFAULT_QUEUE): Promise<JobEnvelope<TPayload>> {
@@ -96,6 +122,12 @@ export async function getQueueObservability() {
 
   return {
     enabled: isBackgroundJobsEnabled(),
+    features: {
+      email: isEmailJobsEnabled(),
+      transcription: isTranscriptionJobsEnabled(),
+      analytics: isAnalyticsJobsEnabled(),
+      notificationDigests: isNotificationDigestJobsEnabled(),
+    },
     queueLength: typeof queueLength === "number" ? queueLength : Number.parseInt(String(queueLength), 10) || 0,
     metrics: Object.fromEntries(metricValues),
   }
