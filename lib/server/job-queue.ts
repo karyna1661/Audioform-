@@ -19,6 +19,7 @@ export type EmailJobPayload = {
 
 export type TranscriptionJobPayload = {
   questionId: string
+  responseId?: string | null
   mimeType: string
   fileName: string
   audioBase64: string

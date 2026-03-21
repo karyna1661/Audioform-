@@ -6,9 +6,11 @@ import { enqueueTranscriptionJob, isTranscriptionJobsEnabled } from "@/lib/serve
 import { getRequestId, logServerError } from "@/lib/server/observability"
 import { applyRateLimit, getRequestClientIp } from "@/lib/server/rate-limit"
 import { transcribeAudioFile } from "@/lib/server/transcription-provider"
+import { completeTranscript, createPendingTranscript } from "@/lib/server/transcript-store"
 
 const requestSchema = z.object({
   questionId: z.string().min(1),
+  responseId: z.string().uuid().optional(),
 })
 
 const ALLOWED_AUDIO_MIME = new Set([
@@ -54,6 +56,7 @@ export async function POST(request: NextRequest) {
     const audioFile = formData.get("audio") as File
     const parsed = requestSchema.safeParse({
       questionId: formData.get("questionId"),
+      responseId: formData.get("responseId") || undefined,
     })
 
     if (!audioFile || !parsed.success) {
@@ -90,9 +93,17 @@ export async function POST(request: NextRequest) {
       const buffer = Buffer.from(await audioFile.arrayBuffer())
       const job = await enqueueTranscriptionJob({
         questionId: parsed.data.questionId,
+        responseId: parsed.data.responseId ?? null,
         mimeType: audioFile.type || "application/octet-stream",
         fileName: audioFile.name || `${parsed.data.questionId}.audio`,
         audioBase64: buffer.toString("base64"),
+      })
+
+      await createPendingTranscript({
+        jobId: job.id,
+        responseId: parsed.data.responseId ?? null,
+        questionId: parsed.data.questionId,
+        provider: "openai",
       })
 
       return NextResponse.json({
@@ -104,6 +115,16 @@ export async function POST(request: NextRequest) {
     }
 
     const transcription = await transcribeAudioFile(audioFile)
+    if (parsed.data.responseId) {
+      const syncJobId = `sync-${parsed.data.responseId}-${Date.now()}`
+      await createPendingTranscript({
+        jobId: syncJobId,
+        responseId: parsed.data.responseId,
+        questionId: parsed.data.questionId,
+        provider: "openai",
+      })
+      await completeTranscript(syncJobId, transcription, "openai")
+    }
     return NextResponse.json({
       success: true,
       transcription,

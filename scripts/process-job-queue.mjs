@@ -50,6 +50,33 @@ async function setJobResult(jobId, value, ttlSeconds = 3600) {
   await runRedisCommand(["SETEX", `audioform:job-result:${jobId}`, String(ttlSeconds), JSON.stringify(value)])
 }
 
+async function completeTranscript(jobId, transcriptText, provider = "openai") {
+  await supabaseRequest(`/rest/v1/response_transcripts?job_id=eq.${encodeURIComponent(jobId)}`, {
+    method: "PATCH",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({
+      status: "completed",
+      transcript_text: transcriptText,
+      provider,
+      error_message: null,
+      updated_at: new Date().toISOString(),
+    }),
+  })
+}
+
+async function failTranscript(jobId, errorMessage, provider = "openai") {
+  await supabaseRequest(`/rest/v1/response_transcripts?job_id=eq.${encodeURIComponent(jobId)}`, {
+    method: "PATCH",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({
+      status: "failed",
+      provider,
+      error_message: errorMessage,
+      updated_at: new Date().toISOString(),
+    }),
+  })
+}
+
 async function incrementQueueMetric(metric) {
   await runRedisCommand(["INCR", `audioform:queue-metric:${metric}`])
 }
@@ -359,17 +386,26 @@ async function processNext() {
   }
 
   if (envelope.type === "transcription.process") {
-    const transcription = await transcribeAudioPayload(envelope.payload)
-    await setJobResult(envelope.id, {
-      success: true,
-      transcription,
-      questionId: envelope.payload.questionId,
-      completedAt: new Date().toISOString(),
-    })
-    await incrementQueueMetric("transcriptions")
-    await incrementQueueMetric("processed")
-    console.log(`[queue-worker] processed ${envelope.type}`, { id: envelope.id })
-    return true
+    try {
+      const transcription = await transcribeAudioPayload(envelope.payload)
+      await completeTranscript(envelope.id, transcription, "openai")
+      await setJobResult(envelope.id, {
+        success: true,
+        transcription,
+        questionId: envelope.payload.questionId,
+        responseId: envelope.payload.responseId ?? null,
+        completedAt: new Date().toISOString(),
+      })
+      await incrementQueueMetric("transcriptions")
+      await incrementQueueMetric("processed")
+      console.log(`[queue-worker] processed ${envelope.type}`, { id: envelope.id })
+      return true
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      await failTranscript(envelope.id, message, "openai").catch(() => {})
+      await incrementQueueMetric("failed")
+      throw error
+    }
   }
 
   if (envelope.type === "analytics.record") {
