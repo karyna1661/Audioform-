@@ -214,7 +214,94 @@ async function processAnalyticsJob(payload) {
 }
 
 async function processNotificationDigestJob(payload) {
-  console.log("[queue-worker] digest placeholder", payload)
+  const [configRows, userRows, surveyRows] = await Promise.all([
+    supabaseRequest(
+      `/rest/v1/notification_configs?user_id=eq.${encodeURIComponent(payload.userId)}&select=user_id,new_response,completed_questionnaire,daily_summary,weekly_summary,template_subject,template_body,recipients,updated_at&limit=1`,
+    ),
+    supabaseRequest(
+      `/rest/v1/users?id=eq.${encodeURIComponent(payload.userId)}&select=id,name,email&limit=1`,
+    ),
+    supabaseRequest(
+      `/rest/v1/surveys?created_by=eq.${encodeURIComponent(payload.userId)}&select=id,title,status&order=updated_at.desc`,
+    ),
+  ])
+
+  const config = Array.isArray(configRows) ? configRows[0] : null
+  const user = Array.isArray(userRows) ? userRows[0] : null
+  const surveys = Array.isArray(surveyRows) ? surveyRows : []
+
+  if (!user) {
+    console.warn("[queue-worker] digest skipped: missing user", payload.userId)
+    return
+  }
+
+  if (!config) {
+    console.warn("[queue-worker] digest skipped: missing config", payload.userId)
+    return
+  }
+
+  const digestEnabled = payload.digestType === "daily" ? config.daily_summary : config.weekly_summary
+  if (!digestEnabled) {
+    console.log("[queue-worker] digest skipped: disabled", payload)
+    return
+  }
+
+  const recipientList = Array.isArray(config.recipients) && config.recipients.length ? config.recipients : [user.email]
+  const surveyIds = surveys.map((survey) => survey.id)
+  let responseCount = 0
+
+  if (surveyIds.length) {
+    const since = new Date(
+      Date.now() - (payload.digestType === "daily" ? 24 : 7 * 24) * 60 * 60 * 1000,
+    ).toISOString()
+    const countResponse = await fetch(
+      `${resolveSupabaseConfig().url}/rest/v1/response_records?survey_id=in.(${surveyIds.map((id) => encodeURIComponent(id)).join(",")})&status=eq.uploaded&created_at=gte.${since}&select=id`,
+      {
+        method: "HEAD",
+        headers: {
+          apikey: resolveSupabaseConfig().key,
+          Authorization: `Bearer ${resolveSupabaseConfig().key}`,
+          Prefer: "count=exact",
+          Range: "0-0",
+        },
+      },
+    )
+    if (countResponse.ok) {
+      const contentRange = countResponse.headers.get("content-range")
+      const total = contentRange?.split("/")[1]
+      responseCount = total ? Number.parseInt(total, 10) || 0 : 0
+    }
+  }
+
+  const publishedCount = surveys.filter((survey) => survey.status === "published").length
+  const subject = `${payload.digestType === "daily" ? "Daily" : "Weekly"} Audioform digest`
+  const text = [
+    `Hi ${user.name || "there"},`,
+    "",
+    `Here is your ${payload.digestType} Audioform digest.`,
+    `Surveys: ${surveys.length}`,
+    `Published surveys: ${publishedCount}`,
+    `New uploaded responses: ${responseCount}`,
+    "",
+    "Open your dashboard to review the latest voice feedback.",
+  ].join("\n")
+
+  await processEmailJob({
+    to: recipientList,
+    subject,
+    text,
+    html: `<div style="font-family:sans-serif;max-width:640px;margin:0 auto;">
+      <h1 style="font-size:22px;margin-bottom:12px;">${subject}</h1>
+      <p style="line-height:1.6;">Hi ${user.name || "there"},</p>
+      <p style="line-height:1.6;">Here is your ${payload.digestType} Audioform digest.</p>
+      <ul style="line-height:1.8; padding-left: 18px;">
+        <li>Surveys: ${surveys.length}</li>
+        <li>Published surveys: ${publishedCount}</li>
+        <li>New uploaded responses: ${responseCount}</li>
+      </ul>
+      <p style="line-height:1.6;">Open your dashboard to review the latest voice feedback.</p>
+    </div>`,
+  })
 }
 
 async function transcribeAudioPayload(payload) {
