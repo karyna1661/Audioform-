@@ -73,7 +73,7 @@ Make Railway use the SAME database as localhost:
 1. In Railway dashboard, set these variables:
    ```bash
    SUPABASE_URL=https://kzjfvgptagccpkjvguwf.supabase.co
-   SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+   SUPABASE_SERVICE_ROLE_KEY=<REDACTED_SERVICE_ROLE_KEY>
    ```
 
 2. Your local users will now work on Railway

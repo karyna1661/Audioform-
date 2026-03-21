@@ -1,25 +1,25 @@
 # Audioform
 
-Audioform is a voice feedback platform for builders who ship in public. It helps teams publish short voice surveys, collect spoken responses, and review higher-signal feedback with more context than text forms.
+Audioform is a voice feedback platform for founders and product teams who want richer feedback than forms can capture. Teams publish short voice surveys, collect spoken responses, and review signal faster with replayable context.
 
-## What It Does
+## Features
 
-- Create and publish voice surveys with builder-focused prompt templates
-- Collect spoken responses from desktop and mobile respondents
-- Store and review responses with replay, moderation, and bookmarking workflows
-- Share surveys directly or embed them in external sites
-- Track survey and response activity across admin surfaces
+- Publish short voice surveys with builder-focused prompt guidance
+- Collect spoken responses across desktop and mobile
+- Review responses with playback, flagging, and high-signal triage
+- Share surveys with rich social previews or embed them on external sites
+- Track response activity across admin dashboards
 
-## Product Direction
+## Product Focus
 
-Audioform is built around one idea: better questions create better voice responses, which creates better product decisions.
+Audioform is built around one core loop:
 
-The current product focuses on:
+1. Ask a better prompt
+2. Capture a spoken response
+3. Replay the exact customer moment
+4. Decide what to improve next
 
-- decision-ready feedback loops
-- short, high-signal question sets
-- replayable response review for builders
-- AI-optional workflows now, with AI-assisted insight extraction later
+The product currently emphasizes short prompt sets, first-response speed, and decision-ready feedback loops.
 
 ## Tech Stack
 
@@ -27,96 +27,63 @@ The current product focuses on:
 - `React 19`
 - `TypeScript`
 - `Tailwind CSS`
-- Supabase REST-backed persistence for surveys and responses
-- Backblaze B2 for production audio storage when configured
-- Remotion for video/demo rendering workflows
+- Supabase-backed persistence for surveys and responses
+- Backblaze B2 for production audio storage
 
 ## Core App Areas
 
-- `app/admin/questionnaires/v1/page.tsx` - survey creation flow
-- `app/questionnaire/v1/page.tsx` - respondent voice survey flow
-- `app/admin/responses/page.tsx` - response review experience
-- `app/api/surveys` - survey CRUD and publishing
-- `app/api/responses/init` and `app/api/responses/upload` - 2-phase response upload pipeline
-- `lib/server/response-store.ts` - response persistence and storage coordination
+- `app/admin/questionnaires/v1/page.tsx` - survey builder
+- `app/questionnaire/v1/page.tsx` - respondent survey entry
+- `app/questionnaire/v1/questionnaire-client.tsx` - respondent upload and completion flow
+- `app/admin/responses/page.tsx` - response inbox
+- `app/share/survey/[surveyId]/page.tsx` - social share landing page
+- `app/api/responses/init` + `app/api/responses/upload` - 2-phase upload pipeline
 
-## Local Development
-
-1. Install dependencies:
+## Quick Start
 
 ```bash
 npm install
-```
-
-2. Create a local `.env` with the required variables.
-
-3. Start the app:
-
-```bash
 npm run dev
 ```
 
-4. Open the app in your browser.
+Create a local `.env` first, then open the app in your browser.
 
-## Important Environment Variables
+## Required Environment Variables
 
-Required for core app behavior:
+Core:
 
 - `AUTH_SESSION_SECRET`
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `NEXT_PUBLIC_APP_URL`
 
-Used for integrations and production workflows:
+Storage / integrations:
 
 - `B2_KEY_ID`
 - `B2_APPLICATION_KEY`
 - `B2_BUCKET_ID` or `B2_BUCKET_NAME`
-- `GOOGLE_CLIENT_ID`
-- `GOOGLE_CLIENT_SECRET`
-- `APIFY_TOKEN`
-- `NEXT_PUBLIC_AUDIOFORM_FEEDBACK_SURVEY_ID`
 
-Optional right now:
-
-- `NEXT_PUBLIC_PRIVY_APP_ID`
-- `PRIVY_VERIFICATION_KEY`
-
-Validate env setup with:
+Validate environment setup with:
 
 ```bash
 npm run validate:env
 ```
 
-## Scripts
+## Useful Scripts
 
-- `npm run dev` - validate env and run local development server
-- `npm run build` - validate env and create a production build
-- `npm run start` - run the production server
-- `npm run verify` - runtime guard, secret guard, and TypeScript check
-- `npm run gtm:brief` - generate weekly GTM brief
-- `npm run video:preview` - open Remotion studio
+- `npm run dev` - run local development
+- `npm run build` - build for production
+- `npm run start` - run production server
+- `npm run verify` - type-check and runtime guards
 
-## Upload Pipeline
+## Documentation
 
-Respondent audio now uses a 2-phase flow:
-
-1. `POST /api/responses/init` creates a pending `response_records` row
-2. `POST /api/responses/upload` uploads audio and finalizes the record
-
-In development, audio files are written to `uploads/audio-responses/`.
-In production, audio can be stored in Backblaze B2 when configured.
-
-## Documentation Map
-
-Start here:
-
-- `README_DOCUMENTATION.md` - documentation index
-- `QUICK_START_GUIDE.md` - operator walkthrough
-- `BUILD_SUMMARY.md` - implementation and architecture summary
-- `USER_FLOW_WALKTHROUGH.md` - builder and respondent journeys
+- `docs/README.md` - documentation index
+- `docs/product/QUESTION_INTELLIGENCE_SYSTEM.md` - builder prompt system
+- `docs/product/USER_FLOW_WALKTHROUGH.md` - builder and respondent journeys
+- `docs/internal/DEPLOYMENT_P0_BETA.md` - deployment runbook
 - `future-work/` - roadmap, GTM, and scalability planning
 
-## Current Status
+## Status
 
-The repo contains active product code, deployment notes, migration files, and future planning docs. Some historical docs remain in the root for reference, so treat `future-work/` and current route files as the best source of truth for product direction.
+The repository contains the current beta candidate of Audioform plus supporting docs for product, deployment, and future planning.

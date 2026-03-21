@@ -75,7 +75,7 @@
 | `NEXT_PUBLIC_PRIVY_APP_ID` | Privy authentication | `cmf6o0wqr01j7jo...` |
 | `PRIVY_VERIFICATION_KEY` | Token verification | `-----BEGIN PUBLIC KEY-----...` |
 | `SUPABASE_URL` | Database location | `https://kzjfvgptagccpkjvguwf.supabase.co` |
-| `SUPABASE_SERVICE_ROLE_KEY` | Database admin key | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` |
+| `SUPABASE_SERVICE_ROLE_KEY` | Database admin key | `<REDACTED_SERVICE_ROLE_KEY>` |
 | `NEXT_PUBLIC_APP_URL` | App base URL | `https://audioform-beta.up.railway.app` |
 
 ### Optional (Features Limited If Missing)

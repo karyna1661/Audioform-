@@ -80,4 +80,3 @@ If you want database-enforced tenant isolation for normal application traffic, y
 - Confirm `NEXT_PUBLIC_*` values contain no credentials.
 - Confirm old credentials fail after rotation.
 - Re-test login, signup, survey CRUD, response moderation, and audio playback.
-

@@ -365,10 +365,10 @@ Forms/API calls lack CSRF tokens. Session cookies are `SameSite: lax` which help
 
 ### Attack Scenario 1: Service Role Key Extraction
 1. Attacker gains access to `.env` file (via XSS, log leak, or insider threat)
-2. Extracts `SUPABASE_SERVICE_ROLE=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`
+2. Extracts `SUPABASE_SERVICE_ROLE=<REDACTED_SERVICE_ROLE_KEY>`
 3. Makes direct Supabase REST call:
    ```bash
-   curl -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
+   curl -H "Authorization: Bearer <REDACTED_SERVICE_ROLE_KEY>" \
         https://kzjfvgptagccpkjvguwf.supabase.co/rest/v1/response_records?select=*
    ```
 4. Downloads ALL audio recordings, user IDs, metadata

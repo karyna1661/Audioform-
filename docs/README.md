@@ -1,11 +1,28 @@
 # Documentation Index
 
-## Canonical docs (start here)
+This repo keeps the public GitHub surface intentionally small. Most operator notes, incident writeups, and historical rollout docs now live under structured docs folders.
 
-- `docs/DEPLOYMENT_P0_BETA.md`: Single source of truth for deploying to Railway + verification.
-- `docs/DATABASE_SETUP_SUPABASE.md`: Single source of truth for running database schema/migrations in Supabase.
+## Start Here
 
-## Notes
+- `README.md` - product overview, setup, scripts, and current architecture map
+- `docs/product/QUESTION_INTELLIGENCE_SYSTEM.md` - survey-builder prompt system
+- `docs/product/USER_FLOW_WALKTHROUGH.md` - builder and respondent journey map
+- `future-work/` - roadmap, GTM, and scalability planning
 
-- Several older root-level docs were consolidated into the canonical docs above and now exist as short pointers.
+## Product Docs
+
+- `docs/product/QUESTION_INTELLIGENCE_SYSTEM.md`
+- `docs/product/USER_FLOW_WALKTHROUGH.md`
+- `docs/product/SURVEY_QUALITY_ENHANCEMENT_SUMMARY.md`
+
+## Internal Runbooks
+
+- `docs/internal/QUICK_START_GUIDE.md`
+- `docs/internal/DEPLOYMENT_P0_BETA.md`
+- `docs/internal/DATABASE_SETUP_SUPABASE.md`
+- `docs/internal/security/`
+
+## Archive
+
+- `docs/archive/` contains incident notes, old launch status docs, fix summaries, migration notes, and deployment history that are still useful internally but should not dominate the repo root.
 
