@@ -4,6 +4,48 @@ import { Socket } from "node:net"
 import { connect as connectTls } from "node:tls"
 import nodemailer from "nodemailer"
 
+function decodeJwtPayload(token) {
+  const parts = token.split(".")
+  if (parts.length < 2) return null
+  try {
+    const payload = parts[1].replace(/-/g, "+").replace(/_/g, "/")
+    const padded = payload + "=".repeat((4 - (payload.length % 4)) % 4)
+    return JSON.parse(Buffer.from(padded, "base64").toString("utf8"))
+  } catch {
+    return null
+  }
+}
+
+function resolveSupabaseConfig() {
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE || ""
+  const explicitUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || ""
+  if (explicitUrl && key) return { url: explicitUrl.replace(/\/+$/, ""), key }
+  const payload = key ? decodeJwtPayload(key) : null
+  const ref = typeof payload?.ref === "string" ? payload.ref : ""
+  if (ref && key) return { url: `https://${ref}.supabase.co`, key }
+  throw new Error("Missing Supabase config for queue worker")
+}
+
+async function supabaseRequest(path, init = {}) {
+  const { url, key } = resolveSupabaseConfig()
+  const response = await fetch(`${url}${path}`, {
+    ...init,
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+      ...(init.headers || {}),
+    },
+    cache: "no-store",
+  })
+  if (!response.ok) {
+    const text = await response.text().catch(() => "")
+    throw new Error(`Supabase queue request failed (${response.status}): ${text.slice(0, 280)}`)
+  }
+  if (response.status === 204) return null
+  return response.json()
+}
+
 async function setJobResult(jobId, value, ttlSeconds = 3600) {
   await runRedisCommand(["SETEX", `audioform:job-result:${jobId}`, String(ttlSeconds), JSON.stringify(value)])
 }
@@ -153,6 +195,28 @@ async function processEmailJob(payload) {
   })
 }
 
+async function processAnalyticsJob(payload) {
+  await supabaseRequest("/rest/v1/analytics_events", {
+    method: "POST",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify([
+      {
+        id: crypto.randomUUID(),
+        event_name: payload.eventName,
+        user_id: payload.userId ?? null,
+        survey_id: payload.surveyId ?? null,
+        response_id: payload.responseId ?? null,
+        event_data: payload.eventData ?? {},
+        timestamp: new Date().toISOString(),
+      },
+    ]),
+  })
+}
+
+async function processNotificationDigestJob(payload) {
+  console.log("[queue-worker] digest placeholder", payload)
+}
+
 async function transcribeAudioPayload(payload) {
   if (!process.env.OPENAI_API_KEY) {
     if (process.env.NODE_ENV === "production") {
@@ -207,6 +271,18 @@ async function processNext() {
       questionId: envelope.payload.questionId,
       completedAt: new Date().toISOString(),
     })
+    console.log(`[queue-worker] processed ${envelope.type}`, { id: envelope.id })
+    return true
+  }
+
+  if (envelope.type === "analytics.record") {
+    await processAnalyticsJob(envelope.payload)
+    console.log(`[queue-worker] processed ${envelope.type}`, { id: envelope.id })
+    return true
+  }
+
+  if (envelope.type === "notification.digest") {
+    await processNotificationDigestJob(envelope.payload)
     console.log(`[queue-worker] processed ${envelope.type}`, { id: envelope.id })
     return true
   }

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto"
+import { enqueueAnalyticsJob, isBackgroundJobsEnabled } from "@/lib/server/job-queue"
 
 export type AnalyticsEvent = {
   id: string
@@ -118,6 +119,25 @@ export async function recordAnalyticsEvent(input: {
 
   if (!rows.length) throw new Error("Failed to persist analytics event.")
   return mapRow(rows[0])
+}
+
+export async function recordOrQueueAnalyticsEvent(input: {
+  eventName: string
+  userId?: string | null
+  surveyId?: string | null
+  responseId?: string | null
+  eventData?: Record<string, unknown>
+}): Promise<
+  | { mode: "queued"; jobId: string }
+  | { mode: "inline"; event: AnalyticsEvent }
+> {
+  if (isBackgroundJobsEnabled()) {
+    const job = await enqueueAnalyticsJob(input)
+    return { mode: "queued", jobId: job.id }
+  }
+
+  const event = await recordAnalyticsEvent(input)
+  return { mode: "inline", event }
 }
 
 /**

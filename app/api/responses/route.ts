@@ -27,7 +27,6 @@ import { findUserById } from "@/lib/server/auth-store"
 import { sendOrQueueEmail } from "@/lib/server/queued-email"
 import { getCorsHeaders, hasAllowedApiOrigin } from "@/lib/server/cors"
 import { applyRateLimit, getRequestClientIp } from "@/lib/server/rate-limit"
-import { hasTrustedOrigin } from "@/lib/server/request-guards"
 
 const uploadSchema = z.object({
   questionId: z.string().min(1),
@@ -383,32 +382,25 @@ export async function PATCH(request: NextRequest) {
   }
 
   try {
-    if (
-      !hasTrustedOrigin({
-        requestOrigin: request.headers.get("origin"),
-        requestReferer: request.headers.get("referer"),
-        requestUrl: request.url,
-        configuredAppUrl: process.env.NEXT_PUBLIC_APP_URL,
-      })
-    ) {
-      return NextResponse.json({ error: "Invalid request origin." }, { status: 403 })
+    if (!hasAllowedApiOrigin(request)) {
+      return NextResponse.json({ error: "Invalid request origin." }, { status: 403, headers: corsHeaders })
     }
 
     const json = await request.json()
     const parsed = moderationSchema.safeParse(json)
     if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid moderation payload", details: parsed.error.flatten() }, { status: 400 })
+      return NextResponse.json({ error: "Invalid moderation payload", details: parsed.error.flatten() }, { status: 400, headers: corsHeaders })
     }
 
     const { id, flagged, highSignal, bookmarked } = parsed.data
     if (flagged === undefined && highSignal === undefined && bookmarked === undefined) {
-      return NextResponse.json({ error: "No moderation fields provided." }, { status: 400 })
+      return NextResponse.json({ error: "No moderation fields provided." }, { status: 400, headers: corsHeaders })
     }
 
     const ownedSurveyIds = (await listSurveys({ createdBy: session.sub })).map((survey) => survey.id)
     const existing = await getStoredResponseByIdForSurveyIds(id, ownedSurveyIds)
     if (!existing) {
-      return NextResponse.json({ error: "Response not found." }, { status: 404 })
+      return NextResponse.json({ error: "Response not found." }, { status: 404, headers: corsHeaders })
     }
 
     const updated = await updateStoredResponseForSurveyIds(id, ownedSurveyIds, {
@@ -417,7 +409,7 @@ export async function PATCH(request: NextRequest) {
       bookmarked,
     })
     if (!updated) {
-      return NextResponse.json({ error: "Response not found." }, { status: 404 })
+      return NextResponse.json({ error: "Response not found." }, { status: 404, headers: corsHeaders })
     }
 
     return NextResponse.json({
@@ -436,10 +428,10 @@ export async function PATCH(request: NextRequest) {
         moderationUpdatedAt: updated.moderationUpdatedAt,
         timestamp: updated.createdAt,
       },
-    })
+    }, { headers: corsHeaders })
   } catch (error) {
     console.error("Error updating response moderation:", error)
-    return NextResponse.json({ error: "Failed to update response moderation." }, { status: 500 })
+    return NextResponse.json({ error: "Failed to update response moderation." }, { status: 500, headers: corsHeaders })
   }
 }
 
@@ -457,22 +449,15 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: "Missing response id." }, { status: 400 })
   }
 
-  if (
-    !hasTrustedOrigin({
-      requestOrigin: request.headers.get("origin"),
-      requestReferer: request.headers.get("referer"),
-      requestUrl: request.url,
-      configuredAppUrl: process.env.NEXT_PUBLIC_APP_URL,
-    })
-  ) {
-    return NextResponse.json({ error: "Invalid request origin." }, { status: 403 })
+  if (!hasAllowedApiOrigin(request)) {
+    return NextResponse.json({ error: "Invalid request origin." }, { status: 403, headers: corsHeaders })
   }
 
   const ownedSurveyIds = (await listSurveys({ createdBy: session.sub })).map((survey) => survey.id)
   const deleted = await deleteStoredResponseForSurveyIds(id, ownedSurveyIds)
   if (!deleted) {
-    return NextResponse.json({ error: "Response not found." }, { status: 404 })
+    return NextResponse.json({ error: "Response not found." }, { status: 404, headers: corsHeaders })
   }
 
-  return NextResponse.json({ success: true })
+  return NextResponse.json({ success: true }, { headers: corsHeaders })
 }

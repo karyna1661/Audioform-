@@ -24,6 +24,19 @@ export type TranscriptionJobPayload = {
   audioBase64: string
 }
 
+export type AnalyticsJobPayload = {
+  eventName: string
+  userId?: string | null
+  surveyId?: string | null
+  responseId?: string | null
+  eventData?: Record<string, unknown>
+}
+
+export type NotificationDigestJobPayload = {
+  userId: string
+  digestType: "daily" | "weekly"
+}
+
 export function isBackgroundJobsEnabled(): boolean {
   return isRedisConfigured() && process.env.ENABLE_BACKGROUND_JOBS === "true"
 }
@@ -46,6 +59,16 @@ export async function enqueueEmailJob(payload: EmailJobPayload): Promise<JobEnve
 
 export async function enqueueTranscriptionJob(payload: TranscriptionJobPayload): Promise<JobEnvelope<TranscriptionJobPayload>> {
   return enqueueJob("transcription.process", payload)
+}
+
+export async function enqueueAnalyticsJob(payload: AnalyticsJobPayload): Promise<JobEnvelope<AnalyticsJobPayload>> {
+  return enqueueJob("analytics.record", payload)
+}
+
+export async function enqueueNotificationDigestJob(
+  payload: NotificationDigestJobPayload,
+): Promise<JobEnvelope<NotificationDigestJobPayload>> {
+  return enqueueJob("notification.digest", payload)
 }
 
 export async function setJobResult(jobId: string, value: unknown, ttlSeconds = 3600): Promise<void> {

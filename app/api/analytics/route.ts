@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { z } from "zod"
-import { recordAnalyticsEvent } from "@/lib/server/analytics-store"
+import { recordOrQueueAnalyticsEvent } from "@/lib/server/analytics-store"
 import { getSessionFromRequest } from "@/lib/server/auth-session"
 import { getCorsHeaders, hasAllowedApiOrigin } from "@/lib/server/cors"
 import { applyRateLimit, getRequestClientIp } from "@/lib/server/rate-limit"
@@ -45,8 +45,7 @@ export async function POST(request: NextRequest) {
 
     const session = await getSessionFromRequest()
     
-    // Record event to database
-    await recordAnalyticsEvent({
+    const result = await recordOrQueueAnalyticsEvent({
       eventName: parsed.data.eventName,
       userId: session?.sub ?? null,
       surveyId: parsed.data.surveyId ?? null,
@@ -54,7 +53,14 @@ export async function POST(request: NextRequest) {
       eventData: parsed.data.eventData ?? {},
     })
 
-    return NextResponse.json({ success: true }, { headers: corsHeaders })
+    return NextResponse.json(
+      {
+        success: true,
+        deliveryMode: result.mode,
+        jobId: result.mode === "queued" ? result.jobId : null,
+      },
+      { headers: corsHeaders },
+    )
   } catch (error) {
     console.error("Failed to record analytics event:", error)
     return NextResponse.json({ error: "Failed to record event" }, { status: 500, headers: corsHeaders })
