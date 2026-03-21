@@ -21,7 +21,7 @@ export default function Home() {
   // Homepage feedback survey - always points to official Audioform feedback survey
   const feedbackSurveyId = process.env.NEXT_PUBLIC_AUDIOFORM_FEEDBACK_SURVEY_ID
   const homepageQuestionnaireHref = feedbackSurveyId
-    ? `/questionnaire/v1?surveyId=${encodeURIComponent(feedbackSurveyId)}&t=${Date.now()}`
+    ? `/share/survey/${encodeURIComponent(feedbackSurveyId)}`
     : "/questionnaire/v1"
   
   // Admin dashboard preview - points to user's active survey
