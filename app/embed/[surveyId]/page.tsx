@@ -23,12 +23,48 @@ type PromptItem = {
   text: string
 }
 
+type UploadSession = {
+  responseId: string
+  idempotencyKey: string
+  sessionId: string
+  uploadUrl: string
+}
+
 function buildPrompts(survey: PublicSurvey): PromptItem[] {
   if (!Array.isArray(survey.questions) || survey.questions.length === 0) return []
   return survey.questions.slice(0, 8).map((text, index) => ({
     id: `q${index + 1}`,
     text,
   }))
+}
+
+async function initializeUploadSession(surveyId: string, questionId: string): Promise<UploadSession> {
+  const initController = new AbortController()
+  const initTimeout = window.setTimeout(() => initController.abort(), 15000)
+  const initResponse = await fetch("/api/responses/init", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ surveyId, questionId }),
+    credentials: "include",
+    signal: initController.signal,
+  }).finally(() => window.clearTimeout(initTimeout))
+
+  if (!initResponse.ok) {
+    const errorPayload = (await initResponse.json().catch(() => null)) as { error?: string } | null
+    throw new Error(errorPayload?.error || "Failed to initialize your upload.")
+  }
+
+  const initPayload = (await initResponse.json()) as Partial<UploadSession>
+  if (!initPayload.responseId || !initPayload.idempotencyKey || !initPayload.sessionId || !initPayload.uploadUrl) {
+    throw new Error("Upload session payload missing.")
+  }
+
+  return {
+    responseId: initPayload.responseId,
+    idempotencyKey: initPayload.idempotencyKey,
+    sessionId: initPayload.sessionId,
+    uploadUrl: initPayload.uploadUrl,
+  }
 }
 
 export default function EmbedSurveyPage() {
@@ -49,6 +85,7 @@ export default function EmbedSurveyPage() {
   const [recordingDurations, setRecordingDurations] = useState<Record<string, number>>({})
   const [recorderSubmitState, setRecorderSubmitState] = useState<"idle" | "uploading" | "error" | "success">("idle")
   const isMountedRef = useRef(true)
+  const uploadSessionsRef = useRef<Record<string, UploadSession>>({})
 
   useEffect(() => {
     return () => {
@@ -81,53 +118,35 @@ export default function EmbedSurveyPage() {
   const prompts = useMemo(() => (survey ? buildPrompts(survey) : []), [survey])
   const currentPrompt = prompts[index]
 
-  const uploadResponse = async (questionId: string, blob: Blob, durationSeconds: number | null, attempt = 1): Promise<boolean> => {
+  const uploadResponse = async (
+    questionId: string,
+    blob: Blob,
+    durationSeconds: number | null,
+    attempt = 1,
+    existingSession?: UploadSession,
+  ): Promise<boolean> => {
     if (isMountedRef.current) {
       setPendingUploads((value) => value + 1)
     }
     try {
-      const initController = new AbortController()
-      const initTimeout = window.setTimeout(() => initController.abort(), 15000)
-      const initResponse = await fetch("/api/responses/init", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ surveyId, questionId }),
-        credentials: "include",
-        signal: initController.signal,
-      }).finally(() => window.clearTimeout(initTimeout))
-
-      if (!initResponse.ok) {
-        const errorPayload = (await initResponse.json().catch(() => null)) as { error?: string } | null
-        throw new Error(errorPayload?.error || "Failed to initialize your upload.")
-      }
-
-      const initPayload = (await initResponse.json()) as {
-        responseId?: string
-        idempotencyKey?: string
-        sessionId?: string
-        uploadUrl?: string
-      }
-
-      if (!initPayload.responseId || !initPayload.idempotencyKey || !initPayload.sessionId || !initPayload.uploadUrl) {
-        throw new Error("Upload session payload missing.")
-      }
+      const session = existingSession || uploadSessionsRef.current[questionId] || await initializeUploadSession(surveyId, questionId)
+      uploadSessionsRef.current[questionId] = session
 
       const formData = new FormData()
       formData.append("audio", blob, `${questionId}-${Date.now()}.webm`)
-      formData.append("responseId", initPayload.responseId)
-      formData.append("idempotencyKey", initPayload.idempotencyKey)
-      formData.append("sessionId", initPayload.sessionId)
+      formData.append("responseId", session.responseId)
+      formData.append("idempotencyKey", session.idempotencyKey)
+      formData.append("sessionId", session.sessionId)
       if (typeof durationSeconds === "number") {
         formData.append("durationSeconds", String(durationSeconds))
       }
 
       const controller = new AbortController()
       const timeout = window.setTimeout(() => controller.abort(), 45000)
-      const response = await fetch(initPayload.uploadUrl, {
+      const response = await fetch(session.uploadUrl, {
         method: "POST",
         body: formData,
         credentials: "include",
-        keepalive: true,
         signal: controller.signal,
       }).finally(() => window.clearTimeout(timeout))
       if (!response.ok) {
@@ -139,7 +158,7 @@ export default function EmbedSurveyPage() {
       if (attempt < 4) {
         const delayMs = 500 * Math.pow(2, attempt - 1)
         await new Promise((resolve) => window.setTimeout(resolve, delayMs))
-        return uploadResponse(questionId, blob, durationSeconds, attempt + 1)
+        return uploadResponse(questionId, blob, durationSeconds, attempt + 1, uploadSessionsRef.current[questionId])
       } else {
         if (isMountedRef.current) {
           setUploadError(err instanceof Error ? err.message : "Failed to submit your voice take.")
@@ -178,6 +197,7 @@ export default function EmbedSurveyPage() {
     }
     setRecorderSubmitState("success")
     setSubmittedCount((value) => value + 1)
+    delete uploadSessionsRef.current[questionId]
     if (currentIndex < prompts.length - 1) {
       setIndex((prev) => prev + 1)
       setRecorderSubmitState("idle")

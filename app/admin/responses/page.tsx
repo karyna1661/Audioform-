@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useAuth, useRequireAdmin } from "@/lib/auth-context"
+import { useRequireAdmin } from "@/lib/auth-context"
 import { ResponseInbox } from "@/components/response-inbox"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, AudioWaveform, Filter } from "lucide-react"
@@ -34,7 +34,6 @@ export default function AdminResponsesPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { status } = useRequireAdmin()
-  const { signOut } = useAuth()
   const [responses, setResponses] = useState<ResponseWithMetadata[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -180,8 +179,8 @@ export default function AdminResponsesPage() {
   }
 
   return (
-    <main className={`af-shell min-h-dvh p-4 pb-28 sm:p-6 sm:pb-6`}>
-      <div className="af-panel af-fade-up mx-auto max-w-7xl rounded-[1.5rem] border p-4 sm:rounded-[2rem] sm:p-6">
+    <main className={`af-shell min-h-dvh p-3 pb-28 sm:p-6 sm:pb-6`}>
+      <div className="af-panel af-fade-up mx-auto max-w-7xl rounded-[1.2rem] border p-3 sm:rounded-[2rem] sm:p-6">
         {/* Header */}
         <header className="flex flex-wrap items-start justify-between gap-3 border-b border-[#dbcdb8] pb-4">
           <div className="flex items-start gap-3">
@@ -197,7 +196,7 @@ export default function AdminResponsesPage() {
               <p className={`font-body text-sm text-[#5c5146] text-pretty`}>
                 Signal Inbox
               </p>
-              <h1 className="text-3xl font-semibold text-balance">
+              <h1 className="text-[clamp(1.55rem,6vw,1.9rem)] font-semibold text-balance">
                 All Responses
               </h1>
               {surveyIdFilter ? (
@@ -213,19 +212,6 @@ export default function AdminResponsesPage() {
                 <p className={`font-body mt-1 text-sm text-[#8a3d2b]`}>{error}</p>
               ) : null}
             </div>
-          </div>
-          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-start sm:self-start">
-            <Button
-              variant="outline"
-              className="w-full border-[#dbcdb8] bg-[#f3ecdf] sm:w-auto"
-              onClick={async () => {
-                await signOut()
-                router.push("/login")
-              }}
-            >
-              <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
-              Sign out
-            </Button>
           </div>
         </header>
 

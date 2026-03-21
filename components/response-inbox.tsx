@@ -96,7 +96,7 @@ export function ResponseInbox({
 }: ResponseInboxProps) {
   const [playingId, setPlayingId] = useState<string | null>(null)
   const [audioErrorById, setAudioErrorById] = useState<Record<string, string>>({})
-  const [activeFilter, setActiveFilter] = useState<"all" | "short" | "medium" | "deep" | "flagged" | "bookmarked" | "highsignal">("all")
+  const [activeFilter, setActiveFilter] = useState<"all" | "flagged" | "highsignal">("all")
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
   useEffect(() => {
@@ -124,16 +124,8 @@ export function ResponseInbox({
 
   const filteredResponses = useMemo(() => {
     switch (activeFilter) {
-      case "short":
-        return responses.filter(r => r.durationBucket === "short")
-      case "medium":
-        return responses.filter(r => r.durationBucket === "medium")
-      case "deep":
-        return responses.filter(r => r.durationBucket === "deep")
       case "flagged":
         return responses.filter(r => r.flagged)
-      case "bookmarked":
-        return responses.filter(r => r.bookmarked)
       case "highsignal":
         return responses.filter(r => r.highSignal)
       default:
@@ -251,18 +243,14 @@ export function ResponseInbox({
       <Tabs
         value={activeFilter}
         onValueChange={(value) =>
-          setActiveFilter(value as "all" | "short" | "medium" | "deep" | "flagged" | "bookmarked" | "highsignal")
+          setActiveFilter(value as "all" | "flagged" | "highsignal")
         }
         className="w-full"
       >
-        <TabsList className="grid w-full grid-cols-7">
-          <TabsTrigger value="all">All</TabsTrigger>
-          <TabsTrigger value="deep">Deep</TabsTrigger>
-          <TabsTrigger value="medium">Medium</TabsTrigger>
-          <TabsTrigger value="short">Short</TabsTrigger>
-          <TabsTrigger value="flagged">Flagged</TabsTrigger>
-          <TabsTrigger value="bookmarked">Bookmarked</TabsTrigger>
-          <TabsTrigger value="highsignal">High Signal</TabsTrigger>
+        <TabsList className="flex w-full items-center gap-1">
+          <TabsTrigger value="all" className="shrink-0">All</TabsTrigger>
+          <TabsTrigger value="flagged" className="shrink-0">Flagged</TabsTrigger>
+          <TabsTrigger value="highsignal" className="shrink-0">High Signal</TabsTrigger>
         </TabsList>
       </Tabs>
 
@@ -285,7 +273,7 @@ export function ResponseInbox({
                 <div className="flex items-start justify-between gap-4">
                   {/* Left Section - Info */}
                   <div className="flex-1 space-y-2">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <Badge variant="outline" className="text-xs">
                         {response.surveyTitle}
                       </Badge>

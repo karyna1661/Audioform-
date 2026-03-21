@@ -245,12 +245,25 @@ export default function AdminDashboardV4Page() {
   }
 
   return (
-    <main className={`af-shell min-h-dvh p-4 pb-28 sm:p-6 sm:pb-6`}>
-      <div className="af-panel af-fade-up mx-auto max-w-7xl rounded-[1.5rem] border p-4 sm:rounded-[2rem] sm:p-6">
+    <main className={`af-shell min-h-dvh p-3 pb-28 sm:p-6 sm:pb-6`}>
+      <div className="af-panel af-fade-up mx-auto max-w-7xl rounded-[1.2rem] border p-3 sm:rounded-[2rem] sm:p-6">
+        <div className="mb-2 flex justify-end sm:hidden">
+          <Button
+            variant="outline"
+            className="border-[#dbcdb8] bg-[#f3ecdf]"
+            onClick={async () => {
+              await signOut()
+              router.push("/login")
+            }}
+          >
+            <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
+            Sign out
+          </Button>
+        </div>
         <header className="flex flex-wrap items-start justify-between gap-3 border-b border-[#dbcdb8] pb-4">
           <div>
             <p className={`font-body text-sm text-[#5c5146] text-pretty`}>Builder workspace</p>
-            <h1 className="text-3xl font-semibold text-balance">Signal Inbox</h1>
+            <h1 className="text-[clamp(1.55rem,6vw,1.9rem)] font-semibold text-balance">Signal Inbox</h1>
             <p className={`font-body mt-1 text-sm text-[#5c5146] text-pretty`}>Hi {user?.name}, hear clear signal and decide your next product move faster.</p>
             {uiMessage ? <p className={`font-body mt-1 text-sm text-[#5c5146]`}>{uiMessage}</p> : null}
             {loadError ? <p className={`font-body mt-1 text-sm text-[#8a3d2b]`}>{loadError}</p> : null}
@@ -258,7 +271,7 @@ export default function AdminDashboardV4Page() {
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-start sm:self-start">
             <Button
               variant="outline"
-              className="w-full border-[#dbcdb8] bg-[#f3ecdf] sm:w-auto"
+              className="hidden border-[#dbcdb8] bg-[#f3ecdf] sm:inline-flex"
               onClick={async () => {
                 await signOut()
                 router.push("/login")
@@ -423,9 +436,10 @@ export default function AdminDashboardV4Page() {
                       <Button
                         variant="outline"
                         className="w-full border-[#dbcdb8] bg-[#fff6ed] sm:w-auto"
-                        onClick={async () => {
+                        onClick={async (event) => {
+                          event.stopPropagation()
                           if (typeof window === "undefined") return
-                          const link = `${window.location.origin}/questionnaire/v1?surveyId=${encodeURIComponent(
+                          const link = `${window.location.origin}/share/survey/${encodeURIComponent(
                             survey.id,
                           )}`
                           try {
@@ -444,7 +458,8 @@ export default function AdminDashboardV4Page() {
                       <Button
                         variant="outline"
                         className="w-full border-[#dbcdb8] bg-[#fff6ed] sm:w-auto"
-                        onClick={async () => {
+                        onClick={async (event) => {
+                          event.stopPropagation()
                           if (typeof window === "undefined") return
                           const creatorId = user.id
                           const embedLink = `${window.location.origin}/embed/by-creator/${creatorId}/${survey.id}`
@@ -468,7 +483,8 @@ export default function AdminDashboardV4Page() {
                       <Button
                         variant="outline"
                         className="w-full border-[#dbcdb8] bg-[#fff6ed] sm:w-auto"
-                        onClick={async () => {
+                        onClick={async (event) => {
+                          event.stopPropagation()
                           try {
                             const draftLink = `${window.location.origin}/admin/questionnaires/v1?surveyId=${encodeURIComponent(survey.id)}`
                             await navigator.clipboard.writeText(draftLink)

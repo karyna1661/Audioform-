@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server"
 import { z } from "zod"
 import { getSessionFromRequest } from "@/lib/server/auth-session"
 import { getAnonSessionIdFromRequest, getOrCreateAnonSessionId, setAnonSessionCookie } from "@/lib/server/anon-session"
+import { getCorsHeaders, hasAllowedApiOrigin } from "@/lib/server/cors"
 import {
   cleanupStoredFile,
   finalizeUploadedResponse,
@@ -36,17 +37,17 @@ function logUpload(event: string, payload: Record<string, unknown>) {
 }
 
 export async function POST(request: NextRequest) {
-  const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
-    "Access-Control-Allow-Credentials": "true",
-  }
+  const corsHeaders = getCorsHeaders(request, { methods: "POST, OPTIONS" })
 
   let storagePath: string | null = null
   let storageFileId: string | null = null
 
   try {
+    if (!hasAllowedApiOrigin(request)) {
+      logUpload("invalid_origin", { origin: request.headers.get("origin"), referer: request.headers.get("referer") })
+      return NextResponse.json({ error: "Invalid request origin." }, { status: 403, headers: corsHeaders })
+    }
+
     const ip = getRequestClientIp(request.headers)
     const rate = applyRateLimit({
       key: `responses:upload:${ip}`,
@@ -195,15 +196,10 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function OPTIONS() {
+export async function OPTIONS(request: NextRequest) {
   return new NextResponse(null, {
     status: 204,
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
-      "Access-Control-Allow-Credentials": "true",
-    },
+    headers: getCorsHeaders(request, { methods: "POST, OPTIONS" }),
   })
 }
 

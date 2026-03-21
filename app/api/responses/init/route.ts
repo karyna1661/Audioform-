@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto"
 import { z } from "zod"
 import { getSessionFromRequest } from "@/lib/server/auth-session"
 import { getOrCreateAnonSessionId, setAnonSessionCookie } from "@/lib/server/anon-session"
+import { getCorsHeaders, hasAllowedApiOrigin } from "@/lib/server/cors"
 import { initPendingResponse } from "@/lib/server/response-store"
 import { getPublishedSurveyById, getLatestPublishedSurveyQuestions } from "@/lib/server/survey-store"
 import { applyRateLimit, getRequestClientIp } from "@/lib/server/rate-limit"
@@ -23,14 +24,14 @@ function logInit(event: string, payload: Record<string, unknown>) {
 }
 
 export async function POST(request: NextRequest) {
-  const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
-    "Access-Control-Allow-Credentials": "true",
-  }
+  const corsHeaders = getCorsHeaders(request, { methods: "POST, OPTIONS" })
 
   try {
+    if (!hasAllowedApiOrigin(request)) {
+      logInit("invalid_origin", { origin: request.headers.get("origin"), referer: request.headers.get("referer") })
+      return NextResponse.json({ error: "Invalid request origin." }, { status: 403, headers: corsHeaders })
+    }
+
     const ip = getRequestClientIp(request.headers)
     const rate = applyRateLimit({
       key: `responses:init:${ip}`,
@@ -103,15 +104,10 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function OPTIONS() {
+export async function OPTIONS(request: NextRequest) {
   return new NextResponse(null, {
     status: 204,
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
-      "Access-Control-Allow-Credentials": "true",
-    },
+    headers: getCorsHeaders(request, { methods: "POST, OPTIONS" }),
   })
 }
 

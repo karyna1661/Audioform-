@@ -12,7 +12,7 @@ import { trackEvent } from "@/lib/analytics"
 export default function ThankYouPage() {
   const searchParams = useSearchParams()
   const surveyId = searchParams.get("surveyId")
-  const backToSurveyHref = surveyId ? `/questionnaire?surveyId=${encodeURIComponent(surveyId)}` : "/questionnaire"
+  const backToSurveyHref = surveyId ? `/questionnaire/v1?surveyId=${encodeURIComponent(surveyId)}` : "/questionnaire/v1"
   const supportEmail = process.env.NEXT_PUBLIC_SUPPORT_EMAIL?.trim()
 
   useEffect(() => {

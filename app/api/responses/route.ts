@@ -24,6 +24,7 @@ import {
 import { getNotificationConfigByUserId } from "@/lib/server/notification-store"
 import { findUserById } from "@/lib/server/auth-store"
 import { sendEmail } from "@/lib/server/email-sender"
+import { getCorsHeaders, hasAllowedApiOrigin } from "@/lib/server/cors"
 import { applyRateLimit, getRequestClientIp } from "@/lib/server/rate-limit"
 import { hasTrustedOrigin } from "@/lib/server/request-guards"
 
@@ -57,18 +58,11 @@ function newIdempotencyKey(): string {
 }
 
 export async function POST(request: NextRequest) {
-  // Add CORS headers for cross-origin requests from mobile
-  const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Credentials': 'true',
-  }
+  const corsHeaders = getCorsHeaders(request, { methods: "POST, GET, PATCH, DELETE, OPTIONS" })
 
   try {
-    // Handle preflight OPTIONS request
-    if (request.method === 'OPTIONS') {
-      return new NextResponse(null, { status: 204, headers: corsHeaders })
+    if (!hasAllowedApiOrigin(request)) {
+      return NextResponse.json({ error: "Invalid request origin." }, { status: 403, headers: corsHeaders })
     }
 
     const ip = getRequestClientIp(request.headers)
@@ -304,26 +298,15 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Handle preflight CORS requests
-export async function OPTIONS() {
+export async function OPTIONS(request: NextRequest) {
   return new NextResponse(null, {
     status: 204,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-      'Access-Control-Allow-Credentials': 'true',
-    },
+    headers: getCorsHeaders(request, { methods: "POST, GET, PATCH, DELETE, OPTIONS" }),
   })
 }
 
 export async function GET(request: NextRequest) {
-  const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Credentials': 'true',
-  }
+  const corsHeaders = getCorsHeaders(request, { methods: "POST, GET, PATCH, DELETE, OPTIONS" })
 
   const session = await getSessionFromRequest()
   if (!session) {
@@ -390,12 +373,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Credentials': 'true',
-  }
+  const corsHeaders = getCorsHeaders(request, { methods: "POST, GET, PATCH, DELETE, OPTIONS" })
 
   const session = await getSessionFromRequest()
   if (!session) {
@@ -464,12 +442,7 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Credentials': 'true',
-  }
+  const corsHeaders = getCorsHeaders(request, { methods: "POST, GET, PATCH, DELETE, OPTIONS" })
 
   const session = await getSessionFromRequest()
   if (!session) {

@@ -1,409 +1,73 @@
-"use client"
+import type { Metadata } from "next"
+import QuestionnaireClientPage from "./questionnaire-client"
+import { getLatestPublishedSurveyQuestions, getPublishedSurveyById } from "@/lib/server/survey-store"
 
-import { useEffect, useRef, useState } from "react"
-import Link from "next/link"
-import { useRouter, useSearchParams } from "next/navigation"
-import { AlertCircle } from "lucide-react"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { AudioRecorder } from "@/components/audio-recorder"
-import { Button } from "@/components/ui/button"
-import { useMobile } from "@/hooks/use-mobile"
-import { trackEvent } from "@/lib/analytics"
-import { getActiveSurveyId, recordFirstResponseForActiveSurvey } from "@/lib/behavior-metrics"
-import { useAuth } from "@/lib/auth-context"
-import { SurveyLoadingSkeleton } from "@/components/survey-loading-skeleton"
-
-
-type PublicSurvey = {
-  id: string
-  title: string
-  decisionFocus: string | null
-  intent: string | null
-  questionCount: number
-  questions?: string[]
+type PageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
 }
 
-function buildPromptsFromSurvey(survey: PublicSurvey): Array<{ id: string; text: string }> {
-  if (!Array.isArray(survey.questions) || survey.questions.length === 0) return []
-  return survey.questions.slice(0, 8).map((text, index) => ({
-    id: `q${index + 1}`,
-    text,
-  }))
+function getParam(value: string | string[] | undefined): string | null {
+  if (typeof value === "string" && value.trim().length > 0) return value
+  if (Array.isArray(value) && typeof value[0] === "string" && value[0].trim().length > 0) return value[0]
+  return null
+}
+
+export async function generateMetadata({ searchParams }: PageProps): Promise<Metadata> {
+  const params = await searchParams
+  const surveyId = getParam(params.surveyId)
+
+  if (!surveyId) {
+    return {
+      title: "Audioform voice survey",
+      description: "Listen to the question before you answer. Share one concrete moment by voice.",
+      openGraph: {
+        images: [{ url: "/api/og/survey" }],
+      },
+      twitter: {
+        card: "summary_large_image",
+        images: ["/api/og/survey"],
+      },
+    }
+  }
+
+  const survey = await getPublishedSurveyById(surveyId)
+  const prompts = await getLatestPublishedSurveyQuestions(surveyId)
+  const firstPrompt = prompts[0]?.trim() || "Share one concrete moment by voice."
+  const title = survey?.title?.trim() || "Audioform voice survey"
+  const description = firstPrompt.length > 160 ? `${firstPrompt.slice(0, 157)}...` : firstPrompt
+  const url = `${process.env.NEXT_PUBLIC_APP_URL || "https://audioform-production.up.railway.app"}/questionnaire/v1?surveyId=${encodeURIComponent(surveyId)}`
+  const imageUrl = `/api/og/survey?surveyId=${encodeURIComponent(surveyId)}`
+
+  return {
+    title,
+    description,
+    alternates: {
+      canonical: url,
+    },
+    openGraph: {
+      title,
+      description,
+      url,
+      type: "website",
+      siteName: "Audioform",
+      images: [
+        {
+          url: imageUrl,
+          width: 1200,
+          height: 630,
+          alt: `${title} first prompt preview`,
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: [imageUrl],
+    },
+  }
 }
 
 export default function QuestionnaireV1Page() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const { status: authStatus, user } = useAuth()
-  const isMobile = useMobile()
-  const [index, setIndex] = useState(0)
-  const [answers, setAnswers] = useState<Record<string, Blob>>({})
-  const [permissionGranted, setPermissionGranted] = useState<boolean | null>(null)
-  const [uploadError, setUploadError] = useState<string | null>(null)
-  const [pendingUploads, setPendingUploads] = useState(0)
-  const [failedQueue, setFailedQueue] = useState<Array<{ questionId: string; blob: Blob; durationSeconds: number | null }>>([])
-  const [isSubmittingAnswer, setIsSubmittingAnswer] = useState(false)
-  const [lastDurationSeconds, setLastDurationSeconds] = useState<number | null>(null)
-  const [recordingDurations, setRecordingDurations] = useState<Record<string, number>>({})
-  const [recorderSubmitState, setRecorderSubmitState] = useState<"idle" | "uploading" | "error" | "success">("idle")
-  const [surveyLoading, setSurveyLoading] = useState(true)
-  const [surveyError, setSurveyError] = useState<string | null>(null)
-  const [questionList, setQuestionList] = useState<Array<{ id: string; text: string }>>([])
-  const isMountedRef = useRef(true)
-
-  useEffect(() => {
-    return () => {
-      isMountedRef.current = false
-    }
-  }, [])
-
-  useEffect(() => {
-    trackEvent("respondent_started")
-    const run = async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-        stream.getTracks().forEach((t) => t.stop())
-        setPermissionGranted(true)
-      } catch {
-        setPermissionGranted(false)
-      }
-    }
-    run()
-  }, [])
-
-  const resolvedSurveyId = searchParams.get("surveyId") || getActiveSurveyId() || null
-  const current = questionList[index]
-
-  useEffect(() => {
-    let isMounted = true
-    const loadSurveyPrompts = async () => {
-      setSurveyLoading(true)
-      setSurveyError(null)
-      if (!resolvedSurveyId) {
-        if (isMounted) {
-          setQuestionList([])
-          setSurveyError("No survey selected. Open a published survey link from a creator.")
-          setSurveyLoading(false)
-        }
-        return
-      }
-      try {
-        const response = await fetch(`/api/surveys/public/${encodeURIComponent(resolvedSurveyId)}`, {
-          cache: "no-store",
-        })
-        if (!response.ok) {
-          if (isMounted) {
-            setQuestionList([])
-            setSurveyError("This survey is unavailable or unpublished.")
-          }
-          return
-        }
-
-        const json = (await response.json()) as { survey?: PublicSurvey }
-        if (!json.survey) {
-          if (isMounted) {
-            setQuestionList([])
-            setSurveyError("Survey payload missing.")
-          }
-          return
-        }
-
-        const prompts = buildPromptsFromSurvey(json.survey)
-        if (isMounted) {
-          if (!prompts.length) {
-            setQuestionList([])
-            setSurveyError("This published survey has no saved prompts yet.")
-          } else {
-            setQuestionList(prompts)
-          }
-        }
-      } catch (error) {
-        if (isMounted) {
-          setSurveyError(error instanceof Error ? error.message : "Failed to load survey prompts.")
-          setQuestionList([])
-        }
-      } finally {
-        if (isMounted) setSurveyLoading(false)
-      }
-    }
-
-    void loadSurveyPrompts()
-    return () => {
-      isMounted = false
-    }
-  }, [resolvedSurveyId])
-
-  const uploadResponse = async (questionId: string, blob: Blob, durationSeconds: number | null, attempt = 1): Promise<boolean> => {
-    if (!resolvedSurveyId) {
-      if (isMountedRef.current) {
-        setUploadError("Survey id missing. Re-open the creator's survey link.")
-      }
-      return false
-    }
-    if (isMountedRef.current) {
-      setPendingUploads((value) => value + 1)
-    }
-    try {
-      const initController = new AbortController()
-      const initTimeout = window.setTimeout(() => initController.abort(), 15000)
-      const initResponse = await fetch("/api/responses/init", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          surveyId: resolvedSurveyId,
-          questionId,
-        }),
-        credentials: "include",
-        signal: initController.signal,
-      }).finally(() => window.clearTimeout(initTimeout))
-
-      if (!initResponse.ok) {
-        throw new Error("Failed to initialize response upload.")
-      }
-
-      const initPayload = (await initResponse.json()) as {
-        responseId?: string
-        idempotencyKey?: string
-        sessionId?: string
-        uploadUrl?: string
-      }
-
-      if (!initPayload.responseId || !initPayload.idempotencyKey || !initPayload.sessionId || !initPayload.uploadUrl) {
-        throw new Error("Upload session payload missing.")
-      }
-
-      const formData = new FormData()
-      formData.append("audio", blob, `${questionId}-${Date.now()}.webm`)
-      formData.append("responseId", initPayload.responseId)
-      formData.append("idempotencyKey", initPayload.idempotencyKey)
-      formData.append("sessionId", initPayload.sessionId)
-      if (typeof durationSeconds === "number") {
-        formData.append("durationSeconds", String(durationSeconds))
-      }
-
-      const uploadController = new AbortController()
-      const uploadTimeout = window.setTimeout(() => uploadController.abort(), 45000)
-      const response = await fetch(initPayload.uploadUrl, {
-        method: "POST",
-        body: formData,
-        credentials: "include",
-        keepalive: true,
-        signal: uploadController.signal,
-      }).finally(() => window.clearTimeout(uploadTimeout))
-
-      if (!response.ok) {
-        const errorPayload = (await response.json().catch(() => null)) as { error?: string } | null
-        throw new Error(errorPayload?.error || "Failed to save response.")
-      }
-
-      recordFirstResponseForActiveSurvey()
-      return true
-    } catch (error) {
-      if (attempt < 4) {
-        const delayMs = 500 * Math.pow(2, attempt - 1)
-        await new Promise((resolve) => window.setTimeout(resolve, delayMs))
-        return uploadResponse(questionId, blob, durationSeconds, attempt + 1)
-      } else {
-        if (isMountedRef.current) {
-          setUploadError(error instanceof Error ? error.message : "Failed to save response.")
-          setFailedQueue((items) => [...items, { questionId, blob, durationSeconds }])
-        }
-        return false
-      }
-    } finally {
-      if (isMountedRef.current) {
-        setPendingUploads((value) => Math.max(0, value - 1))
-      }
-    }
-  }
-
-  const onSubmit = (blob: Blob) => {
-    // Capture questionId and index synchronously at time of submission
-    // This prevents race conditions where current/index might change during async execution
-    if (!current) return
-    const questionIdForSubmission = current.id
-    const indexForSubmission = index
-    void submitAndAdvance(blob, questionIdForSubmission, indexForSubmission)
-  }
-
-  const submitAndAdvance = async (blob: Blob, questionId: string, currentIndex: number) => {
-    if (isSubmittingAnswer) return
-    setIsSubmittingAnswer(true)
-
-    setUploadError(null)
-    setRecorderSubmitState("uploading")
-    const uploaded = await uploadResponse(questionId, blob, recordingDurations[questionId] ?? null)
-    if (!isMountedRef.current) return
-    if (!uploaded) {
-      setRecorderSubmitState("error")
-      setIsSubmittingAnswer(false)
-      return
-    }
-
-    setRecorderSubmitState("success")
-
-    setAnswers((prev) => ({ ...prev, [questionId]: blob }))
-
-    if (currentIndex < questionList.length - 1) {
-      setIndex((prev) => prev + 1)
-      setRecorderSubmitState("idle")
-      setIsSubmittingAnswer(false)
-      return
-    }
-
-    trackEvent("respondent_completed")
-    const target = resolvedSurveyId
-      ? `/questionnaire/thank-you?surveyId=${encodeURIComponent(resolvedSurveyId)}`
-      : "/questionnaire/thank-you"
-    router.push(target)
-  }
-
-  const retryFailedUploads = async () => {
-    const queued = [...failedQueue]
-    setFailedQueue([])
-    setUploadError(null)
-    await Promise.all(queued.map((item) => uploadResponse(item.questionId, item.blob, item.durationSeconds)))
-  }
-
-  if (surveyLoading) return <SurveyLoadingSkeleton />
-
-  if (surveyError || questionList.length === 0) {
-    return (
-      <main className={`min-h-dvh bg-[#f3ecdf] p-4 sm:p-6`}>
-        <section className="mx-auto max-w-3xl rounded-[1.5rem] border border-[#dbcdb8] bg-[#f9f4ea] p-4 sm:rounded-[2rem] sm:p-6">
-          <h1 className="text-2xl font-semibold text-balance">Survey unavailable</h1>
-          <p className={`font-body mt-2 text-sm text-[#5c5146] text-pretty`}>
-            {surveyError || "This survey cannot be loaded."}
-          </p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Link href="/" className="rounded-full border border-[#dbcdb8] bg-[#fff6ed] px-4 py-2 text-sm hover:bg-[#f5ebdd]">
-              Return home
-            </Link>
-            {authStatus === "authenticated" && user?.role === "admin" ? (
-              <Link href="/admin/questionnaires" className="rounded-full bg-[#b85e2d] px-4 py-2 text-sm text-[#fff6ed] hover:bg-[#a05227]">
-                Create survey
-              </Link>
-            ) : null}
-          </div>
-        </section>
-      </main>
-    )
-  }
-
-  if (permissionGranted === false) {
-    return (
-      <main className={`min-h-dvh bg-[#f3ecdf] p-4 sm:p-6`}>
-        <div className="mx-auto max-w-md">
-          <Alert variant="destructive" aria-live="assertive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Microphone Access Required</AlertTitle>
-            <AlertDescription className={`font-body text-pretty`}>
-              We could not access your microphone. Enable mic permission in browser settings, then reload this page to continue.
-            </AlertDescription>
-          </Alert>
-          <Button className="mt-4 w-full bg-[#b85e2d] text-[#fff6ed] hover:bg-[#a05227]" onClick={() => window.location.reload()}>
-            Retry microphone access
-          </Button>
-        </div>
-      </main>
-    )
-  }
-
-  return (
-    <main className={`min-h-dvh bg-[#f3ecdf] p-4 sm:p-6`}>
-      <section className="mx-auto max-w-3xl rounded-[1.5rem] border border-[#dbcdb8] bg-[#f9f4ea] p-4 sm:rounded-[2rem] sm:p-6">
-        {authStatus === "authenticated" && user?.role === "admin" ? (
-          <div className="mb-4">
-            <Link href="/admin/dashboard/v4" className={`font-body text-sm text-[#8a431f] underline`}>
-              Back to dashboard
-            </Link>
-          </div>
-        ) : null}
-          <p className={`font-body text-sm text-[#5c5146] text-pretty`}>
-            Give one clear 30-second response so the builder can decide what to improve next.
-          </p>
-        <div className="mt-3 flex items-center justify-between">
-          <p className={`font-body text-sm text-[#5c5146]`}>
-            Question {Math.min(index + 1, questionList.length)} of {questionList.length}
-          </p>
-          <p className={`font-body text-sm tabular-nums text-[#5c5146]`}>{Math.round((Object.keys(answers).length / questionList.length) * 100)}%</p>
-        </div>
-
-        <div className="mt-2 h-2 rounded-full bg-[#e8dcc9]">
-          <div className="h-2 rounded-full bg-[#b85e2d]" style={{ width: `${(Object.keys(answers).length / questionList.length) * 100}%` }} />
-        </div>
-
-        <div className="mt-8">
-            <h1 className="text-2xl font-semibold text-balance sm:text-3xl">{current.text}</h1>
-            <p className={`font-body mt-2 text-sm text-[#5c5146] text-pretty`}>
-              Speak directly. One concrete moment in 20-45 seconds is ideal.
-            </p>
-            <div className="mt-6 rounded-2xl border border-[#dbcdb8] bg-[#fff6ed] p-4">
-              <AudioRecorder
-                key={current.id}
-                onSubmit={onSubmit}
-                questionId={current.id}
-                isMobile={isMobile}
-                isUploading={isSubmittingAnswer || pendingUploads > 0}
-                submitState={recorderSubmitState}
-                onRecordingStart={() => trackEvent("response_recording_started", { question_id: current.id })}
-                onRecordingSubmit={({ questionId, durationSeconds }) => {
-                  setLastDurationSeconds(durationSeconds)
-                  setRecordingDurations((prev) => ({ ...prev, [questionId]: durationSeconds }))
-                  trackEvent("response_recording_submitted", {
-                    survey_id: resolvedSurveyId,
-                    question_id: questionId,
-                    duration_seconds: durationSeconds,
-                  })
-                  trackEvent("response_duration_bucketed", {
-                    survey_id: resolvedSurveyId,
-                    question_id: questionId,
-                    duration_seconds: durationSeconds,
-                    duration_bucket: durationSeconds > 20 ? "deep" : durationSeconds >= 10 ? "medium" : "short",
-                  })
-                }}
-              />
-            </div>
-            {uploadError ? (
-              <div className={`font-body mt-3 rounded-lg border border-[#e0b8ad] bg-[#f9e6e0] px-3 py-2 text-sm text-[#8a3d2b]`}>
-                <p>{uploadError}</p>
-                {failedQueue.length > 0 ? (
-                  <Button
-                    variant="outline"
-                    className="mt-2 border-[#e0b8ad] bg-[#fff6ed]"
-                    onClick={() => void retryFailedUploads()}
-                  >
-                    Retry failed upload{failedQueue.length > 1 ? "s" : ""}
-                  </Button>
-                ) : null}
-              </div>
-            ) : null}
-            {lastDurationSeconds !== null && lastDurationSeconds < 10 ? (
-              <p className={`font-body mt-3 rounded-lg border border-[#dbcdb8] bg-[#f3ecdf] px-3 py-2 text-sm text-[#5c5146]`}>
-                Add one concrete example before submitting.
-              </p>
-            ) : null}
-            {pendingUploads > 0 ? (
-              <p className={`font-body mt-3 rounded-lg border border-[#dbcdb8] bg-[#f3ecdf] px-3 py-2 text-sm text-[#5c5146]`}>
-                Syncing {pendingUploads} response{pendingUploads === 1 ? "" : "s"} in the background...
-              </p>
-            ) : null}
-            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <Button
-                variant="outline"
-                className="w-full border-[#dbcdb8] bg-[#f3ecdf] sm:w-auto"
-                onClick={() => setIndex((prev) => Math.max(0, prev - 1))}
-                disabled={index === 0 || isSubmittingAnswer}
-              >
-                Previous
-              </Button>
-              <p className={`font-body text-center text-sm text-[#5c5146] sm:text-left`}>{Object.keys(answers).length} answered</p>
-            </div>
-          </div>
-      </section>
-    </main>
-  )
+  return <QuestionnaireClientPage />
 }
-
-
-

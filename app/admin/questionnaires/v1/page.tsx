@@ -320,6 +320,37 @@ export default function QuestionnairesV1Page() {
     return surveyId
   }
 
+  const saveDraft = useCallback(async () => {
+    if (!title.trim()) {
+      setDraftMessage("Add a survey title before saving.")
+      return
+    }
+
+    setIsSavingDraft(true)
+    const savedAt = new Date().toISOString()
+    window.localStorage.setItem(
+      "audioform_survey_draft_v1",
+      JSON.stringify({
+        surveyId: draftSurveyId || createSurveyId(title, user?.id || "creator"),
+        title,
+        questions,
+        savedAt,
+      }),
+    )
+
+    try {
+      await saveSurvey("draft")
+      setDraftMessage(`Draft saved at ${new Date(savedAt).toLocaleString()}`)
+      trackEvent("survey_draft_saved", {
+        question_count: questions.length,
+      })
+    } catch (error) {
+      setDraftMessage(error instanceof Error ? error.message : "Failed to save draft.")
+    } finally {
+      setIsSavingDraft(false)
+    }
+  }, [draftSurveyId, questions, title, user?.id])
+
   useEffect(() => {
     const rawDraft = window.localStorage.getItem("audioform_survey_draft_v1")
     if (!rawDraft) return
@@ -407,14 +438,15 @@ export default function QuestionnairesV1Page() {
     ? Math.round(questions.reduce((sum, q) => sum + evaluateQuestionQuality(q).score, 0) / questions.length)
     : 0
   const minimumQualityThreshold = 60
+  const nonEmptyPromptCount = questions.filter((q) => q.trim().length > 0).length
   const readyChecks = {
     hasTitle: title.trim().length > 0,
-    hasTwoQuestions: questions.filter((q) => q.trim().length > 0).length >= 2,
+    hasPrompt: nonEmptyPromptCount >= 1,
     hasDepthPrompt: questions.some((q) => q.length > 40),
   }
   const readinessItems = [
     { ok: readyChecks.hasTitle, label: "Title" },
-    { ok: readyChecks.hasTwoQuestions, label: "Prompt flow (2+ prompts)" },
+    { ok: readyChecks.hasPrompt, label: "Prompt flow (1+ prompt)" },
     { ok: readyChecks.hasDepthPrompt, label: "Depth prompt" },
   ]
   const completionScore =
@@ -422,8 +454,8 @@ export default function QuestionnairesV1Page() {
   const builderOnboardingChecklist = [
     {
       id: "questions",
-      label: "Add 2+ high-quality prompts",
-      done: readyChecks.hasTwoQuestions && selectedQuestionQuality.score >= 80,
+      label: "Add 1+ high-quality prompt",
+      done: readyChecks.hasPrompt && selectedQuestionQuality.score >= 80,
     },
     {
       id: "quality",
@@ -444,7 +476,7 @@ export default function QuestionnairesV1Page() {
   const mobileGridSectionClass = (step: number) => (mobileStep === step ? "grid" : "hidden lg:grid")
   const surveyLink =
     publishedSurveyId
-      ? `${typeof window !== "undefined" ? window.location.origin : ""}/questionnaire/v1?surveyId=${encodeURIComponent(
+      ? `${typeof window !== "undefined" ? window.location.origin : ""}/share/survey/${encodeURIComponent(
           publishedSurveyId,
         )}`
       : ""
@@ -463,20 +495,20 @@ export default function QuestionnairesV1Page() {
   const releaseDeskCopy = "Publish when the title is clear, the sequence is short, and each prompt asks for one concrete moment."
 
   return (
-    <main className={`af-shell min-h-dvh p-4 pb-28 sm:p-6 sm:pb-6`}>
-      <div className="af-panel af-fade-up mx-auto max-w-7xl rounded-[2.2rem] border border-[#cfbea4] p-4 sm:p-6">
+    <main className={`af-shell min-h-dvh p-3 pb-28 sm:p-6 sm:pb-6`}>
+      <div className="af-panel af-fade-up mx-auto max-w-7xl rounded-[1.7rem] border border-[#cfbea4] p-3 sm:rounded-[2.2rem] sm:p-6">
         <header className="af-fade-up af-delay-1 border-b border-[#cfbea4] pb-5">
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
             <div className="max-w-3xl">
               <p className="font-body text-xs font-semibold uppercase tracking-[0.22em] text-[#7a6146]">Research Desk</p>
-              <h1 className="mt-3 text-4xl font-semibold leading-[0.96] text-balance sm:text-5xl">
+              <h1 className="mt-3 text-[clamp(1.85rem,7.5vw,3rem)] font-semibold leading-[0.96] text-balance">
                 Build a voice survey that yields decision-grade signal.
               </h1>
               <p className="font-body mt-4 max-w-2xl text-sm leading-6 text-[#665746] text-pretty sm:text-[15px]">
                 Start with a proven prompt angle, keep the sequence short, and publish only when every question feels specific enough to earn a real story.
               </p>
             </div>
-            <div className="flex flex-wrap gap-2 lg:justify-self-end lg:justify-end lg:self-start">
+            <div className="hidden flex-wrap gap-2 lg:justify-self-end lg:justify-end lg:self-start lg:flex">
               <Link href="/admin/dashboard/v4">
                 <Button variant="outline" className="border-[#cfbea4] bg-[#efe3cf]">
                   <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
@@ -492,34 +524,7 @@ export default function QuestionnairesV1Page() {
               </Button>
               <Button
                 className="bg-[#b85e2d] text-[#fff6ed] hover:bg-[#a05227]"
-                onClick={async () => {
-                  if (!title.trim()) {
-                    setDraftMessage("Add a survey title before saving.")
-                    return
-                  }
-                  setIsSavingDraft(true)
-                  const savedAt = new Date().toISOString()
-                  window.localStorage.setItem(
-                    "audioform_survey_draft_v1",
-                    JSON.stringify({
-                      surveyId: draftSurveyId || createSurveyId(title, user?.id || "creator"),
-                      title,
-                      questions,
-                      savedAt,
-                    }),
-                  )
-                  try {
-                    await saveSurvey("draft")
-                    setDraftMessage(`Draft saved at ${new Date(savedAt).toLocaleString()}`)
-                    trackEvent("survey_draft_saved", {
-                      question_count: questions.length,
-                    })
-                  } catch (error) {
-                    setDraftMessage(error instanceof Error ? error.message : "Failed to save draft.")
-                  } finally {
-                    setIsSavingDraft(false)
-                  }
-                }}
+                onClick={() => void saveDraft()}
                 disabled={isSavingDraft}
               >
                 {isSavingDraft ? "Saving..." : "Save draft"}
@@ -527,31 +532,34 @@ export default function QuestionnairesV1Page() {
             </div>
           </div>
 
-          <div className="mt-5 rounded-[1.4rem] border border-[#d7c6b0] bg-[#fff8f0] px-4 py-3">
-            <p className="font-body text-sm leading-6 text-[#665746]">
-              Working rule: {workingRuleCopy}
-            </p>
+          <div className="mt-5 rounded-[1.4rem] border border-[#d7c6b0] bg-[#fff8f0] px-4 py-2">
+            <div className="af-marquee" aria-label="Working rule">
+              <p className="af-marquee-track font-body text-sm text-[#665746]">
+                <span>Working rule: {workingRuleCopy}</span>
+                <span aria-hidden="true">Working rule: {workingRuleCopy}</span>
+              </p>
+            </div>
           </div>
         </header>
         {draftMessage ? (
           <p className="font-body mt-3 rounded-2xl border border-[#cfbea4] bg-[#fff8f0] px-4 py-3 text-sm text-[#665746]">{draftMessage}</p>
         ) : null}
 
-        <section className="mt-4 rounded-[1.6rem] border border-[#cfbea4] bg-[#fff8f0] p-4 lg:hidden">
+        <section className="mt-4 rounded-[1.3rem] border border-[#cfbea4] bg-[#fff8f0] p-3 sm:rounded-[1.6rem] sm:p-4 lg:hidden">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#7a6146]">Mobile flow</p>
-              <p className="mt-1 text-lg font-semibold text-[#261c14]">Step {mobileStep + 1} of {mobileSteps.length}: {mobileSteps[mobileStep]}</p>
+              <p className="mt-1 text-base font-semibold text-[#261c14] sm:text-lg">Step {mobileStep + 1} of {mobileSteps.length}: {mobileSteps[mobileStep]}</p>
             </div>
             <p className="font-body text-sm text-[#665746]">{questions.length} {questions.length === 1 ? "prompt" : "prompts"}</p>
           </div>
-          <div className="mt-3 grid grid-cols-5 gap-2">
+          <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
             {mobileSteps.map((label, index) => (
               <button
                 key={label}
                 type="button"
                 onClick={() => setMobileStep(index)}
-                className={`rounded-full px-2 py-2 text-[11px] font-semibold transition-colors ${mobileStep === index ? "bg-[#b85e2d] text-[#fff6ed]" : "bg-[#efe3cf] text-[#7a6146]"}`}
+                className={`min-w-10 shrink-0 rounded-full px-3 py-2 text-[11px] font-semibold transition-colors ${mobileStep === index ? "bg-[#b85e2d] text-[#fff6ed]" : "bg-[#efe3cf] text-[#7a6146]"}`}
               >
                 {index + 1}
               </button>
@@ -649,8 +657,7 @@ export default function QuestionnairesV1Page() {
                   </div>
 
                   {/* Survey Templates Section */}
-                  {(showTemplates || typeof window === 'undefined') && (
-                    <div className={typeof window !== 'undefined' && !showTemplates ? 'hidden' : ''}>
+                  <div className={showTemplates ? "" : "hidden sm:block"}>
                       <div className="mb-4 hidden sm:block">
                         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#7a6146]">Template shelf</p>
                       </div>
@@ -679,12 +686,10 @@ export default function QuestionnairesV1Page() {
                           </button>
                         ))}
                       </div>
-                    </div>
-                  )}
+                  </div>
 
                   {/* Question Categories Section */}
-                  {(!showTemplates || typeof window === 'undefined') && (
-                    <div className={`${typeof window !== 'undefined' && showTemplates ? 'hidden' : ''} mt-6`}>
+                  <div className={`${showTemplates ? 'hidden sm:block' : ''} mt-6`}>
                       <div className="mb-4 hidden sm:block">
                         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#7a6146]">Question bank</p>
                       </div>
@@ -724,8 +729,7 @@ export default function QuestionnairesV1Page() {
                           </details>
                         ))}
                       </div>
-                    </div>
-                  )}
+                  </div>
 
                   <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(250px,0.9fr)]">
                     <div className="rounded-[1.4rem] border border-[#cfbea4] bg-[#fffdf8] p-4">
@@ -1028,6 +1032,9 @@ export default function QuestionnairesV1Page() {
               </div>
               <div className="p-5">
                 <p className="font-body text-sm leading-6 text-[#665746]">{releaseDeskCopy}</p>
+                {draftMessage ? (
+                  <p className="font-body mt-4 rounded-2xl border border-[#cfbea4] bg-[#fff8f0] px-4 py-3 text-sm text-[#665746]">{draftMessage}</p>
+                ) : null}
                 <div className="mt-4 rounded-2xl border border-[#cfbea4] bg-[#fffdf8] p-4">
                   <p className="text-sm font-semibold">Before you publish</p>
                   <ul className="mt-3 space-y-2">
@@ -1049,8 +1056,8 @@ export default function QuestionnairesV1Page() {
                   <Button
                     className="bg-[#b85e2d] text-[#fff6ed] hover:bg-[#a05227]"
                     onClick={async () => {
-                      if (!readyChecks.hasTitle || !readyChecks.hasTwoQuestions) {
-                        setDraftMessage("Add a title and at least two prompts before publishing.")
+                      if (!readyChecks.hasTitle || !readyChecks.hasPrompt) {
+                        setDraftMessage("Add a title and at least one prompt before publishing.")
                         return
                       }
 
@@ -1086,6 +1093,14 @@ export default function QuestionnairesV1Page() {
                     {isPublishing ? "Publishing..." : "Publish survey"}
                   </Button>
                 </div>
+                <div className="mt-3 grid gap-2 lg:hidden">
+                  <Button variant="outline" className="border-[#cfbea4] bg-[#fff7ee]" onClick={() => void saveDraft()} disabled={isSavingDraft}>
+                    {isSavingDraft ? "Saving..." : "Save draft"}
+                  </Button>
+                  <Button variant="outline" className="border-[#cfbea4] bg-[#fff7ee]" onClick={startNewDraft}>
+                    New draft
+                  </Button>
+                </div>
               </div>
             </section>
           </div>
@@ -1093,6 +1108,9 @@ export default function QuestionnairesV1Page() {
             <aside className="af-accent-card af-fade-up af-delay-2 hidden h-fit rounded-3xl border border-[#cfbea4] p-4 lg:sticky lg:top-6 lg:block">
             <h2 className="text-xl font-semibold text-balance">Release desk</h2>
             <p className="font-body mt-1 text-sm leading-6 text-[#665746]">{releaseDeskCopy}</p>
+            {draftMessage ? (
+              <p className="font-body mt-4 rounded-2xl border border-[#cfbea4] bg-[#fff8f0] px-4 py-3 text-sm text-[#665746]">{draftMessage}</p>
+            ) : null}
 
             <div className="mt-4 rounded-2xl border border-[#cfbea4] bg-[#fff7ee] p-4">
               <p className="text-sm font-semibold">Before you publish</p>
@@ -1113,8 +1131,8 @@ export default function QuestionnairesV1Page() {
               <Button
                 className="w-full bg-[#b85e2d] text-[#fff6ed] hover:bg-[#a05227]"
                 onClick={async () => {
-                  if (!readyChecks.hasTitle || !readyChecks.hasTwoQuestions) {
-                        setDraftMessage("Add a title and at least two prompts before publishing.")
+                  if (!readyChecks.hasTitle || !readyChecks.hasPrompt) {
+                        setDraftMessage("Add a title and at least one prompt before publishing.")
                     return
                   }
 

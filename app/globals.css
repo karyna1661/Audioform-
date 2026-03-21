@@ -60,6 +60,16 @@ body {
   .af-delay-3 {
     animation-delay: 210ms;
   }
+  .af-marquee {
+    overflow: hidden;
+    white-space: nowrap;
+  }
+  .af-marquee-track {
+    display: inline-flex;
+    min-width: 100%;
+    gap: 3rem;
+    animation: afMarquee 24s linear infinite;
+  }
 }
 
 @layer base {
@@ -186,11 +196,21 @@ body {
   }
 }
 
+@keyframes afMarquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .af-fade-up,
   .af-delay-1,
   .af-delay-2,
-  .af-delay-3 {
+  .af-delay-3,
+  .af-marquee-track {
     animation: none !important;
   }
   .af-glow-hover {
