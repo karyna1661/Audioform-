@@ -8,6 +8,7 @@ import {
   markResponseFailed,
   uploadAudioToStorage,
   deleteStoredResponseForSurveyIds,
+  countStoredResponses,
   getStoredResponseByIdForSurveyIds,
   listStoredResponses,
   updateStoredResponseForSurveyIds,
@@ -202,11 +203,9 @@ export async function POST(request: NextRequest) {
           const owner = await findUserById(survey.createdBy)
           const config = await getNotificationConfigByUserId(survey.createdBy)
           if (owner && config.newResponse) {
-            const responseCount = (
-              await listStoredResponses({
-                surveyId: stored.surveyId,
-              })
-            ).length
+            const responseCount = await countStoredResponses({
+              surveyId: stored.surveyId,
+            })
             const recipients = config.recipients.length ? config.recipients : [owner.email]
             const submissionDate = new Date(stored.createdAt).toLocaleString()
 
@@ -340,8 +339,9 @@ export async function GET(request: NextRequest) {
     userId: userId || undefined,
     limit,
   })
+  const surveyIdsNeedingQuestions = Array.from(new Set(responses.map((item) => item.surveyId)))
   const surveyQuestionEntries = await Promise.all(
-    scopedSurveyIds.map(async (id) => [id, await getLatestPublishedSurveyQuestions(id)] as const),
+    surveyIdsNeedingQuestions.map(async (id) => [id, await getLatestPublishedSurveyQuestions(id)] as const),
   )
   const surveyQuestionsById = new Map(surveyQuestionEntries)
 

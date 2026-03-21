@@ -353,6 +353,39 @@ export async function listStoredResponses(filters?: {
   return rows.map(mapRow)
 }
 
+export async function countStoredResponses(filters?: {
+  surveyId?: string
+  surveyIds?: string[]
+  questionId?: string
+  userId?: string
+}): Promise<number> {
+  const params: string[] = ["select=id", "status=eq.uploaded"]
+  if (filters?.surveyId) params.push(`survey_id=eq.${encodeURIComponent(filters.surveyId)}`)
+  if (filters?.surveyIds?.length) params.push(`survey_id=in.(${filters.surveyIds.map((id) => encodeURIComponent(id)).join(",")})`)
+  if (filters?.questionId) params.push(`question_id=eq.${encodeURIComponent(filters.questionId)}`)
+  if (filters?.userId) params.push(`user_id=eq.${encodeURIComponent(filters.userId)}`)
+
+  const { url, key } = resolveSupabaseConfig()
+  const response = await fetch(`${url}/rest/v1/response_records?${params.join("&")}`, {
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      Prefer: "count=exact",
+    },
+    cache: "no-store",
+  })
+
+  if (!response.ok) {
+    const text = await response.text()
+    throw new Error(`Supabase response count failed (${response.status}): ${text.slice(0, 280)}`)
+  }
+
+  const countHeader = response.headers.get("content-range")
+  const total = countHeader?.split("/")[1]
+  const parsed = total ? Number.parseInt(total, 10) : NaN
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
 export async function getStoredResponseByIdForSurveyIds(
   id: string,
   surveyIds: string[],

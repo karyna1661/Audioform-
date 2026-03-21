@@ -108,7 +108,7 @@ export default function AdminDashboardV4Page() {
 
     const loadResponses = async () => {
       try {
-        const responseRes = await fetch("/api/responses?limit=200", {
+        const responseRes = await fetch("/api/responses?limit=50", {
           credentials: "include",
           cache: "no-store",
         })
