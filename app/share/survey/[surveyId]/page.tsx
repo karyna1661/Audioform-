@@ -11,11 +11,9 @@ const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://audioform-production.
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { surveyId } = await params
   const survey = await getPublishedSurveyById(surveyId)
-  const prompts = await getLatestPublishedSurveyQuestions(surveyId)
 
   const title = survey?.title?.trim() || "Audioform voice survey"
-  const firstPrompt = prompts[0]?.trim() || "Share one concrete moment by voice."
-  const description = firstPrompt.length > 180 ? `${firstPrompt.slice(0, 177)}...` : firstPrompt
+  const description = "Powered by Audioform. Answer by voice in under a minute."
   const url = `${appUrl}/share/survey/${encodeURIComponent(surveyId)}`
   const imageUrl = `${appUrl}/api/og/survey?surveyId=${encodeURIComponent(surveyId)}`
 
