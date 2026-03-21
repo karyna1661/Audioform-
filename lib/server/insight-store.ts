@@ -133,3 +133,9 @@ export async function getInsightByTranscriptId(transcriptId: string): Promise<St
   const rows = await supabaseRequest<InsightRow[]>(`/rest/v1/insight_results?transcript_id=eq.${encodeURIComponent(transcriptId)}&select=id,transcript_id,response_id,summary,primary_theme,themes,sentiment,sentiment_score,signal_score,quotes,provider,extractor_version,created_at,updated_at&limit=1`)
   return rows.length ? mapRow(rows[0]) : null
 }
+
+export async function listInsightsByTranscriptIds(transcriptIds: string[]): Promise<StoredInsight[]> {
+  if (!transcriptIds.length) return []
+  const rows = await supabaseRequest<InsightRow[]>(`/rest/v1/insight_results?transcript_id=in.(${transcriptIds.map((id) => encodeURIComponent(id)).join(",")})&select=id,transcript_id,response_id,summary,primary_theme,themes,sentiment,sentiment_score,signal_score,quotes,provider,extractor_version,created_at,updated_at`)
+  return rows.map(mapRow)
+}

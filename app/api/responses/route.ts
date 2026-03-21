@@ -26,7 +26,10 @@ import { getNotificationConfigByUserId } from "@/lib/server/notification-store"
 import { findUserById } from "@/lib/server/auth-store"
 import { sendOrQueueEmail } from "@/lib/server/queued-email"
 import { getCorsHeaders, hasAllowedApiOrigin } from "@/lib/server/cors"
+import { listInsightsByTranscriptIds } from "@/lib/server/insight-store"
+import { getRequestId, logServerEvent, logServerError } from "@/lib/server/observability"
 import { applyRateLimit, getRequestClientIp } from "@/lib/server/rate-limit"
+import { listTranscriptsByResponseIds } from "@/lib/server/transcript-store"
 
 const uploadSchema = z.object({
   questionId: z.string().min(1),
@@ -61,6 +64,7 @@ export async function POST(request: NextRequest) {
   const corsHeaders = getCorsHeaders(request, { methods: "POST, GET, PATCH, DELETE, OPTIONS" })
 
   try {
+    const requestId = getRequestId(request.headers)
     if (!hasAllowedApiOrigin(request)) {
       return NextResponse.json({ error: "Invalid request origin." }, { status: 403, headers: corsHeaders })
     }
@@ -122,7 +126,8 @@ export async function POST(request: NextRequest) {
 
     const session = await getSessionFromRequest()
     const anonSessionId = await getOrCreateAnonSessionId()
-    console.log("Creating response storage:", {
+    logServerEvent("api.responses", "create_requested", {
+      requestId,
       questionId: parsed.data.questionId,
       surveyId: parsed.data.surveyId,
       userId: session?.sub ?? null,
@@ -171,7 +176,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Failed to finalize response." }, { status: 503, headers: corsHeaders })
       }
 
-      console.log("Response stored successfully:", {
+      logServerEvent("api.responses", "stored", {
+        requestId,
         id: stored.id,
         storagePath: stored.storagePath,
         publicUrl: stored.publicUrl,
@@ -276,7 +282,9 @@ export async function POST(request: NextRequest) {
       throw inner
     }
   } catch (error) {
-    console.error("Error handling audio upload:", error)
+    logServerError("api.responses", "upload_failed", error, {
+      requestId: getRequestId(request.headers),
+    })
     const message = error instanceof Error ? error.message : "Failed to process audio upload"
     
     // More specific error messages
@@ -312,6 +320,9 @@ export async function GET(request: NextRequest) {
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: corsHeaders })
   }
+  if (session.role !== "admin") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403, headers: corsHeaders })
+  }
 
   const searchParams = request.nextUrl.searchParams
   const surveyId = searchParams.get("surveyId") || undefined
@@ -343,31 +354,65 @@ export async function GET(request: NextRequest) {
     surveyIdsNeedingQuestions.map(async (id) => [id, await getLatestPublishedSurveyQuestions(id)] as const),
   )
   const surveyQuestionsById = new Map(surveyQuestionEntries)
+  const transcripts = await listTranscriptsByResponseIds(responses.map((item) => item.id))
+  const transcriptByResponseId = new Map<string, (typeof transcripts)[number]>()
+  for (const transcript of transcripts) {
+    if (transcript.responseId && !transcriptByResponseId.has(transcript.responseId)) {
+      transcriptByResponseId.set(transcript.responseId, transcript)
+    }
+  }
+  const insights = await listInsightsByTranscriptIds(transcripts.map((item) => item.id))
+  const insightByTranscriptId = new Map(insights.map((insight) => [insight.transcriptId, insight]))
 
   return NextResponse.json({
     responses: responses.map((item) => {
       const questionList = surveyQuestionsById.get(item.surveyId) ?? []
       const questionIndex = Number.parseInt(item.questionId.replace(/^q/i, ""), 10) - 1
       const questionText = Number.isFinite(questionIndex) && questionIndex >= 0 ? questionList[questionIndex] ?? null : null
+      const transcript = transcriptByResponseId.get(item.id) ?? null
+      const insight = transcript ? insightByTranscriptId.get(transcript.id) ?? null : null
 
       return {
-      id: item.id,
-      surveyId: item.surveyId,
-      surveyTitle: surveyTitleById.get(item.surveyId) || "Untitled survey",
-      questionId: item.questionId,
-      questionText,
-      userId: item.userId,
-      fileName: item.fileName,
-      mimeType: item.mimeType,
-      fileSize: item.size,
-      durationSeconds: item.durationSeconds,
-      durationBucket: item.durationBucket,
-      playbackUrl: `/api/responses/${item.id}/audio`,
-      flagged: item.flagged,
-      highSignal: item.highSignal,
-      bookmarked: item.bookmarked,
-      moderationUpdatedAt: item.moderationUpdatedAt,
-      timestamp: item.createdAt,
+        id: item.id,
+        surveyId: item.surveyId,
+        surveyTitle: surveyTitleById.get(item.surveyId) || "Untitled survey",
+        questionId: item.questionId,
+        questionText,
+        userId: item.userId,
+        fileName: item.fileName,
+        mimeType: item.mimeType,
+        fileSize: item.size,
+        durationSeconds: item.durationSeconds,
+        durationBucket: item.durationBucket,
+        playbackUrl: `/api/responses/${item.id}/audio`,
+        flagged: item.flagged,
+        highSignal: item.highSignal,
+        bookmarked: item.bookmarked,
+        moderationUpdatedAt: item.moderationUpdatedAt,
+        timestamp: item.createdAt,
+        transcript: transcript
+          ? {
+              id: transcript.id,
+              status: transcript.status,
+              text: transcript.transcriptText,
+              provider: transcript.provider,
+              errorMessage: transcript.errorMessage,
+            }
+          : null,
+        insight: insight
+          ? {
+              id: insight.id,
+              summary: insight.summary,
+              primaryTheme: insight.primaryTheme,
+              themes: insight.themes,
+              sentiment: insight.sentiment,
+              sentimentScore: insight.sentimentScore,
+              signalScore: insight.signalScore,
+              quotes: insight.quotes,
+              provider: insight.provider,
+              extractorVersion: insight.extractorVersion,
+            }
+          : null,
       }
     }),
   }, { headers: corsHeaders })
@@ -379,6 +424,9 @@ export async function PATCH(request: NextRequest) {
   const session = await getSessionFromRequest()
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: corsHeaders })
+  }
+  if (session.role !== "admin") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403, headers: corsHeaders })
   }
 
   try {
@@ -430,7 +478,9 @@ export async function PATCH(request: NextRequest) {
       },
     }, { headers: corsHeaders })
   } catch (error) {
-    console.error("Error updating response moderation:", error)
+    logServerError("api.responses", "moderation_failed", error, {
+      requestId: getRequestId(request.headers),
+    })
     return NextResponse.json({ error: "Failed to update response moderation." }, { status: 500, headers: corsHeaders })
   }
 }
@@ -441,6 +491,9 @@ export async function DELETE(request: NextRequest) {
   const session = await getSessionFromRequest()
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: corsHeaders })
+  }
+  if (session.role !== "admin") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403, headers: corsHeaders })
   }
 
   const searchParams = request.nextUrl.searchParams

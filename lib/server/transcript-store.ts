@@ -137,3 +137,9 @@ export async function getTranscriptByResponseId(responseId: string): Promise<Sto
   const rows = await supabaseRequest<TranscriptRow[]>(`/rest/v1/response_transcripts?response_id=eq.${encodeURIComponent(responseId)}&select=id,job_id,response_id,question_id,status,transcript_text,provider,error_message,created_at,updated_at&order=updated_at.desc&limit=1`)
   return rows.length ? mapRow(rows[0]) : null
 }
+
+export async function listTranscriptsByResponseIds(responseIds: string[]): Promise<StoredTranscript[]> {
+  if (!responseIds.length) return []
+  const rows = await supabaseRequest<TranscriptRow[]>(`/rest/v1/response_transcripts?response_id=in.(${responseIds.map((id) => encodeURIComponent(id)).join(",")})&select=id,job_id,response_id,question_id,status,transcript_text,provider,error_message,created_at,updated_at&order=updated_at.desc`)
+  return rows.map(mapRow)
+}

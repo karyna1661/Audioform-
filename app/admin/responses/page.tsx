@@ -7,6 +7,7 @@ import { ResponseInbox } from "@/components/response-inbox"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, AudioWaveform, Filter } from "lucide-react"
 import { trackEvent } from "@/lib/analytics"
+import { shouldTrackCreatorRevisitWithin7d } from "@/lib/behavior-metrics"
 import { AdminMobileNav } from "@/components/admin-mobile-nav"
 import { SurveyLoadingSkeleton } from "@/components/survey-loading-skeleton"
 
@@ -15,8 +16,8 @@ type ResponseWithMetadata = {
   surveyId: string
   surveyTitle: string
   questionId: string
-   questionText?: string | null
-   userId: string | null
+  questionText?: string | null
+  userId: string | null
   fileName: string
   mimeType: string
   fileSize: number
@@ -28,12 +29,31 @@ type ResponseWithMetadata = {
   bookmarked: boolean
   moderationUpdatedAt: string | null
   timestamp: string
+  transcript?: {
+    id: string
+    status: "pending" | "completed" | "failed"
+    text: string | null
+    provider: string | null
+    errorMessage: string | null
+  } | null
+  insight?: {
+    id: string
+    summary: string | null
+    primaryTheme: string | null
+    themes: string[]
+    sentiment: string | null
+    sentimentScore: number | null
+    signalScore: number | null
+    quotes: string[]
+    provider: string | null
+    extractorVersion: string | null
+  } | null
 }
 
 export default function AdminResponsesPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { status } = useRequireAdmin()
+  const { status, user } = useRequireAdmin()
   const [responses, setResponses] = useState<ResponseWithMetadata[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -74,6 +94,9 @@ export default function AdminResponsesPage() {
             survey_id: surveyIdFilter,
             focus: focusMode,
           })
+          if (user?.id && shouldTrackCreatorRevisitWithin7d(user.id, "responses")) {
+            trackEvent("creator_returned_within_7d", { surface: "responses" })
+          }
         }
       } catch (err) {
         if (!cancelled) {
@@ -97,11 +120,9 @@ export default function AdminResponsesPage() {
       cancelled = true
       window.clearInterval(intervalId)
     }
-  }, [status, surveyIdFilter, focusMode])
+  }, [status, surveyIdFilter, focusMode, user?.id])
 
   const handlePlayResponse = (responseId: string) => {
-    // In a real implementation, this would play the audio
-    console.log("Playing response:", responseId)
     trackEvent("response_replayed", { response_id: responseId })
   }
 
