@@ -17,6 +17,13 @@ export type EmailJobPayload = {
   text?: string
 }
 
+export type TranscriptionJobPayload = {
+  questionId: string
+  mimeType: string
+  fileName: string
+  audioBase64: string
+}
+
 export function isBackgroundJobsEnabled(): boolean {
   return isRedisConfigured() && process.env.ENABLE_BACKGROUND_JOBS === "true"
 }
@@ -35,4 +42,17 @@ export async function enqueueJob<TPayload>(type: string, payload: TPayload, queu
 
 export async function enqueueEmailJob(payload: EmailJobPayload): Promise<JobEnvelope<EmailJobPayload>> {
   return enqueueJob("email.send", payload)
+}
+
+export async function enqueueTranscriptionJob(payload: TranscriptionJobPayload): Promise<JobEnvelope<TranscriptionJobPayload>> {
+  return enqueueJob("transcription.process", payload)
+}
+
+export async function setJobResult(jobId: string, value: unknown, ttlSeconds = 3600): Promise<void> {
+  await runRedisCommand(["SETEX", `audioform:job-result:${jobId}`, String(ttlSeconds), JSON.stringify(value)])
+}
+
+export async function getJobResult(jobId: string): Promise<unknown | null> {
+  const result = await runRedisCommand(["GET", `audioform:job-result:${jobId}`])
+  return typeof result === "string" ? JSON.parse(result) : null
 }

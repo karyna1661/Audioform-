@@ -65,6 +65,11 @@ Use this only after setting:
 - `ENABLE_BACKGROUND_JOBS=true`
 - SMTP credentials
 
+Current queue-backed jobs:
+
+- outbound email
+- optional async transcription via `/api/transcribe?mode=async`
+
 ## Step 4 — Smoke test (10 minutes)
 
 ### Auth

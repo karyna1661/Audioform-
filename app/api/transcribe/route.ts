@@ -2,7 +2,9 @@ import { type NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { getSessionFromRequest } from "@/lib/server/auth-session"
 import { getCorsHeaders, hasAllowedApiOrigin } from "@/lib/server/cors"
+import { enqueueTranscriptionJob, isBackgroundJobsEnabled } from "@/lib/server/job-queue"
 import { applyRateLimit, getRequestClientIp } from "@/lib/server/rate-limit"
+import { transcribeAudioFile } from "@/lib/server/transcription-provider"
 
 const requestSchema = z.object({
   questionId: z.string().min(1),
@@ -19,6 +21,7 @@ const ALLOWED_AUDIO_MIME = new Set([
   "audio/x-wav",
 ])
 const MAX_AUDIO_SIZE_BYTES = 8 * 1024 * 1024
+const MAX_QUEUED_TRANSCRIPTION_BYTES = 3 * 1024 * 1024
 
 export async function POST(request: NextRequest) {
   const corsHeaders = getCorsHeaders(request, { methods: "POST, OPTIONS" })
@@ -74,47 +77,35 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unsupported audio format." }, { status: 415, headers: corsHeaders })
     }
 
-    // Check if OpenAI API key is available
-    if (!process.env.OPENAI_API_KEY) {
-      if (process.env.NODE_ENV === "production") {
+    const asyncModeRequested = request.nextUrl.searchParams.get("mode") === "async"
+    if (asyncModeRequested && isBackgroundJobsEnabled()) {
+      if (audioFile.size > MAX_QUEUED_TRANSCRIPTION_BYTES) {
         return NextResponse.json(
-          { error: "Transcription provider is not configured in production." },
-          { status: 503, headers: corsHeaders },
+          { error: `Queued transcription currently supports files up to ${Math.floor(MAX_QUEUED_TRANSCRIPTION_BYTES / (1024 * 1024))}MB.` },
+          { status: 413, headers: corsHeaders },
         )
       }
+
+      const buffer = Buffer.from(await audioFile.arrayBuffer())
+      const job = await enqueueTranscriptionJob({
+        questionId: parsed.data.questionId,
+        mimeType: audioFile.type || "application/octet-stream",
+        fileName: audioFile.name || `${parsed.data.questionId}.audio`,
+        audioBase64: buffer.toString("base64"),
+      })
+
       return NextResponse.json({
         success: true,
-        transcription:
-          "This is a mock transcription since OPENAI_API_KEY is not configured. In a production environment, this would be the actual transcription of the audio.",
+        queued: true,
+        jobId: job.id,
         questionId: parsed.data.questionId,
-        info: "OPENAI_API_KEY not configured - using mock transcription",
-      }, { headers: corsHeaders })
+      }, { status: 202, headers: corsHeaders })
     }
 
-    const openaiForm = new FormData()
-    openaiForm.append("file", audioFile)
-    openaiForm.append("model", process.env.OPENAI_TRANSCRIBE_MODEL || "gpt-4o-mini-transcribe")
-
-    const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      },
-      body: openaiForm,
-    })
-
-    if (!response.ok) {
-      await response.text()
-      return NextResponse.json(
-        { error: "Transcription provider request failed" },
-        { status: 502, headers: corsHeaders },
-      )
-    }
-
-    const data = (await response.json()) as { text?: string }
+    const transcription = await transcribeAudioFile(audioFile)
     return NextResponse.json({
       success: true,
-      transcription: data.text || "",
+      transcription,
       questionId: parsed.data.questionId,
     }, { headers: corsHeaders })
   } catch (error: any) {

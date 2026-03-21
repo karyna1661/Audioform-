@@ -4,6 +4,10 @@ import { Socket } from "node:net"
 import { connect as connectTls } from "node:tls"
 import nodemailer from "nodemailer"
 
+async function setJobResult(jobId, value, ttlSeconds = 3600) {
+  await runRedisCommand(["SETEX", `audioform:job-result:${jobId}`, String(ttlSeconds), JSON.stringify(value)])
+}
+
 function parseRedisUrl() {
   const redisUrl = process.env.REDIS_URL?.trim()
   if (!redisUrl) throw new Error("REDIS_URL is required for queue worker")
@@ -149,6 +153,41 @@ async function processEmailJob(payload) {
   })
 }
 
+async function transcribeAudioPayload(payload) {
+  if (!process.env.OPENAI_API_KEY) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("Transcription provider is not configured in production.")
+    }
+
+    return "This is a mock transcription since OPENAI_API_KEY is not configured. In a production environment, this would be the actual transcription of the audio."
+  }
+
+  const bytes = Buffer.from(payload.audioBase64, "base64")
+  const file = new File([bytes], payload.fileName || "audio.webm", {
+    type: payload.mimeType || "audio/webm",
+  })
+
+  const openaiForm = new FormData()
+  openaiForm.append("file", file)
+  openaiForm.append("model", process.env.OPENAI_TRANSCRIBE_MODEL || "gpt-4o-mini-transcribe")
+
+  const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+    },
+    body: openaiForm,
+  })
+
+  if (!response.ok) {
+    await response.text().catch(() => "")
+    throw new Error("Transcription provider request failed")
+  }
+
+  const data = await response.json()
+  return data.text || ""
+}
+
 async function processNext() {
   const result = await runRedisCommand(["BLPOP", "audioform:jobs", "5"])
   if (!Array.isArray(result) || result.length < 2 || typeof result[1] !== "string") return false
@@ -156,6 +195,18 @@ async function processNext() {
   const envelope = JSON.parse(result[1])
   if (envelope.type === "email.send") {
     await processEmailJob(envelope.payload)
+    console.log(`[queue-worker] processed ${envelope.type}`, { id: envelope.id })
+    return true
+  }
+
+  if (envelope.type === "transcription.process") {
+    const transcription = await transcribeAudioPayload(envelope.payload)
+    await setJobResult(envelope.id, {
+      success: true,
+      transcription,
+      questionId: envelope.payload.questionId,
+      completedAt: new Date().toISOString(),
+    })
     console.log(`[queue-worker] processed ${envelope.type}`, { id: envelope.id })
     return true
   }
