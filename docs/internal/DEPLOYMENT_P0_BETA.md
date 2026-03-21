@@ -14,7 +14,7 @@ Run:
 - Base schema: `database/schema-production.sql`
 - Any required migrations: `database/migrations/*.sql`
 
-Follow: `docs/DATABASE_SETUP_SUPABASE.md`
+Follow: `docs/internal/DATABASE_SETUP_SUPABASE.md`
 
 ## Step 2 — Configure Railway env vars
 
@@ -30,6 +30,7 @@ Recommended:
 - `B2_KEY_ID`
 - `B2_APPLICATION_KEY`
 - `B2_BUCKET_ID` or `B2_BUCKET_NAME`
+- `REDIS_URL`
 - SMTP vars for notifications (optional)
 
 ## Step 3 — Deploy
@@ -72,6 +73,11 @@ railway up
 
 ### Analytics
 - Confirm `/api/analytics` returns success for actions
+
+### Readiness and health
+- Confirm `/api/health` returns `200` in a healthy environment
+- Confirm `/api/ready` returns `200` before marking the deploy ready
+- If Redis is configured, verify rate-limited endpoints still behave normally
 
 ## Rollback (if needed)
 
