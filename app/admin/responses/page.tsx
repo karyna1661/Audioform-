@@ -57,6 +57,7 @@ export default function AdminResponsesPage() {
   const [responses, setResponses] = useState<ResponseWithMetadata[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [extractingInsightId, setExtractingInsightId] = useState<string | null>(null)
   
   const surveyIdFilter = searchParams.get("surveyId") || undefined
   const focusMode = searchParams.get("focus")
@@ -195,6 +196,34 @@ export default function AdminResponsesPage() {
     }
   }
 
+  const handleExtractInsight = async (responseId: string) => {
+    try {
+      setExtractingInsightId(responseId)
+      const response = await fetch(`/api/responses/${responseId}/extract-insight`, {
+        method: "POST",
+        credentials: "include",
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to enqueue insight extraction.")
+      }
+
+      trackEvent("response_bookmarked", {
+        response_id: responseId,
+        action: "extract_insight",
+      })
+
+      window.setTimeout(() => {
+        window.location.reload()
+      }, 1500)
+    } catch (err) {
+      console.error("Failed to extract insight:", err)
+      setError(err instanceof Error ? err.message : "Failed to extract insight.")
+    } finally {
+      setExtractingInsightId(null)
+    }
+  }
+
   if (status === "loading" || loading) {
     return <SurveyLoadingSkeleton label="Loading responses..." />
   }
@@ -258,10 +287,12 @@ export default function AdminResponsesPage() {
           <ResponseInbox
             responses={responses}
             onPlayResponse={handlePlayResponse}
-            onFlagResponse={handleFlagResponse}
-            onMarkHighSignal={handleMarkHighSignal}
-            onBookmarkResponse={handleBookmarkResponse}
-          />
+          onFlagResponse={handleFlagResponse}
+          onMarkHighSignal={handleMarkHighSignal}
+          onBookmarkResponse={handleBookmarkResponse}
+          onExtractInsight={handleExtractInsight}
+          extractingInsightId={extractingInsightId}
+        />
         </section>
       </div>
     </main>

@@ -8,6 +8,7 @@ import { useRequireAdmin } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, ArrowUpRight, Calendar, CheckCircle2, Mic, Target, Trash2 } from "lucide-react"
 import { trackEvent } from "@/lib/analytics"
+import { shouldTrackCreatorRevisitWithin7d } from "@/lib/behavior-metrics"
 import { SurveyLoadingSkeleton } from "@/components/survey-loading-skeleton"
 import { AdminMobileNav } from "@/components/admin-mobile-nav"
 import {
@@ -36,6 +37,25 @@ type ResponseItem = {
   surveyId: string
   userId: string | null
   timestamp: string
+  transcript?: {
+    id: string
+    status: "pending" | "completed" | "failed"
+    text: string | null
+    provider: string | null
+    errorMessage: string | null
+  } | null
+  insight?: {
+    id: string
+    summary: string | null
+    primaryTheme: string | null
+    themes: string[]
+    sentiment: string | null
+    sentimentScore: number | null
+    signalScore: number | null
+    quotes: string[]
+    provider: string | null
+    extractorVersion: string | null
+  } | null
 }
 
 type DashboardEventItem = {
@@ -72,7 +92,7 @@ export default function AdminDashboardV4Page() {
   useEffect(() => {
     if (status !== "authenticated") return
 
-    let cancelled = false
+      let cancelled = false
 
     const loadData = async () => {
       try {
@@ -95,6 +115,9 @@ export default function AdminDashboardV4Page() {
         }
 
         trackEvent("response_inbox_opened")
+        if (user?.id && shouldTrackCreatorRevisitWithin7d(user.id, "dashboard")) {
+          trackEvent("creator_returned_within_7d", { surface: "dashboard" })
+        }
         const firstPublished = loadedSurveys.find((survey) => survey.status === "published")
         if (firstPublished?.id) {
           trackEvent("first_response_viewed", { survey_id: firstPublished.id })
@@ -142,7 +165,7 @@ export default function AdminDashboardV4Page() {
       cancelled = true
       window.clearInterval(intervalId)
     }
-  }, [status, router])
+  }, [status, router, user?.id])
 
   const responsesBySurvey = useMemo(() => {
     return responses.reduce<Record<string, number>>((acc, item) => {
@@ -163,6 +186,24 @@ export default function AdminDashboardV4Page() {
   }, [responses])
 
   const uniqueRespondents = useMemo(() => new Set(responses.map((item) => item.userId)).size, [responses])
+  const extractorMetrics = useMemo(() => {
+    const withTranscript = responses.filter((item) => item.transcript).length
+    const transcriptPending = responses.filter((item) => item.transcript?.status === "pending").length
+    const transcriptFailed = responses.filter((item) => item.transcript?.status === "failed").length
+    const withInsight = responses.filter((item) => item.insight).length
+    return { withTranscript, transcriptPending, transcriptFailed, withInsight }
+  }, [responses])
+  const groupedThemes = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const response of responses) {
+      for (const theme of response.insight?.themes ?? []) {
+        counts.set(theme, (counts.get(theme) ?? 0) + 1)
+      }
+    }
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+  }, [responses])
   const publishedRate = useMemo(() => {
     if (!surveys.length) return 0
     return Math.round((surveys.filter((s) => s.status === "published").length / surveys.length) * 100)
@@ -517,6 +558,33 @@ export default function AdminDashboardV4Page() {
           </section>
 
           <aside className="space-y-4">
+            <article className="af-accent-card af-fade-up af-delay-2 rounded-2xl border p-4">
+              <h2 className="text-lg font-semibold text-balance">Insight Extractor</h2>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <Metric label="Transcripts" value={`${extractorMetrics.withTranscript}`} />
+                <Metric label="Insights" value={`${extractorMetrics.withInsight}`} />
+                <Metric label="Pending" value={`${extractorMetrics.transcriptPending}`} />
+                <Metric label="Failed" value={`${extractorMetrics.transcriptFailed}`} />
+              </div>
+              <div className="mt-4">
+                <p className="text-sm font-semibold text-balance">Top themes</p>
+                <ul className="font-body mt-2 space-y-2 text-sm text-[#5c5146]">
+                  {groupedThemes.length ? (
+                    groupedThemes.map(([theme, count]) => (
+                      <li key={theme} className="flex items-center justify-between rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] px-3 py-2">
+                        <span className="capitalize">{theme}</span>
+                        <span className="tabular-nums">{count}</span>
+                      </li>
+                    ))
+                  ) : (
+                    <li className="rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] p-3">
+                      Theme groups will appear after transcript extraction completes.
+                    </li>
+                  )}
+                </ul>
+              </div>
+            </article>
+
             <article className="af-accent-card af-fade-up af-delay-2 rounded-2xl border p-4">
               <h2 className="text-lg font-semibold text-balance">Today</h2>
               <p className={`font-body mt-1 text-xs text-[#5c5146]`}>

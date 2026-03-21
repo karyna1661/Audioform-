@@ -64,6 +64,8 @@ type ResponseInboxProps = {
   onFlagResponse?: (responseId: string, flagged: boolean) => void
   onMarkHighSignal?: (responseId: string, highSignal: boolean) => void
   onBookmarkResponse?: (responseId: string, bookmarked: boolean) => void
+  onExtractInsight?: (responseId: string) => void
+  extractingInsightId?: string | null
 }
 
 function formatDuration(seconds?: number | null): string {
@@ -118,7 +120,9 @@ export function ResponseInbox({
   onPlayResponse,
   onFlagResponse,
   onMarkHighSignal,
-  onBookmarkResponse
+  onBookmarkResponse,
+  onExtractInsight,
+  extractingInsightId = null,
 }: ResponseInboxProps) {
   const [playingId, setPlayingId] = useState<string | null>(null)
   const [audioErrorById, setAudioErrorById] = useState<Record<string, string>>({})
@@ -385,7 +389,25 @@ export function ResponseInbox({
                            <p className="mt-2 text-sm text-[#8a3d2b]">{response.transcript.errorMessage}</p>
                          ) : (
                            <p className="mt-2 text-sm text-[#665746]">Transcript is processing.</p>
-                         )}
+                        )}
+                      </div>
+                     ) : null}
+
+                     {!response.insight ? (
+                       <div className="flex flex-wrap items-center gap-2">
+                         <Button
+                           variant="outline"
+                           size="sm"
+                           className="border-[#cfbea4] bg-[#fff6ed] text-[#7a6146]"
+                           disabled={!onExtractInsight || extractingInsightId === response.id}
+                           onClick={() => onExtractInsight?.(response.id)}
+                         >
+                           {extractingInsightId === response.id
+                             ? "Extracting..."
+                             : response.transcript?.status === "failed"
+                               ? "Retry extraction"
+                               : "Extract insight"}
+                         </Button>
                        </div>
                      ) : null}
 
