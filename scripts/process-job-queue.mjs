@@ -77,6 +77,93 @@ async function failTranscript(jobId, errorMessage, provider = "openai") {
   })
 }
 
+async function upsertInsightResult(input) {
+  await supabaseRequest("/rest/v1/insight_results?on_conflict=transcript_id", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify([
+      {
+        transcript_id: input.transcriptId,
+        response_id: input.responseId ?? null,
+        summary: input.summary ?? null,
+        primary_theme: input.primaryTheme ?? null,
+        themes: input.themes ?? [],
+        sentiment: input.sentiment ?? null,
+        sentiment_score: input.sentimentScore ?? null,
+        signal_score: input.signalScore ?? null,
+        quotes: input.quotes ?? [],
+        provider: input.provider ?? null,
+        extractor_version: input.extractorVersion ?? null,
+        updated_at: new Date().toISOString(),
+      },
+    ]),
+  })
+}
+
+function pickSentiment(text) {
+  const positiveWords = ["love", "great", "clear", "easy", "smooth", "helpful"]
+  const negativeWords = ["confusing", "unclear", "frustrating", "hard", "slow", "stuck", "difficult"]
+  const lower = text.toLowerCase()
+  const positiveHits = positiveWords.filter((word) => lower.includes(word)).length
+  const negativeHits = negativeWords.filter((word) => lower.includes(word)).length
+  if (negativeHits > positiveHits) return { sentiment: "negative", score: Math.min(0.9, 0.55 + negativeHits * 0.08) }
+  if (positiveHits > negativeHits) return { sentiment: "positive", score: Math.min(0.9, 0.55 + positiveHits * 0.08) }
+  return { sentiment: "neutral", score: 0.5 }
+}
+
+function extractThemes(text) {
+  const lower = text.toLowerCase()
+  const themeMatchers = [
+    ["onboarding", ["onboarding", "getting started", "setup", "first time"]],
+    ["pricing", ["pricing", "price", "cost", "expensive", "cheap"]],
+    ["navigation", ["find", "where", "navigate", "menu"]],
+    ["clarity", ["clear", "unclear", "confusing", "understand"]],
+    ["speed", ["slow", "fast", "loading", "upload"]],
+  ]
+  return themeMatchers.filter(([, needles]) => needles.some((needle) => lower.includes(needle))).map(([theme]) => theme).slice(0, 3)
+}
+
+function summarize(text) {
+  const compact = text.replace(/\s+/g, " ").trim()
+  if (compact.length <= 180) return compact
+  return `${compact.slice(0, 177)}...`
+}
+
+function extractQuotes(text) {
+  const compact = text.replace(/\s+/g, " ").trim()
+  if (!compact) return []
+  return [compact.length <= 160 ? compact : `${compact.slice(0, 157)}...`]
+}
+
+function calculateSignalScore(text, themes) {
+  const lengthBoost = Math.min(40, Math.round(text.length / 12))
+  const themeBoost = themes.length * 15
+  return Math.max(25, Math.min(100, 25 + lengthBoost + themeBoost))
+}
+
+async function extractAndStoreInsight({ transcriptId, responseId, transcriptText }) {
+  const text = (transcriptText || "").trim()
+  const themes = extractThemes(text)
+  const sentiment = pickSentiment(text)
+  const summary = summarize(text)
+  const quotes = extractQuotes(text)
+  const signalScore = calculateSignalScore(text, themes)
+
+  await upsertInsightResult({
+    transcriptId,
+    responseId: responseId ?? null,
+    summary,
+    primaryTheme: themes[0] ?? null,
+    themes,
+    sentiment: sentiment.sentiment,
+    sentimentScore: sentiment.score,
+    signalScore,
+    quotes,
+    provider: "audioform-heuristic",
+    extractorVersion: "v1",
+  })
+}
+
 async function incrementQueueMetric(metric) {
   await runRedisCommand(["INCR", `audioform:queue-metric:${metric}`])
 }
@@ -389,6 +476,15 @@ async function processNext() {
     try {
       const transcription = await transcribeAudioPayload(envelope.payload)
       await completeTranscript(envelope.id, transcription, "openai")
+      const transcriptRows = await supabaseRequest(`/rest/v1/response_transcripts?job_id=eq.${encodeURIComponent(envelope.id)}&select=id,response_id,transcript_text&limit=1`)
+      const transcriptRow = Array.isArray(transcriptRows) ? transcriptRows[0] : null
+      if (transcriptRow) {
+        await extractAndStoreInsight({
+          transcriptId: transcriptRow.id,
+          responseId: transcriptRow.response_id,
+          transcriptText: transcriptRow.transcript_text || transcription,
+        })
+      }
       await setJobResult(envelope.id, {
         success: true,
         transcription,

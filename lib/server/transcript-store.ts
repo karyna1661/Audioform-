@@ -132,3 +132,8 @@ export async function getTranscriptByJobId(jobId: string): Promise<StoredTranscr
   const rows = await supabaseRequest<TranscriptRow[]>(`/rest/v1/response_transcripts?job_id=eq.${encodeURIComponent(jobId)}&select=id,job_id,response_id,question_id,status,transcript_text,provider,error_message,created_at,updated_at&limit=1`)
   return rows.length ? mapRow(rows[0]) : null
 }
+
+export async function getTranscriptByResponseId(responseId: string): Promise<StoredTranscript | null> {
+  const rows = await supabaseRequest<TranscriptRow[]>(`/rest/v1/response_transcripts?response_id=eq.${encodeURIComponent(responseId)}&select=id,job_id,response_id,question_id,status,transcript_text,provider,error_message,created_at,updated_at&order=updated_at.desc&limit=1`)
+  return rows.length ? mapRow(rows[0]) : null
+}
