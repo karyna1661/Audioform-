@@ -485,8 +485,8 @@ async function transcribeAudioPayload(payload) {
   })
 
   if (!response.ok) {
-    await response.text().catch(() => "")
-    throw new Error("Transcription provider request failed")
+    const text = await response.text().catch(() => "")
+    throw new Error(`Transcription provider request failed (${response.status}): ${text.slice(0, 400)}`)
   }
 
   const data = await response.json()
