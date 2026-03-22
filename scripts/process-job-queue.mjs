@@ -233,6 +233,8 @@ function parseValue(input, index = 0) {
     if (length === -1) return { value: null, nextIndex: lineEnd + 2 }
     const start = lineEnd + 2
     const end = start + length
+    if (input.length < end + 2) throw new Error("Incomplete Redis response.")
+    if (input.slice(end, end + 2) !== "\r\n") throw new Error("Incomplete Redis response.")
     return { value: input.slice(start, end), nextIndex: end + 2 }
   }
   if (prefix === "*") {
