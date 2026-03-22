@@ -74,7 +74,9 @@ async function supabaseRequest(path, init = {}) {
     throw new Error(`Supabase queue request failed (${response.status}): ${text.slice(0, 280)}`)
   }
   if (response.status === 204) return null
-  return response.json()
+  const text = await response.text().catch(() => "")
+  if (!text.trim()) return null
+  return JSON.parse(text)
 }
 
 async function setJobResult(jobId, value, ttlSeconds = 3600) {
