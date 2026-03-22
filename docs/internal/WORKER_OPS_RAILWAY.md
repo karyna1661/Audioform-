@@ -22,7 +22,9 @@ Current queued workloads:
   - `ENABLE_ANALYTICS_JOBS=true`
   - `ENABLE_NOTIFICATION_DIGEST_JOBS=true`
 - SMTP credentials only if email jobs are enabled
-- `OPENAI_API_KEY` only if transcription jobs are enabled
+- one transcription provider:
+  - `DEEPGRAM_API_KEY` with optional `DEEPGRAM_MODEL`
+  - or `OPENAI_API_KEY` with optional `OPENAI_TRANSCRIBE_MODEL`
 - all standard app env vars already used by the web service
 
 ## Worker command
@@ -49,6 +51,7 @@ Recommended safe first rollout:
 
 - `ENABLE_TRANSCRIPTION_JOBS=true`
 - leave email/digest flags off until SMTP/domain is ready
+- set `TRANSCRIPTION_PROVIDER=deepgram` if using Deepgram
 
 ## Rollout checklist
 

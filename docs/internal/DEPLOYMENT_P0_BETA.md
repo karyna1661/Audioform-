@@ -34,6 +34,9 @@ Recommended:
 - queue feature flags as needed, for example:
   - `ENABLE_TRANSCRIPTION_JOBS=true`
   - `ENABLE_EMAIL_JOBS=true`
+- transcription provider vars:
+  - `DEEPGRAM_API_KEY` and optional `DEEPGRAM_MODEL`
+  - or `OPENAI_API_KEY` and optional `OPENAI_TRANSCRIBE_MODEL`
 - SMTP vars for notifications (optional)
 
 ## Step 3 — Deploy
