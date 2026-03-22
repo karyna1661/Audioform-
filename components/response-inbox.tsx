@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { 
+import {
   Play, 
   Pause, 
   Mic, 
@@ -17,6 +17,7 @@ import {
   Filter,
   AudioWaveform
 } from "lucide-react"
+import { getDurationBucketLabel } from "@/lib/response-duration"
 import { cn } from "@/lib/utils"
 
 type ResponseWithMetadata = {
@@ -239,19 +240,19 @@ export function ResponseInbox({
         <Card>
           <CardContent className="pt-4">
             <div className="text-2xl font-bold text-green-600">{stats.deep}</div>
-            <p className="text-xs text-muted-foreground">Deep (&gt;20s)</p>
+            <p className="text-xs text-muted-foreground">{getDurationBucketLabel("deep")}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4">
             <div className="text-2xl font-bold text-blue-600">{stats.medium}</div>
-            <p className="text-xs text-muted-foreground">Medium (10-20s)</p>
+            <p className="text-xs text-muted-foreground">{getDurationBucketLabel("medium")}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4">
             <div className="text-2xl font-bold text-yellow-600">{stats.short}</div>
-            <p className="text-xs text-muted-foreground">Short (&lt;10s)</p>
+            <p className="text-xs text-muted-foreground">{getDurationBucketLabel("short")}</p>
           </CardContent>
         </Card>
       </div>

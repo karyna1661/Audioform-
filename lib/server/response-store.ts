@@ -2,6 +2,7 @@ import { mkdir, unlink, writeFile } from "node:fs/promises"
 import path from "node:path"
 import { randomUUID } from "node:crypto"
 import { deleteFromB2, isB2Configured, uploadToB2 } from "@/lib/server/b2-storage"
+import { classifyResponseDuration } from "@/lib/response-duration"
 
 export type StoredResponse = {
   id: string
@@ -121,6 +122,10 @@ function extensionForMime(mimeType: string): string {
 }
 
 function mapRow(row: ResponseRow): StoredResponse {
+  const derivedDurationBucket =
+    row.duration_bucket ??
+    (typeof row.duration_seconds === "number" ? classifyResponseDuration(row.duration_seconds) : null)
+
   return {
     id: row.id,
     surveyId: row.survey_id,
@@ -137,7 +142,7 @@ function mapRow(row: ResponseRow): StoredResponse {
     storageFileId: row.storage_file_id,
     publicUrl: row.public_url || undefined,
     durationSeconds: row.duration_seconds,
-    durationBucket: row.duration_bucket,
+    durationBucket: derivedDurationBucket,
     flagged: Boolean(row.flagged),
     highSignal: Boolean(row.high_signal),
     bookmarked: Boolean(row.bookmarked),
@@ -231,7 +236,7 @@ export async function finalizeUploadedResponse(input: {
   durationSeconds?: number | null
 }): Promise<StoredResponse | null> {
   const durationBucket =
-    typeof input.durationSeconds === "number" ? classifyDurationBucket(input.durationSeconds) : null
+    typeof input.durationSeconds === "number" ? classifyResponseDuration(input.durationSeconds) : null
 
   const rows = await supabaseRequest<ResponseRow[]>(
     `/rest/v1/response_records?id=eq.${encodeURIComponent(input.id)}`,
@@ -323,12 +328,6 @@ export async function cleanupStoredFile(input: {
  * - medium: 10-20 seconds  
  * - deep: > 20 seconds
  */
-function classifyDurationBucket(seconds: number): "short" | "medium" | "deep" {
-  if (seconds < 10) return "short"
-  if (seconds < 20) return "medium"
-  return "deep"
-}
-
 export async function listStoredResponses(filters?: {
   surveyId?: string
   surveyIds?: string[]
