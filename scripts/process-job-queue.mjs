@@ -463,8 +463,65 @@ async function transcribeAudioPayload(payload) {
   const file = new File([bytes], payload.fileName || "audio.webm", {
     type: payload.mimeType || "audio/webm",
   })
-  const { transcribeAudioFile } = await import("../lib/server/transcription-provider.ts")
-  return transcribeAudioFile(file)
+
+  const configured = (process.env.TRANSCRIPTION_PROVIDER || "").trim().toLowerCase()
+  const provider = configured === "openai" ? "openai" : configured === "deepgram" ? "deepgram" : process.env.DEEPGRAM_API_KEY ? "deepgram" : "openai"
+
+  if (provider === "deepgram") {
+    if (!process.env.DEEPGRAM_API_KEY) {
+      if (process.env.NODE_ENV === "production") {
+        throw new Error("Deepgram transcription provider is not configured in production.")
+      }
+
+      return "This is a mock transcription since DEEPGRAM_API_KEY is not configured. In a production environment, this would be the actual transcription of the audio."
+    }
+
+    const model = process.env.DEEPGRAM_MODEL || "nova-2"
+    const response = await fetch(`https://api.deepgram.com/v1/listen?model=${encodeURIComponent(model)}&smart_format=true`, {
+      method: "POST",
+      headers: {
+        Authorization: `Token ${process.env.DEEPGRAM_API_KEY}`,
+        "Content-Type": payload.mimeType || "audio/webm",
+      },
+      body: Uint8Array.from(bytes),
+    })
+
+    if (!response.ok) {
+      const text = await response.text().catch(() => "")
+      throw new Error(`Transcription provider request failed (${response.status}): ${text.slice(0, 400)}`)
+    }
+
+    const data = await response.json()
+    return data.results?.channels?.[0]?.alternatives?.[0]?.transcript || ""
+  }
+
+  if (!process.env.OPENAI_API_KEY) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("OpenAI transcription provider is not configured in production.")
+    }
+
+    return "This is a mock transcription since OPENAI_API_KEY is not configured. In a production environment, this would be the actual transcription of the audio."
+  }
+
+  const openaiForm = new FormData()
+  openaiForm.append("file", file)
+  openaiForm.append("model", process.env.OPENAI_TRANSCRIBE_MODEL || "gpt-4o-mini-transcribe")
+
+  const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+    },
+    body: openaiForm,
+  })
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => "")
+    throw new Error(`Transcription provider request failed (${response.status}): ${text.slice(0, 400)}`)
+  }
+
+  const data = await response.json()
+  return data.text || ""
 }
 
 async function processNext() {
