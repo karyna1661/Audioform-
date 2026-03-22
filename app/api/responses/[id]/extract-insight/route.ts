@@ -94,6 +94,10 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     return NextResponse.json({ success: true, jobId: job.id }, { status: 202, headers: corsHeaders })
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to extract insight."
+    console.error("[extract-insight] failed", {
+      responseId: await context.params.then((value) => value.id).catch(() => null),
+      message,
+    })
     return NextResponse.json(
       {
         error: process.env.NODE_ENV === "development" ? message : "Failed to extract insight.",

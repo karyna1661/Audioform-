@@ -206,7 +206,8 @@ export default function AdminResponsesPage() {
       })
 
       if (!response.ok) {
-        throw new Error("Failed to enqueue insight extraction.")
+        const payload = (await response.json().catch(() => null)) as { error?: string } | null
+        throw new Error(payload?.error || "Failed to enqueue insight extraction.")
       }
 
       setResponses((prev) =>
