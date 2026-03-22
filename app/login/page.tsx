@@ -17,7 +17,7 @@ export default function LoginPage() {
   const searchParams = useSearchParams()
   const requestedCallbackUrl = searchParams.get("callbackUrl")
   const callbackUrl = sanitizeCallbackUrl(requestedCallbackUrl)
-  const { signIn, status } = useAuth()
+  const { signIn, signOut, status, user } = useAuth()
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -27,10 +27,22 @@ export default function LoginPage() {
   const errorId = error ? "login-form-error" : undefined
 
   useEffect(() => {
-    if (status === "authenticated") {
+    if (status === "authenticated" && user?.role === "admin") {
       router.push(callbackUrl)
     }
-  }, [status, router, callbackUrl])
+  }, [status, user?.role, router, callbackUrl])
+
+  useEffect(() => {
+    if (searchParams.get("error") === "admin_required") {
+      setError("This account does not have creator access. Please sign in with your admin account.")
+    }
+  }, [searchParams])
+
+  useEffect(() => {
+    if (status === "authenticated" && user && user.role !== "admin") {
+      void signOut()
+    }
+  }, [status, user, signOut])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

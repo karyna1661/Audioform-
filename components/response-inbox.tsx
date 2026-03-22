@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { 
+import {
   Play, 
   Pause, 
   Mic, 
@@ -17,6 +17,7 @@ import {
   Filter,
   AudioWaveform
 } from "lucide-react"
+import { getDurationBucketLabel } from "@/lib/response-duration"
 import { cn } from "@/lib/utils"
 
 type ResponseWithMetadata = {
@@ -127,6 +128,7 @@ export function ResponseInbox({
   const [playingId, setPlayingId] = useState<string | null>(null)
   const [audioErrorById, setAudioErrorById] = useState<Record<string, string>>({})
   const [activeFilter, setActiveFilter] = useState<"all" | "flagged" | "highsignal">("all")
+  const [expandedInsightIds, setExpandedInsightIds] = useState<Record<string, boolean>>({})
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
   useEffect(() => {
@@ -238,19 +240,19 @@ export function ResponseInbox({
         <Card>
           <CardContent className="pt-4">
             <div className="text-2xl font-bold text-green-600">{stats.deep}</div>
-            <p className="text-xs text-muted-foreground">Deep (&gt;20s)</p>
+            <p className="text-xs text-muted-foreground">{getDurationBucketLabel("deep")}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4">
             <div className="text-2xl font-bold text-blue-600">{stats.medium}</div>
-            <p className="text-xs text-muted-foreground">Medium (10-20s)</p>
+            <p className="text-xs text-muted-foreground">{getDurationBucketLabel("medium")}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4">
             <div className="text-2xl font-bold text-yellow-600">{stats.short}</div>
-            <p className="text-xs text-muted-foreground">Short (&lt;10s)</p>
+            <p className="text-xs text-muted-foreground">{getDurationBucketLabel("short")}</p>
           </CardContent>
         </Card>
       </div>
@@ -277,7 +279,7 @@ export function ResponseInbox({
         }
         className="w-full"
       >
-        <TabsList className="flex w-full items-center gap-1">
+        <TabsList className="ml-auto flex w-fit items-center gap-1">
           <TabsTrigger value="all" className="shrink-0">All</TabsTrigger>
           <TabsTrigger value="flagged" className="shrink-0">Flagged</TabsTrigger>
           <TabsTrigger value="highsignal" className="shrink-0">High Signal</TabsTrigger>
@@ -293,6 +295,13 @@ export function ResponseInbox({
           </div>
         ) : (
           filteredResponses.map((response) => (
+            (() => {
+              const isExpanded = Boolean(expandedInsightIds[response.id])
+              const fullSummary = response.insight?.summary ?? null
+              const truncatedSummary = fullSummary && fullSummary.length > 160 && !isExpanded
+                ? `${fullSummary.slice(0, 157)}...`
+                : fullSummary
+              return (
             <Card key={response.id} className={cn(
               "transition-colors",
               response.flagged && "border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-900/20",
@@ -369,9 +378,25 @@ export function ResponseInbox({
                              Signal {response.insight.signalScore ?? "-"}/100
                            </span>
                          </div>
-                         {response.insight.summary ? (
-                           <p className="mt-2 text-sm leading-6 text-[#3c3026]">{response.insight.summary}</p>
-                         ) : null}
+                          {truncatedSummary ? (
+                            <>
+                              <p className="mt-2 text-sm leading-6 text-[#3c3026]">{truncatedSummary}</p>
+                              {fullSummary && fullSummary.length > 160 ? (
+                                <button
+                                  type="button"
+                                  className="mt-2 text-xs font-medium text-[#8a431f] hover:underline"
+                                  onClick={() =>
+                                    setExpandedInsightIds((current) => ({
+                                      ...current,
+                                      [response.id]: !current[response.id],
+                                    }))
+                                  }
+                                >
+                                  {isExpanded ? "See less" : "See all"}
+                                </button>
+                              ) : null}
+                            </>
+                          ) : null}
                          {response.insight.quotes?.[0] ? (
                            <p className="mt-2 text-xs italic text-[#665746]">"{response.insight.quotes[0]}"</p>
                          ) : null}
@@ -417,10 +442,10 @@ export function ResponseInbox({
                    </div>
 
                   {/* Right Section - Actions */}
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="icon"
+                   <div className="flex flex-col items-end gap-2 self-start">
+                     <Button
+                       variant="outline"
+                       size="icon"
                       onClick={() => void handlePlayToggle(response)}
                       title={playingId === response.id ? "Pause" : "Play"}
                     >
@@ -454,13 +479,15 @@ export function ResponseInbox({
                       size="icon"
                       onClick={() => onBookmarkResponse?.(response.id, !response.bookmarked)}
                       title="Bookmark"
-                    >
-                      <Bookmark className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                     >
+                       <Bookmark className="h-4 w-4" />
+                     </Button>
+                   </div>
+                 </div>
+               </CardContent>
+             </Card>
+              )
+            })()
           ))
         )}
       </div>

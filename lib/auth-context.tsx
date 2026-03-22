@@ -134,6 +134,7 @@ export function useRequireAuth(redirectTo = "/login") {
 export function useRequireAdmin(redirectTo = "/") {
   const { user, status } = useAuth()
   const router = useRouter()
+  const effectiveStatus = status === "authenticated" && user?.role !== "admin" ? "unauthenticated" : status
 
   useEffect(() => {
     if (status === "loading") return
@@ -142,7 +143,11 @@ export function useRequireAdmin(redirectTo = "/") {
       router.push("/login")
       return
     }
+
+    if (status === "authenticated" && user?.role !== "admin") {
+      router.push(`/login?error=admin_required&callbackUrl=${encodeURIComponent(redirectTo)}`)
+    }
   }, [user, status, router, redirectTo])
 
-  return { user, status }
+  return { user: effectiveStatus === "authenticated" ? user : null, status: effectiveStatus }
 }

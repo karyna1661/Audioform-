@@ -11,6 +11,7 @@ import { useMobile } from "@/hooks/use-mobile"
 import { trackEvent } from "@/lib/analytics"
 import { getActiveSurveyId, recordFirstResponseForActiveSurvey } from "@/lib/behavior-metrics"
 import { useAuth } from "@/lib/auth-context"
+import { classifyResponseDuration } from "@/lib/response-duration"
 import { SurveyLoadingSkeleton } from "@/components/survey-loading-skeleton"
 
 type PublicSurvey = {
@@ -84,6 +85,7 @@ export default function QuestionnaireClientPage() {
   const [surveyLoading, setSurveyLoading] = useState(true)
   const [surveyError, setSurveyError] = useState<string | null>(null)
   const [questionList, setQuestionList] = useState<Array<{ id: string; text: string }>>([])
+  const [shortResponseHint, setShortResponseHint] = useState<string | null>(null)
   const isMountedRef = useRef(true)
   const uploadSessionsRef = useRef<Record<string, UploadSession>>({})
 
@@ -254,12 +256,27 @@ export default function QuestionnaireClientPage() {
 
     setUploadError(null)
     setRecorderSubmitState("uploading")
-    const uploaded = await uploadResponse(questionId, blob, recordingDurations[questionId] ?? null)
+    const durationSeconds = recordingDurations[questionId] ?? null
+    const uploaded = await uploadResponse(questionId, blob, durationSeconds)
     if (!isMountedRef.current) return
     if (!uploaded) {
       setRecorderSubmitState("error")
       setIsSubmittingAnswer(false)
       return
+    }
+
+    if (resolvedSurveyId && typeof durationSeconds === "number") {
+      trackEvent("response_recording_submitted", {
+        survey_id: resolvedSurveyId,
+        question_id: questionId,
+        duration_seconds: durationSeconds,
+      })
+      trackEvent("response_duration_bucketed", {
+        survey_id: resolvedSurveyId,
+        question_id: questionId,
+        duration_seconds: durationSeconds,
+        duration_bucket: classifyResponseDuration(durationSeconds),
+      })
     }
 
     setRecorderSubmitState("success")
@@ -367,9 +384,22 @@ export default function QuestionnaireClientPage() {
             onRecordingSubmit={({ questionId, durationSeconds }) => {
               setLastDurationSeconds(durationSeconds)
               setRecordingDurations((prev) => ({ ...prev, [questionId]: durationSeconds }))
+              setShortResponseHint(
+                durationSeconds < 10
+                  ? "This take is on the short side. If you can, add one concrete moment or example before sending."
+                  : null,
+              )
             }}
           />
         </div>
+
+        {shortResponseHint ? (
+          <Alert className="mt-4 border-[#dbcdb8] bg-[#fff6ed] text-[#5c5146]">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Want a stronger answer?</AlertTitle>
+            <AlertDescription className="font-body text-pretty">{shortResponseHint}</AlertDescription>
+          </Alert>
+        ) : null}
 
         {uploadError ? (
           <Alert className="mt-4 border-[#e3c3b5] bg-[#fff0e9] text-[#8a3d2b]">
