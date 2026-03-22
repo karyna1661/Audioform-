@@ -37,6 +37,25 @@ type ResponseWithMetadata = {
   bookmarked: boolean
   moderationUpdatedAt: string | null
   timestamp: string
+  transcript?: {
+    id: string
+    status: "pending" | "completed" | "failed"
+    text: string | null
+    provider: string | null
+    errorMessage: string | null
+  } | null
+  insight?: {
+    id: string
+    summary: string | null
+    primaryTheme: string | null
+    themes: string[]
+    sentiment: string | null
+    sentimentScore: number | null
+    signalScore: number | null
+    quotes: string[]
+    provider: string | null
+    extractorVersion: string | null
+  } | null
 }
 
 type ResponseInboxProps = {
@@ -45,6 +64,8 @@ type ResponseInboxProps = {
   onFlagResponse?: (responseId: string, flagged: boolean) => void
   onMarkHighSignal?: (responseId: string, highSignal: boolean) => void
   onBookmarkResponse?: (responseId: string, bookmarked: boolean) => void
+  onExtractInsight?: (responseId: string) => void
+  extractingInsightId?: string | null
 }
 
 function formatDuration(seconds?: number | null): string {
@@ -87,12 +108,21 @@ function getDurationBucketIcon(bucket: string): ReactNode {
   }
 }
 
+function getSignalTone(score?: number | null): string {
+  if (!score && score !== 0) return "text-[#7a6146]"
+  if (score >= 75) return "text-[#25613a]"
+  if (score >= 50) return "text-[#8a5a1f]"
+  return "text-[#7a6146]"
+}
+
 export function ResponseInbox({ 
   responses,
   onPlayResponse,
   onFlagResponse,
   onMarkHighSignal,
-  onBookmarkResponse
+  onBookmarkResponse,
+  onExtractInsight,
+  extractingInsightId = null,
 }: ResponseInboxProps) {
   const [playingId, setPlayingId] = useState<string | null>(null)
   const [audioErrorById, setAudioErrorById] = useState<Record<string, string>>({})
@@ -273,7 +303,7 @@ export function ResponseInbox({
                 <div className="flex items-start justify-between gap-4">
                   {/* Left Section - Info */}
                   <div className="flex-1 space-y-2">
-                    <div className="flex flex-wrap items-center gap-2">
+                     <div className="flex flex-wrap items-center gap-2">
                       <Badge variant="outline" className="text-xs">
                         {response.surveyTitle}
                       </Badge>
@@ -323,6 +353,63 @@ export function ResponseInbox({
                         {new Date(response.timestamp).toLocaleDateString()}
                       </span>
                      </div>
+
+                     {response.insight ? (
+                       <div className="rounded-2xl border border-[#dbcdb8] bg-[#fffaf3] p-3">
+                         <div className="flex flex-wrap items-center gap-2">
+                           <Badge variant="outline" className="border-[#cfbea4] bg-[#fff6ed] text-[#7a6146]">
+                             Insight ready
+                           </Badge>
+                           {response.insight.primaryTheme ? (
+                             <Badge variant="outline" className="border-[#cfbea4] bg-[#fff6ed] text-[#7a6146]">
+                               Theme: {response.insight.primaryTheme}
+                             </Badge>
+                           ) : null}
+                           <span className={cn("text-xs font-medium", getSignalTone(response.insight.signalScore))}>
+                             Signal {response.insight.signalScore ?? "-"}/100
+                           </span>
+                         </div>
+                         {response.insight.summary ? (
+                           <p className="mt-2 text-sm leading-6 text-[#3c3026]">{response.insight.summary}</p>
+                         ) : null}
+                         {response.insight.quotes?.[0] ? (
+                           <p className="mt-2 text-xs italic text-[#665746]">"{response.insight.quotes[0]}"</p>
+                         ) : null}
+                       </div>
+                     ) : response.transcript ? (
+                       <div className="rounded-2xl border border-[#dbcdb8] bg-[#fffaf3] p-3">
+                         <div className="flex flex-wrap items-center gap-2">
+                           <Badge variant="outline" className="border-[#cfbea4] bg-[#fff6ed] text-[#7a6146]">
+                             Transcript {response.transcript.status}
+                           </Badge>
+                         </div>
+                         {response.transcript.text ? (
+                           <p className="mt-2 text-sm leading-6 text-[#3c3026]">{response.transcript.text}</p>
+                         ) : response.transcript.errorMessage ? (
+                           <p className="mt-2 text-sm text-[#8a3d2b]">{response.transcript.errorMessage}</p>
+                         ) : (
+                           <p className="mt-2 text-sm text-[#665746]">Transcript is processing.</p>
+                        )}
+                      </div>
+                     ) : null}
+
+                     {!response.insight ? (
+                       <div className="flex flex-wrap items-center gap-2">
+                         <Button
+                           variant="outline"
+                           size="sm"
+                           className="border-[#cfbea4] bg-[#fff6ed] text-[#7a6146]"
+                           disabled={!onExtractInsight || extractingInsightId === response.id}
+                           onClick={() => onExtractInsight?.(response.id)}
+                         >
+                           {extractingInsightId === response.id
+                             ? "Extracting..."
+                             : response.transcript?.status === "failed"
+                               ? "Retry extraction"
+                               : "Extract insight"}
+                         </Button>
+                       </div>
+                     ) : null}
 
                      {audioErrorById[response.id] ? (
                        <p className="text-xs text-[#8a3d2b]">{audioErrorById[response.id]}</p>

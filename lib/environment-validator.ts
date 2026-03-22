@@ -33,6 +33,9 @@ const optionalEnvVars = [
   'GOOGLE_CLIENT_ID',
   'GOOGLE_CLIENT_SECRET',
 
+  // Shared infrastructure
+  'REDIS_URL',
+
   // Optional auth providers
   'NEXT_PUBLIC_PRIVY_APP_ID',
   'PRIVY_VERIFICATION_KEY',

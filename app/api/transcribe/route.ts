@@ -1,10 +1,16 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { getSessionFromRequest } from "@/lib/server/auth-session"
+import { getCorsHeaders, hasAllowedApiOrigin } from "@/lib/server/cors"
+import { enqueueTranscriptionJob, isTranscriptionJobsEnabled } from "@/lib/server/job-queue"
+import { getRequestId, logServerError } from "@/lib/server/observability"
 import { applyRateLimit, getRequestClientIp } from "@/lib/server/rate-limit"
+import { transcribeAudioFile } from "@/lib/server/transcription-provider"
+import { completeTranscript, createPendingTranscript } from "@/lib/server/transcript-store"
 
 const requestSchema = z.object({
   questionId: z.string().min(1),
+  responseId: z.string().uuid().optional(),
 })
 
 const ALLOWED_AUDIO_MIME = new Set([
@@ -18,16 +24,23 @@ const ALLOWED_AUDIO_MIME = new Set([
   "audio/x-wav",
 ])
 const MAX_AUDIO_SIZE_BYTES = 8 * 1024 * 1024
+const MAX_QUEUED_TRANSCRIPTION_BYTES = 3 * 1024 * 1024
 
 export async function POST(request: NextRequest) {
+  const corsHeaders = getCorsHeaders(request, { methods: "POST, OPTIONS" })
+
   try {
+    if (!hasAllowedApiOrigin(request)) {
+      return NextResponse.json({ error: "Invalid request origin." }, { status: 403, headers: corsHeaders })
+    }
+
     const session = await getSessionFromRequest()
     if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: corsHeaders })
     }
 
     const ip = getRequestClientIp(request.headers)
-    const rate = applyRateLimit({
+    const rate = await applyRateLimit({
       key: `transcribe:post:${ip}`,
       windowMs: 60_000,
       max: 10,
@@ -35,7 +48,7 @@ export async function POST(request: NextRequest) {
     if (!rate.allowed) {
       return NextResponse.json(
         { error: "Too many transcription requests. Please retry shortly." },
-        { status: 429, headers: { "Retry-After": String(rate.retryAfterSeconds) } },
+        { status: 429, headers: { ...corsHeaders, "Retry-After": String(rate.retryAfterSeconds) } },
       )
     }
 
@@ -43,6 +56,7 @@ export async function POST(request: NextRequest) {
     const audioFile = formData.get("audio") as File
     const parsed = requestSchema.safeParse({
       questionId: formData.get("questionId"),
+      responseId: formData.get("responseId") || undefined,
     })
 
     if (!audioFile || !parsed.success) {
@@ -51,73 +65,88 @@ export async function POST(request: NextRequest) {
           error: "Invalid transcription request",
           details: parsed.success ? undefined : parsed.error.flatten(),
         },
-        { status: 400 },
+        { status: 400, headers: corsHeaders },
       )
     }
 
     if (audioFile.size <= 0 || audioFile.size > MAX_AUDIO_SIZE_BYTES) {
       return NextResponse.json(
         { error: `Invalid audio size. Max allowed is ${Math.floor(MAX_AUDIO_SIZE_BYTES / (1024 * 1024))}MB.` },
-        { status: 413 },
+        { status: 413, headers: corsHeaders },
       )
     }
 
     const mimeType = (audioFile.type || "").toLowerCase()
     if (!ALLOWED_AUDIO_MIME.has(mimeType)) {
-      return NextResponse.json({ error: "Unsupported audio format." }, { status: 415 })
+      return NextResponse.json({ error: "Unsupported audio format." }, { status: 415, headers: corsHeaders })
     }
 
-    // Check if OpenAI API key is available
-    if (!process.env.OPENAI_API_KEY) {
-      if (process.env.NODE_ENV === "production") {
+    const asyncModeRequested = request.nextUrl.searchParams.get("mode") === "async"
+    if (asyncModeRequested && isTranscriptionJobsEnabled()) {
+      if (audioFile.size > MAX_QUEUED_TRANSCRIPTION_BYTES) {
         return NextResponse.json(
-          { error: "Transcription provider is not configured in production." },
-          { status: 503 },
+          { error: `Queued transcription currently supports files up to ${Math.floor(MAX_QUEUED_TRANSCRIPTION_BYTES / (1024 * 1024))}MB.` },
+          { status: 413, headers: corsHeaders },
         )
       }
+
+      const buffer = Buffer.from(await audioFile.arrayBuffer())
+      const job = await enqueueTranscriptionJob({
+        questionId: parsed.data.questionId,
+        responseId: parsed.data.responseId ?? null,
+        mimeType: audioFile.type || "application/octet-stream",
+        fileName: audioFile.name || `${parsed.data.questionId}.audio`,
+        audioBase64: buffer.toString("base64"),
+      })
+
+      await createPendingTranscript({
+        jobId: job.id,
+        responseId: parsed.data.responseId ?? null,
+        questionId: parsed.data.questionId,
+        provider: "openai",
+      })
+
       return NextResponse.json({
         success: true,
-        transcription:
-          "This is a mock transcription since OPENAI_API_KEY is not configured. In a production environment, this would be the actual transcription of the audio.",
+        queued: true,
+        jobId: job.id,
         questionId: parsed.data.questionId,
-        info: "OPENAI_API_KEY not configured - using mock transcription",
+      }, { status: 202, headers: corsHeaders })
+    }
+
+    const transcription = await transcribeAudioFile(audioFile)
+    if (parsed.data.responseId) {
+      const syncJobId = `sync-${parsed.data.responseId}-${Date.now()}`
+      await createPendingTranscript({
+        jobId: syncJobId,
+        responseId: parsed.data.responseId,
+        questionId: parsed.data.questionId,
+        provider: "openai",
       })
+      await completeTranscript(syncJobId, transcription, "openai")
     }
-
-    const openaiForm = new FormData()
-    openaiForm.append("file", audioFile)
-    openaiForm.append("model", process.env.OPENAI_TRANSCRIBE_MODEL || "gpt-4o-mini-transcribe")
-
-    const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      },
-      body: openaiForm,
-    })
-
-    if (!response.ok) {
-      await response.text()
-      return NextResponse.json(
-        { error: "Transcription provider request failed" },
-        { status: 502 },
-      )
-    }
-
-    const data = (await response.json()) as { text?: string }
     return NextResponse.json({
       success: true,
-      transcription: data.text || "",
+      transcription,
       questionId: parsed.data.questionId,
-    })
+    }, { headers: corsHeaders })
   } catch (error: any) {
-    console.error("Error transcribing audio:", error)
+    logServerError("api.transcribe", "transcription_failed", error, {
+      requestId: getRequestId(request.headers),
+    })
 
     return NextResponse.json(
       {
         error: "Failed to transcribe audio",
       },
-      { status: 500 },
+      { status: 500, headers: corsHeaders },
     )
   }
+}
+
+export async function OPTIONS(request: NextRequest) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: getCorsHeaders(request, { methods: "POST, OPTIONS" }),
+  })
 }

@@ -14,7 +14,7 @@ Run:
 - Base schema: `database/schema-production.sql`
 - Any required migrations: `database/migrations/*.sql`
 
-Follow: `docs/DATABASE_SETUP_SUPABASE.md`
+Follow: `docs/internal/DATABASE_SETUP_SUPABASE.md`
 
 ## Step 2 — Configure Railway env vars
 
@@ -30,6 +30,13 @@ Recommended:
 - `B2_KEY_ID`
 - `B2_APPLICATION_KEY`
 - `B2_BUCKET_ID` or `B2_BUCKET_NAME`
+- `REDIS_URL`
+- queue feature flags as needed, for example:
+  - `ENABLE_TRANSCRIPTION_JOBS=true`
+  - `ENABLE_EMAIL_JOBS=true`
+- transcription provider vars:
+  - `DEEPGRAM_API_KEY` and optional `DEEPGRAM_MODEL`
+  - or `OPENAI_API_KEY` and optional `OPENAI_TRANSCRIBE_MODEL`
 - SMTP vars for notifications (optional)
 
 ## Step 3 — Deploy
@@ -48,6 +55,30 @@ git push origin main
 railway link --project <project-id>
 railway up
 ```
+
+### Optional queue worker
+
+When Redis is configured and background jobs are enabled, run a separate worker service with:
+
+```bash
+npm run worker:queue
+```
+
+Use this only after setting:
+
+- `REDIS_URL`
+- optional feature flags such as `ENABLE_TRANSCRIPTION_JOBS=true`
+- SMTP credentials
+
+Current queue-backed jobs:
+
+- outbound email
+- optional async transcription via `/api/transcribe?mode=async`
+
+Safe first queue rollout recommendation:
+
+- enable transcription jobs first
+- leave email jobs off until SMTP/domain setup is complete
 
 ## Step 4 — Smoke test (10 minutes)
 
@@ -72,6 +103,11 @@ railway up
 
 ### Analytics
 - Confirm `/api/analytics` returns success for actions
+
+### Readiness and health
+- Confirm `/api/health` returns `200` in a healthy environment
+- Confirm `/api/ready` returns `200` before marking the deploy ready
+- If Redis is configured, verify rate-limited endpoints still behave normally
 
 ## Rollback (if needed)
 

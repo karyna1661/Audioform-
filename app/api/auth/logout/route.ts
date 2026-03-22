@@ -1,20 +1,22 @@
-import { NextResponse } from "next/server"
+import { NextResponse, type NextRequest } from "next/server"
 import { clearSessionCookie } from "@/lib/server/auth-session"
-import { hasTrustedOrigin } from "@/lib/server/request-guards"
+import { getCorsHeaders, hasAllowedApiOrigin } from "@/lib/server/cors"
 
-export async function POST(request: Request) {
-  if (
-    !hasTrustedOrigin({
-      requestOrigin: request.headers.get("origin"),
-      requestReferer: request.headers.get("referer"),
-      requestUrl: request.url,
-      configuredAppUrl: process.env.NEXT_PUBLIC_APP_URL,
-    })
-  ) {
-    return NextResponse.json({ error: "Invalid request origin." }, { status: 403 })
+export async function POST(request: NextRequest) {
+  const corsHeaders = getCorsHeaders(request, { methods: "POST, OPTIONS" })
+
+  if (!hasAllowedApiOrigin(request)) {
+    return NextResponse.json({ error: "Invalid request origin." }, { status: 403, headers: corsHeaders })
   }
 
-  const response = NextResponse.json({ success: true })
+  const response = NextResponse.json({ success: true }, { headers: corsHeaders })
   clearSessionCookie(response)
   return response
+}
+
+export async function OPTIONS(request: NextRequest) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: getCorsHeaders(request, { methods: "POST, OPTIONS" }),
+  })
 }

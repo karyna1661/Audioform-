@@ -1,7 +1,9 @@
-import { NextResponse } from "next/server"
+import { NextResponse, type NextRequest } from "next/server"
 import { z } from "zod"
-import { recordAnalyticsEvent } from "@/lib/server/analytics-store"
+import { recordOrQueueAnalyticsEvent } from "@/lib/server/analytics-store"
 import { getSessionFromRequest } from "@/lib/server/auth-session"
+import { getCorsHeaders, hasAllowedApiOrigin } from "@/lib/server/cors"
+import { applyRateLimit, getRequestClientIp } from "@/lib/server/rate-limit"
 
 const eventSchema = z.object({
   eventName: z.string(),
@@ -10,22 +12,40 @@ const eventSchema = z.object({
   eventData: z.record(z.unknown()).optional(),
 })
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const corsHeaders = getCorsHeaders(request, { methods: "POST, OPTIONS" })
+
   try {
+    if (!hasAllowedApiOrigin(request)) {
+      return NextResponse.json({ error: "Invalid request origin." }, { status: 403, headers: corsHeaders })
+    }
+
+    const ip = getRequestClientIp(request.headers)
+    const rate = await applyRateLimit({
+      key: `analytics:ingest:${ip}`,
+      windowMs: 60_000,
+      max: 120,
+    })
+    if (!rate.allowed) {
+      return NextResponse.json(
+        { error: "Too many analytics events. Please retry shortly." },
+        { status: 429, headers: { ...corsHeaders, "Retry-After": String(rate.retryAfterSeconds) } },
+      )
+    }
+
     const json = await request.json()
     const parsed = eventSchema.safeParse(json)
     
     if (!parsed.success) {
       return NextResponse.json(
         { error: "Invalid event payload", details: parsed.error.flatten() },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       )
     }
 
     const session = await getSessionFromRequest()
     
-    // Record event to database
-    await recordAnalyticsEvent({
+    const result = await recordOrQueueAnalyticsEvent({
       eventName: parsed.data.eventName,
       userId: session?.sub ?? null,
       surveyId: parsed.data.surveyId ?? null,
@@ -33,9 +53,23 @@ export async function POST(request: Request) {
       eventData: parsed.data.eventData ?? {},
     })
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json(
+      {
+        success: true,
+        deliveryMode: result.mode,
+        jobId: result.mode === "queued" ? result.jobId : null,
+      },
+      { headers: corsHeaders },
+    )
   } catch (error) {
     console.error("Failed to record analytics event:", error)
-    return NextResponse.json({ error: "Failed to record event" }, { status: 500 })
+    return NextResponse.json({ error: "Failed to record event" }, { status: 500, headers: corsHeaders })
   }
+}
+
+export async function OPTIONS(request: NextRequest) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: getCorsHeaders(request, { methods: "POST, OPTIONS" }),
+  })
 }
