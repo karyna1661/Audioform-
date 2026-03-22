@@ -1,8 +1,39 @@
 #!/usr/bin/env node
 
+import fs from "node:fs"
 import { Socket } from "node:net"
+import path from "node:path"
 import { connect as connectTls } from "node:tls"
 import nodemailer from "nodemailer"
+
+function loadEnvFile(fileName) {
+  const filePath = path.join(process.cwd(), fileName)
+  if (!fs.existsSync(filePath)) return
+
+  const contents = fs.readFileSync(filePath, "utf8")
+  for (const rawLine of contents.split(/\r?\n/)) {
+    const line = rawLine.trim()
+    if (!line || line.startsWith("#") || !line.includes("=")) continue
+
+    const [rawKey, ...rawValueParts] = line.split("=")
+    const key = rawKey.trim()
+    if (!key || process.env[key]) continue
+
+    const joined = rawValueParts.join("=").trim()
+    process.env[key] = joined.replace(/^['"]|['"]$/g, "")
+  }
+}
+
+function preloadEnvFiles() {
+  [
+    ".env",
+    ".env.local",
+    ".env.development",
+    ".env.development.local",
+  ].forEach(loadEnvFile)
+}
+
+preloadEnvFiles()
 
 function decodeJwtPayload(token) {
   const parts = token.split(".")
