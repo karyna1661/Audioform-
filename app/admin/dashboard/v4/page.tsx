@@ -339,16 +339,16 @@ export default function AdminDashboardV4Page() {
           </div>
         </header>
 
-        <section className="af-accent-card af-fade-up af-delay-1 mt-5 rounded-2xl border p-4">
+        <section className="af-accent-card af-fade-up af-delay-1 mt-5 rounded-2xl border p-4 sm:p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-lg font-semibold text-balance">First-run checklist</h2>
-            <p className="font-body text-xs text-[#5c5146] text-pretty">
+            <p className="hidden font-body text-xs text-[#5c5146] text-pretty sm:block">
               Complete these three steps to reach first value fast.
             </p>
           </div>
           <ul className="mt-3 grid gap-2 sm:grid-cols-3">
             {onboardingChecklist.map((item) => (
-              <li key={item.id} className="rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] p-3 text-sm">
+              <li key={item.id} className="rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] p-2.5 text-sm sm:p-3">
                 <p className="inline-flex items-center gap-2 font-semibold text-balance">
                   <CheckCircle2
                     className={`size-4 ${item.done ? "text-[#2d5a17]" : "text-[#8c7f70]"}`}
@@ -363,14 +363,14 @@ export default function AdminDashboardV4Page() {
         </section>
 
         <section className="mt-6 grid gap-4 lg:grid-cols-[260px_1fr_300px]">
-          <aside className="af-accent-card af-fade-up af-delay-1 rounded-2xl border p-4">
+          <aside className="af-accent-card af-fade-up af-delay-1 rounded-2xl border p-4 lg:p-4">
             <h2 className="text-lg font-semibold text-balance">Quick Actions</h2>
-            <div className="mt-3 hidden gap-2 sm:grid">
+            <div className="mt-3 grid gap-2 sm:grid">
               <Link href="/admin/responses" className="inline-flex items-center justify-between rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] px-3 py-2 text-sm hover:bg-[#efe4d3]">
                 Moderate queue (response-level)
                 <ArrowUpRight className="size-4" aria-hidden="true" />
               </Link>
-              <Link href="/admin/notifications" className="rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] px-3 py-2 text-sm hover:bg-[#efe4d3]">
+              <Link href="/admin/notifications" className="hidden rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] px-3 py-2 text-sm hover:bg-[#efe4d3] sm:block">
                 Configure creator notifications
               </Link>
               <Link
@@ -384,7 +384,7 @@ export default function AdminDashboardV4Page() {
             <div className="my-4 border-t border-[#dbcdb8]" />
 
             <h2 className="text-xl font-semibold text-balance">Decision KPIs</h2>
-            <div className="mt-3 space-y-2">
+            <div className="mt-3 grid gap-2 sm:space-y-2">
               <Metric label="Published rate" value={`${publishedRate}%`} />
               <Metric label="Unique respondents" value={`${uniqueRespondents}`} />
               <Metric label="TTFR" value={ttfrLabel} helper={ttfrTrendLabel} />
@@ -565,7 +565,7 @@ export default function AdminDashboardV4Page() {
             </div>
           </section>
 
-          <aside className="space-y-4">
+          <aside className="space-y-4 hidden lg:block">
             <article className="af-accent-card af-fade-up af-delay-2 rounded-2xl border p-4">
               <h2 className="text-lg font-semibold text-balance">Insight Extractor</h2>
               <p className="font-body mt-1 text-xs text-[#5c5146]">
@@ -631,6 +631,35 @@ export default function AdminDashboardV4Page() {
               </ul>
             </article>
           </aside>
+
+          <section className="space-y-4 lg:hidden">
+            <article className="af-accent-card af-fade-up af-delay-2 rounded-2xl border p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold text-balance">Insight Extractor</h2>
+                  <p className="font-body mt-1 text-xs text-[#5c5146]">Theme groups and extractor health.</p>
+                </div>
+                <div className="rounded-full bg-[#f3ecdf] px-2 py-1 text-xs text-[#7a6146]">{extractorMetrics.withInsight} ready</div>
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <Metric label="Insights" value={`${extractorMetrics.withInsight}`} />
+                <Metric label="Pending" value={`${extractorMetrics.transcriptPending}`} />
+              </div>
+              <ul className="mt-3 space-y-2 text-sm text-[#5c5146]">
+                {themeCoverage.slice(0, 3).map(({ theme, count }) => (
+                  <li key={theme} className="flex items-center justify-between rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] px-3 py-2">
+                    <span className="capitalize text-[#261c14]">{theme}</span>
+                    <span className="text-xs tabular-nums">{count}</span>
+                  </li>
+                ))}
+                {!themeCoverage.length ? (
+                  <li className="rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] p-3 text-xs">
+                    Run extraction on a few responses to see grouped themes here.
+                  </li>
+                ) : null}
+              </ul>
+            </article>
+          </section>
         </section>
       </div>
 
