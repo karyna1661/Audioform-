@@ -496,7 +496,7 @@ export default function AdminDashboardV4Page() {
                           if (typeof window === "undefined") return
                           const link = `${window.location.origin}/share/survey/${encodeURIComponent(
                             survey.id,
-                          )}`
+                          )}?v=${new Date(survey.updatedAt).getTime()}`
                           try {
                             await navigator.clipboard.writeText(link)
                             setUiMessage(`Survey link copied for "${survey.title}".`)

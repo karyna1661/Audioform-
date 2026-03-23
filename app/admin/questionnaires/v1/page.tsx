@@ -478,7 +478,7 @@ export default function QuestionnairesV1Page() {
     publishedSurveyId
       ? `${typeof window !== "undefined" ? window.location.origin : ""}/share/survey/${encodeURIComponent(
           publishedSurveyId,
-        )}`
+        )}?v=${Date.now()}`
       : ""
   const embedLink =
     publishedSurveyId && creatorId
