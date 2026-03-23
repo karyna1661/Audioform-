@@ -75,6 +75,8 @@
 - [x] Persist notification rules/templates in backend (`/api/notifications` + Supabase table).
 - [x] Auto-trigger creator notification on new response using saved notification config.
 - [x] Migrate response metadata/moderation persistence from local file store to Supabase (`response_records`).
+- [x] Audit repo against task and future-work checklists; sync completed vs remaining status docs.
+- [x] Enforce server-side admin authz, finish remaining behavioral analytics wiring, retire compare routes, remove stale mock metrics, add short-response nudge, and harden provider retries/logging.
 
 ## Review
 - Survey generator review: shifted the builder toward an editorial research-desk feel with clearer hierarchy, calmer copy, stronger prompt sequencing, and a less assistant-like interface.
@@ -109,3 +111,5 @@
 - Scalability execution-plan review: mapped all 20 checklist items to the current codebase in `future-work/AUDIOFORM_SCALABILITY_EXECUTION_PLAN_RAILWAY_SUPABASE_REDIS.md` with priority, owner role, and Phase 1/2/3 rollout for Railway, Supabase, Redis, and B2.
 - First-response loop review: response inbox now plays stored audio, labels each response with the actual survey question text when available, and both dashboard/inbox poll for fresh responses so new recordings surface without a manual reload.
 - Upload-loop hardening review: recorder now keeps the recorded take visible during slow uploads, embedded survey pages now use the same init/upload pipeline as the main questionnaire instead of the heavier legacy single-request path, upload timeouts were raised for slow mobile networks, and the inbox now surfaces a simple "Start Here" listen-first digest.
+- Checklist audit review: updated `future-work/audioform-beta-readiness-checklist.md` and `future-work/audioform-v1-implementation-checklist.md` to reflect the current codebase; remaining gaps are primarily server-side admin authz, incomplete analytics wiring, compare-route gating, mock showcase metrics, and broader ops/scalability hardening.
+- Hardening + instrumentation review: admin APIs now reject non-admin sessions server-side, compare routes redirect to the chosen live flows, notification/respondent/revisit analytics events are wired end-to-end, the respondent flow now nudges sub-10-second takes without blocking submission, stale mock revenue/traction claims were removed from the visual command center, and Supabase/SMTP/OpenAI provider paths now use timeout/retry plus structured error logging.

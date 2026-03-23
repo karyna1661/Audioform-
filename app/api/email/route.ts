@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { getSessionFromRequest } from "@/lib/server/auth-session"
 import { getCorsHeaders, hasAllowedApiOrigin } from "@/lib/server/cors"
+import { getRequestId, logServerError } from "@/lib/server/observability"
 import { recordDashboardEvent } from "@/lib/server/survey-store"
 import { sendOrQueueEmail } from "@/lib/server/queued-email"
 import { applyRateLimit, getRequestClientIp } from "@/lib/server/rate-limit"
@@ -85,7 +86,9 @@ export async function POST(request: NextRequest) {
       jobId: result.mode === "queued" ? result.jobId : null,
     }, { headers: corsHeaders })
   } catch (error: any) {
-    console.error("Error sending email:", error)
+    logServerError("api.email", "send_failed", error, {
+      requestId: getRequestId(request.headers),
+    })
 
     return NextResponse.json(
       {

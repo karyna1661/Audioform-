@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+const fs = require('fs');
+const path = require('path');
+
 /**
  * Pre-build Environment Validation Script
  * 
@@ -27,6 +30,34 @@ const optionalEnvVars = [
   'PRIVY_VERIFICATION_KEY',
   'NEXT_PUBLIC_AUDIOFORM_FEEDBACK_SURVEY_ID',
 ];
+
+function loadEnvFile(fileName) {
+  const filePath = path.join(process.cwd(), fileName);
+  if (!fs.existsSync(filePath)) return;
+
+  const contents = fs.readFileSync(filePath, 'utf8');
+  for (const rawLine of contents.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('#') || !line.includes('=')) continue;
+
+    const [rawKey, ...rawValueParts] = line.split('=');
+    const key = rawKey.trim();
+    if (!key || process.env[key]) continue;
+
+    const joined = rawValueParts.join('=').trim();
+    const value = joined.replace(/^['"]|['"]$/g, '');
+    process.env[key] = value;
+  }
+}
+
+function preloadEnvFiles() {
+  [
+    '.env',
+    '.env.local',
+    '.env.development',
+    '.env.development.local',
+  ].forEach(loadEnvFile);
+}
 
 function validate() {
   const isProd = process.env.NODE_ENV === 'production';
@@ -127,6 +158,7 @@ function validate() {
 }
 
 // Run validation
+preloadEnvFiles();
 const success = validate();
 
 // Export for use in other scripts

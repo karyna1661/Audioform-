@@ -15,11 +15,12 @@ function getParam(value: string | string[] | undefined): string | null {
 export async function generateMetadata({ searchParams }: PageProps): Promise<Metadata> {
   const params = await searchParams
   const surveyId = getParam(params.surveyId)
+  const brandedDescription = "Powered by Audioform. Answer by voice in under a minute."
 
   if (!surveyId) {
     return {
       title: "Audioform voice survey",
-      description: "Listen to the question before you answer. Share one concrete moment by voice.",
+      description: brandedDescription,
       openGraph: {
         images: [{ url: "/api/og/survey" }],
       },
@@ -32,21 +33,19 @@ export async function generateMetadata({ searchParams }: PageProps): Promise<Met
 
   const survey = await getPublishedSurveyById(surveyId)
   const prompts = await getLatestPublishedSurveyQuestions(surveyId)
-  const firstPrompt = prompts[0]?.trim() || "Share one concrete moment by voice."
   const title = survey?.title?.trim() || "Audioform voice survey"
-  const description = firstPrompt.length > 160 ? `${firstPrompt.slice(0, 157)}...` : firstPrompt
   const url = `${process.env.NEXT_PUBLIC_APP_URL || "https://audioform-production.up.railway.app"}/questionnaire/v1?surveyId=${encodeURIComponent(surveyId)}`
   const imageUrl = `/api/og/survey?surveyId=${encodeURIComponent(surveyId)}`
 
   return {
     title,
-    description,
+    description: brandedDescription,
     alternates: {
       canonical: url,
     },
     openGraph: {
       title,
-      description,
+      description: brandedDescription,
       url,
       type: "website",
       siteName: "Audioform",
@@ -62,7 +61,7 @@ export async function generateMetadata({ searchParams }: PageProps): Promise<Met
     twitter: {
       card: "summary_large_image",
       title,
-      description,
+      description: brandedDescription,
       images: [imageUrl],
     },
   }

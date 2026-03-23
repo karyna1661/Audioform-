@@ -312,7 +312,7 @@ export default function VisualCommandCenter() {
                   name: 'Foundation (No AI)',
                   timeline: 'Weeks 1-4',
                   color: '#ef4444',
-                  items: ['Voice survey builder', 'Mobile recorder', 'Manual extraction', '100 responses in 48h']
+                  items: ['Voice survey builder', 'Mobile recorder', 'Manual extraction', 'First high-signal feedback loop']
                 },
                 {
                   id: 'phase2',
@@ -326,7 +326,7 @@ export default function VisualCommandCenter() {
                   name: 'Insight Mining Rig',
                   timeline: 'Months 4-6',
                   color: '#eab308',
-                  items: ['Cross-survey trends', 'Auto-categorization', 'Real-time analytics', '$2k MRR']
+                  items: ['Cross-survey trends', 'Auto-categorization', 'Real-time analytics', 'Repeatable paid pilot']
                 },
                 {
                   id: 'phase4',
@@ -340,7 +340,7 @@ export default function VisualCommandCenter() {
                   name: 'Voice Insight Engine',
                   timeline: 'Months 9-12',
                   color: '#3b82f6',
-                  items: ['Predictive ML', 'Recommendations', 'Longitudinal studies', '$15k MRR']
+                  items: ['Predictive ML', 'Recommendations', 'Longitudinal studies', 'Decision-grade reporting']
                 }
               ].map((phase, index) => (
                 <div

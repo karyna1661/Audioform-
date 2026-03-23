@@ -3,6 +3,7 @@ import { z } from "zod"
 import { recordOrQueueAnalyticsEvent } from "@/lib/server/analytics-store"
 import { getSessionFromRequest } from "@/lib/server/auth-session"
 import { getCorsHeaders, hasAllowedApiOrigin } from "@/lib/server/cors"
+import { getRequestId, logServerError } from "@/lib/server/observability"
 import { applyRateLimit, getRequestClientIp } from "@/lib/server/rate-limit"
 
 const eventSchema = z.object({
@@ -62,7 +63,9 @@ export async function POST(request: NextRequest) {
       { headers: corsHeaders },
     )
   } catch (error) {
-    console.error("Failed to record analytics event:", error)
+    logServerError("api.analytics", "record_failed", error, {
+      requestId: getRequestId(request.headers),
+    })
     return NextResponse.json({ error: "Failed to record event" }, { status: 500, headers: corsHeaders })
   }
 }

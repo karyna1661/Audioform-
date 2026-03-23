@@ -17,6 +17,7 @@ This repo keeps the public GitHub surface intentionally small. Most operator not
 
 ## Internal Runbooks
 
+- `docs/internal/README.md`
 - `docs/internal/QUICK_START_GUIDE.md`
 - `docs/internal/DEPLOYMENT_P0_BETA.md`
 - `docs/internal/DATABASE_SETUP_SUPABASE.md`
@@ -24,5 +25,6 @@ This repo keeps the public GitHub surface intentionally small. Most operator not
 
 ## Archive
 
+- `docs/archive/README.md`
 - `docs/archive/` contains incident notes, old launch status docs, fix summaries, migration notes, and deployment history that are still useful internally but should not dominate the repo root.
 

@@ -23,6 +23,9 @@ export async function GET() {
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
+  if (session.role !== "admin") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  }
 
   try {
     const config = await getNotificationConfigByUserId(session.sub)
@@ -37,6 +40,9 @@ export async function PUT(request: NextRequest) {
   const session = await getSessionFromRequest()
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: corsHeaders })
+  }
+  if (session.role !== "admin") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403, headers: corsHeaders })
   }
 
   try {

@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer"
+import { logServerError, retryAsync, withTimeout } from "@/lib/server/observability"
 
 type EmailInput = {
   to: string[]
@@ -46,13 +47,34 @@ export async function sendEmail(input: EmailInput): Promise<EmailSendResult> {
   if (!input.subject.trim()) throw new Error("Email subject is required.")
   if (!input.html && !input.text) throw new Error("Email body is required.")
 
-  const transporter = await createTransporter()
-  const info = await transporter.sendMail({
-    from: '"AudioForm" <notifications@audioform.example.com>',
-    to: input.to.join(", "),
-    subject: input.subject,
-    text: input.text,
-    html: input.html,
+  const transporter = await withTimeout(() => createTransporter(), 10_000, "SMTP transporter setup")
+
+  const info = await retryAsync<Awaited<ReturnType<typeof transporter.sendMail>>>(
+    async () =>
+      withTimeout(
+        () =>
+          transporter.sendMail({
+            from: '"AudioForm" <notifications@audioform.example.com>',
+            to: input.to.join(", "),
+            subject: input.subject,
+            text: input.text,
+            html: input.html,
+          }),
+        10_000,
+        "SMTP sendMail",
+      ),
+    {
+      attempts: 2,
+      initialDelayMs: 400,
+      shouldRetry: (error) =>
+        error instanceof Error && /timed out|ECONNRESET|ECONNREFUSED|EPIPE|ETIMEDOUT|ESOCKET/i.test(error.message),
+    },
+  ).catch((error) => {
+    logServerError("server.email", "send_failed", error, {
+      recipientCount: input.to.length,
+      subjectLength: input.subject.length,
+    })
+    throw error
   })
 
   const previewUrl =

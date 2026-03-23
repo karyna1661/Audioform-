@@ -302,121 +302,121 @@ export function ResponseInbox({
                 ? `${fullSummary.slice(0, 157)}...`
                 : fullSummary
               return (
-            <Card key={response.id} className={cn(
-              "transition-colors",
-              response.flagged && "border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-900/20",
-              response.highSignal && "border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-900/20",
-              response.bookmarked && "border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-900/20"
-            )}>
-              <CardContent className="p-3 sm:p-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+              <Card key={response.id} className={cn(
+                "transition-colors",
+                response.flagged && "border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-900/20",
+                response.highSignal && "border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-900/20",
+                response.bookmarked && "border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-900/20"
+              )}>
+              <CardContent className="p-2 sm:p-4">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                   {/* Left Section - Info */}
-                  <div className="flex-1 space-y-2">
-                     <div className="flex flex-wrap items-center gap-2">
-                       <Badge variant="outline" className="text-xs">
-                         {response.surveyTitle}
-                       </Badge>
+                  <div className="flex-1 space-y-1.5 sm:space-y-2">
+                     <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                        <Badge variant="outline" className="text-xs px-1.5 py-0.5">
+                          {response.surveyTitle}
+                        </Badge>
                       {response.durationBucket && (
-                        <Badge className={cn("text-xs", getDurationBucketColor(response.durationBucket))}>
+                        <Badge className={cn("text-xs px-1.5 py-0.5", getDurationBucketColor(response.durationBucket))}>
                           {getDurationBucketIcon(response.durationBucket)}
                           <span className="ml-1 capitalize">{response.durationBucket}</span>
                         </Badge>
                       )}
                       {response.flagged && (
-                        <Badge variant="destructive" className="text-xs">
-                          <Flag className="h-3 w-3 mr-1" />
-                          Flagged
+                        <Badge variant="destructive" className="text-xs px-1.5 py-0.5">
+                          <Flag className="h-3 w-3 mr-0.5" />
+                          <span className="hidden sm:inline">Flagged</span>
                         </Badge>
                       )}
                       {response.highSignal && (
-                        <Badge className="bg-green-600 text-white text-xs">
-                          <Star className="h-3 w-3 mr-1" />
-                          High Signal
+                        <Badge className="bg-green-600 text-white text-xs px-1.5 py-0.5">
+                          <Star className="h-3 w-3 mr-0.5" />
+                          <span className="hidden sm:inline">High Signal</span>
                         </Badge>
                       )}
                       {response.bookmarked && (
-                        <Badge variant="secondary" className="text-xs">
-                          <Bookmark className="h-3 w-3 mr-1" />
-                          Bookmarked
+                        <Badge variant="secondary" className="text-xs px-1.5 py-0.5">
+                          <Bookmark className="h-3 w-3 mr-0.5" />
+                          <span className="hidden sm:inline">Saved</span>
                         </Badge>
                       )}
                     </div>
+                   
+                    <div>
+                      <p className="text-sm font-medium text-foreground line-clamp-1">{buildResponseHeading(response)}</p>
+                      <p className="text-sm text-muted-foreground line-clamp-1">
+                        {response.questionText || `Question ${response.questionId.toUpperCase()}`}
+                      </p>
+                    </div>
                     
-                     <div>
-                       <p className="text-sm font-medium text-foreground">{buildResponseHeading(response)}</p>
-                       <p className="text-sm text-muted-foreground">
-                         {response.questionText || `Question ${response.questionId.toUpperCase()}`}
-                       </p>
-                     </div>
-                      
-                      <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                       <span className="flex items-center gap-1">
-                         <Clock className="h-3 w-3" />
-                         {formatDuration(response.durationSeconds)}
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {formatDuration(response.durationSeconds)}
                       </span>
                       <span className="flex items-center gap-1">
-                        <Mic className="h-3 w-3" />
-                        {formatFileSize(response.fileSize)}
-                      </span>
-                      <span>
-                        {new Date(response.timestamp).toLocaleDateString()}
-                      </span>
-                     </div>
+                       <Mic className="h-3 w-3" />
+                       {formatFileSize(response.fileSize)}
+                     </span>
+                     <span className="hidden sm:inline">
+                       {new Date(response.timestamp).toLocaleDateString()}
+                     </span>
+                    </div>
 
-                     {response.insight ? (
-                       <div className="rounded-2xl border border-[#dbcdb8] bg-[#fffaf3] p-3">
-                         <div className="flex flex-wrap items-center gap-2">
-                           <Badge variant="outline" className="border-[#cfbea4] bg-[#fff6ed] text-[#7a6146]">
-                             Insight ready
-                           </Badge>
-                           {response.insight.primaryTheme ? (
-                             <Badge variant="outline" className="border-[#cfbea4] bg-[#fff6ed] text-[#7a6146]">
-                               Theme: {response.insight.primaryTheme}
-                             </Badge>
+                      {response.insight ? (
+                        <div className="rounded-2xl border border-[#dbcdb8] bg-[#fffaf3] p-2 sm:p-3">
+                          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                            <Badge variant="outline" className="border-[#cfbea4] bg-[#fff6ed] text-[#7a6146] text-xs">
+                              Insight
+                            </Badge>
+                            {response.insight.primaryTheme ? (
+                              <Badge variant="outline" className="border-[#cfbea4] bg-[#fff6ed] text-[#7a6146] text-xs">
+                                {response.insight.primaryTheme}
+                              </Badge>
+                            ) : null}
+                            <span className={cn("text-xs font-medium", getSignalTone(response.insight.signalScore))}>
+                              {response.insight.signalScore ?? "-"}/100
+                            </span>
+                          </div>
+                           {truncatedSummary ? (
+                             <>
+                               <p className="mt-1.5 sm:mt-2 text-xs sm:text-sm leading-5 sm:leading-6 text-[#3c3026] line-clamp-2">{truncatedSummary}</p>
+                               {fullSummary && fullSummary.length > 160 ? (
+                                 <button
+                                   type="button"
+                                   className="mt-1.5 sm:mt-2 text-xs font-medium text-[#8a431f] hover:underline"
+                                   onClick={() =>
+                                     setExpandedInsightIds((current) => ({
+                                       ...current,
+                                       [response.id]: !current[response.id],
+                                     }))
+                                   }
+                                 >
+                                   {isExpanded ? "Less" : "More"}
+                                 </button>
+                               ) : null}
+                             </>
                            ) : null}
-                           <span className={cn("text-xs font-medium", getSignalTone(response.insight.signalScore))}>
-                             Signal {response.insight.signalScore ?? "-"}/100
-                           </span>
-                         </div>
-                          {truncatedSummary ? (
-                            <>
-                              <p className="mt-2 text-sm leading-6 text-[#3c3026]">{truncatedSummary}</p>
-                              {fullSummary && fullSummary.length > 160 ? (
-                                <button
-                                  type="button"
-                                  className="mt-2 text-xs font-medium text-[#8a431f] hover:underline"
-                                  onClick={() =>
-                                    setExpandedInsightIds((current) => ({
-                                      ...current,
-                                      [response.id]: !current[response.id],
-                                    }))
-                                  }
-                                >
-                                  {isExpanded ? "See less" : "See all"}
-                                </button>
-                              ) : null}
-                            </>
+                          {response.insight.quotes?.[0] ? (
+                            <p className="mt-1.5 sm:mt-2 text-xs italic text-[#665746] line-clamp-2">"{response.insight.quotes[0]}"</p>
                           ) : null}
-                         {response.insight.quotes?.[0] ? (
-                           <p className="mt-2 text-xs italic text-[#665746]">"{response.insight.quotes[0]}"</p>
-                         ) : null}
-                       </div>
-                     ) : response.transcript ? (
-                       <div className="rounded-2xl border border-[#dbcdb8] bg-[#fffaf3] p-3">
-                         <div className="flex flex-wrap items-center gap-2">
-                           <Badge variant="outline" className="border-[#cfbea4] bg-[#fff6ed] text-[#7a6146]">
-                             Transcript {response.transcript.status}
-                           </Badge>
-                         </div>
-                         {response.transcript.text ? (
-                           <p className="mt-2 text-sm leading-6 text-[#3c3026]">{response.transcript.text}</p>
-                         ) : response.transcript.errorMessage ? (
-                           <p className="mt-2 text-sm text-[#8a3d2b]">{response.transcript.errorMessage}</p>
-                         ) : (
-                           <p className="mt-2 text-sm text-[#665746]">Transcript is processing.</p>
-                        )}
-                      </div>
-                     ) : null}
+                        </div>
+                      ) : response.transcript ? (
+                        <div className="rounded-2xl border border-[#dbcdb8] bg-[#fffaf3] p-2 sm:p-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge variant="outline" className="border-[#cfbea4] bg-[#fff6ed] text-[#7a6146] text-xs">
+                              Transcript {response.transcript.status}
+                            </Badge>
+                          </div>
+                          {response.transcript.text ? (
+                            <p className="mt-1.5 sm:mt-2 text-xs sm:text-sm leading-5 text-[#3c3026] line-clamp-3">{response.transcript.text}</p>
+                          ) : response.transcript.errorMessage ? (
+                            <p className="mt-1.5 sm:mt-2 text-xs text-[#8a3d2b]">{response.transcript.errorMessage}</p>
+                          ) : (
+                            <p className="mt-1.5 sm:mt-2 text-xs text-[#665746]">Processing...</p>
+                         )}
+                        </div>
+                      ) : null}
 
                      {!response.insight ? (
                        <div className="flex flex-wrap items-center gap-2">

@@ -119,30 +119,6 @@ User: Builder creating survey
 
 **Form Fields:**
 1. **Survey Title**: "Activation Decision Pulse"
-2. **What are you changing?**: Dropdown
-   - Options: Onboarding flow, Pricing page, Feature experience, etc.
-3. **What kind of change?**: Dropdown
-   - Options: Add, Remove, Simplify, Reorder, etc.
-4. **What outcome should improve?**: Dropdown
-   - Options: Conversion, Clarity, Trust, Adoption, etc.
-
-**Generated Decision Anchor** (auto-calculated):
-```
-"Should we simplify onboarding flow to improve conversion?"
-```
-
-**Intent Mode Selection:**
-- 🔍 Validate Direction
-- 🎯 Find Weak Spots ← Selected
-- ❓ Find Confusion
-- ❤️ Capture Emotion
-
-**Audience Selection:**
-- 👷 Builders
-- 👥 Community users
-- 💰 Paying customers
-
----
 
 #### Phase 2: Build Question Flow (Action)
 

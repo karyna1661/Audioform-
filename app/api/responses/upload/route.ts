@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     }
 
     const ip = getRequestClientIp(request.headers)
-    const rate = applyRateLimit({
+    const rate = await applyRateLimit({
       key: `responses:upload:${ip}`,
       windowMs: 60_000,
       max: 40,

@@ -4,6 +4,22 @@ This is the execution plan for implementing the behavioral architecture in produ
 
 Related: see `future-work/audioform-beta-readiness-checklist.md` for prioritized `P0/P1` release gating and verification criteria.
 
+## Status Audit (2026-03-21)
+
+### Done
+- Trigger: home decision framing is live on `app/page.tsx`.
+- Action: respondent flow includes record, playback, elapsed/total playback timing, depth guidance, and a lightweight short-response nudge in `app/questionnaire/v1/questionnaire-client.tsx` and `components/audio-recorder.tsx`.
+- Reward: dashboard shows first-response visibility / TTFR and response quality buckets are derived from persisted metadata.
+- Reinforcement: notification settings persist, creator notifications auto-send on new responses, the thank-you page includes a creator CTA with analytics tracking, and creator revisit instrumentation is now wired.
+
+### Partial
+- Trigger: survey persistence supports `intent` and `templatePack`, but the current builder does not fully save/use explicit intent-mode selection and mapping.
+- Reward: valuable-clip and moderation actions persist, but the dashboard does not yet surface a real most-replayed response or average response length across surveys.
+
+### Not Done Yet
+- Explicit intent-mode to prompt-pack mapping and explanation flow.
+- Most-replayed response and average response length dashboard surfaces.
+
 ## Sprint Goal
 Reduce uncertainty-to-insight latency by optimizing:
 1. Time to first response (TTFR)

@@ -19,6 +19,7 @@ type TtfrSnapshot = {
 const METRICS_KEY = "audioform_v1_survey_metrics"
 const ACTIVE_SURVEY_KEY = "audioform_v1_active_survey_id"
 const TTFR_HISTORY_KEY = "audioform_v1_ttfr_history_seconds"
+const CREATOR_VISIT_KEY = "audioform_v1_creator_visit_registry"
 
 function readJson<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback
@@ -121,4 +122,26 @@ export function getTtfrTrend(): "improving" | "stable" | "slipping" {
   if (latest < previous) return "improving"
   if (latest > previous) return "slipping"
   return "stable"
+}
+
+export function shouldTrackCreatorRevisitWithin7d(userId: string, surface: string): boolean {
+  if (typeof window === "undefined") return false
+
+  const registry = readJson<Record<string, { lastVisitAt?: string; lastTrackedAt?: string }>>(CREATOR_VISIT_KEY, {})
+  const key = `${userId}:${surface}`
+  const current = registry[key] ?? {}
+  const now = Date.now()
+  const lastVisitAt = current.lastVisitAt ? new Date(current.lastVisitAt).getTime() : null
+  const lastTrackedAt = current.lastTrackedAt ? new Date(current.lastTrackedAt).getTime() : null
+
+  const withinSevenDays = lastVisitAt !== null && now - lastVisitAt <= 7 * 24 * 60 * 60 * 1000
+  const notRecentlyTracked = lastTrackedAt === null || now - lastTrackedAt >= 60 * 60 * 1000
+
+  registry[key] = {
+    lastVisitAt: new Date(now).toISOString(),
+    lastTrackedAt: withinSevenDays && notRecentlyTracked ? new Date(now).toISOString() : current.lastTrackedAt,
+  }
+  writeJson(CREATOR_VISIT_KEY, registry)
+
+  return withinSevenDays && notRecentlyTracked
 }

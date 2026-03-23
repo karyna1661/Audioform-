@@ -14,6 +14,7 @@ import { ArrowLeft, ExternalLink, Loader2, Mail, Send } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { SurveyLoadingSkeleton } from "@/components/survey-loading-skeleton"
 import { AdminMobileNav } from "@/components/admin-mobile-nav"
+import { trackEvent } from "@/lib/analytics"
 
 
 export default function NotificationsPage() {
@@ -38,6 +39,7 @@ export default function NotificationsPage() {
 
   useEffect(() => {
     if (status !== "authenticated") return
+    trackEvent("notification_opened")
 
     const loadConfig = async () => {
       try {
@@ -83,6 +85,10 @@ export default function NotificationsPage() {
 
   const handleToggle = (setting: keyof typeof notificationSettings) => {
     setNotificationSettings((prev) => ({ ...prev, [setting]: !prev[setting] }))
+    trackEvent("notification_rule_toggled", {
+      rule_name: setting,
+      enabled: !notificationSettings[setting],
+    })
   }
 
   const handleSendTestEmail = async () => {
@@ -110,6 +116,9 @@ export default function NotificationsPage() {
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || "Failed to send test email")
       setSuccess("Test email sent successfully.")
+      trackEvent("test_email_sent", {
+        recipient_count: emailRecipients.split(",").map((email) => email.trim()).filter(Boolean).length,
+      })
       if (data.previewUrl) setPreviewUrl(data.previewUrl)
     } catch (err: any) {
       setError(err.message || "Failed to send test email. Please try again.")
@@ -259,9 +268,13 @@ export default function NotificationsPage() {
                   setIsSavingTemplate(true)
                   setSuccess(null)
                   setError(null)
-                  try {
-                    await persistConfig("Template saved.")
-                  } catch (err: any) {
+                   try {
+                     await persistConfig("Template saved.")
+                     trackEvent("notification_template_saved", {
+                       template_type: "response_alert",
+                       recipient_count: emailRecipients.split(",").map((email) => email.trim()).filter(Boolean).length,
+                     })
+                   } catch (err: any) {
                     setError(err.message || "Failed to save template.")
                   } finally {
                     setIsSavingTemplate(false)

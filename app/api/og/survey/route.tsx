@@ -65,8 +65,11 @@ export async function GET(request: Request) {
           </div>
         </div>
 
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
-          <div style={{ fontSize: 28, color: "#6e3316" }}>Answer by voice in under a minute</div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ fontSize: 28, color: "#6e3316" }}>Answer by voice in under a minute</div>
+            <div style={{ fontSize: 22, color: "#7a6146" }}>Powered by Audioform</div>
+          </div>
           <div style={{ fontSize: 24, color: "#7a6146" }}>audioform-production.up.railway.app</div>
         </div>
       </div>

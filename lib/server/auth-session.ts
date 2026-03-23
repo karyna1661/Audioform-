@@ -4,7 +4,7 @@ import type { NextResponse } from "next/server"
 
 export const AUTH_COOKIE_NAME = "audioform_session"
 
-type SessionPayload = {
+export type SessionPayload = {
   sub: string
   email: string
   role: "admin" | "user"
@@ -108,4 +108,10 @@ export async function getSessionFromRequest(): Promise<SessionPayload | null> {
     console.error('Failed to get session from cookies:', error)
     return null
   }
+}
+
+export async function getAdminSessionFromRequest(): Promise<SessionPayload | null> {
+  const session = await getSessionFromRequest()
+  if (!session || session.role !== "admin") return null
+  return session
 }

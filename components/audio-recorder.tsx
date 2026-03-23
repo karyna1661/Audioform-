@@ -300,12 +300,12 @@ export function AudioRecorder({
   }
 
   return (
-    <div className="space-y-4" aria-busy={isUploading}>
+    <div className="min-w-0 space-y-3 overflow-x-hidden sm:space-y-4" aria-busy={isUploading}>
       {/* Waveform visualization */}
-      <div className="relative h-24 bg-muted rounded-lg overflow-hidden">
+      <div className="relative h-24 overflow-hidden rounded-[1rem] bg-muted sm:h-28">
         {isUploading ? (
-          <div className="flex h-full items-center justify-center px-4">
-            <div className="w-full max-w-md animate-pulse space-y-2" aria-live="polite">
+            <div className="flex h-full items-center justify-center px-4">
+              <div className="w-full max-w-md animate-pulse space-y-2" aria-live="polite">
               <div className="h-2.5 w-3/4 rounded-full bg-[#d9cdbd]" />
               <div className="h-2.5 w-full rounded-full bg-[#e5d9ca]" />
               <div className="h-2.5 w-5/6 rounded-full bg-[#d9cdbd]" />
@@ -314,38 +314,38 @@ export function AudioRecorder({
         ) : isRecording ? (
           <canvas ref={canvasRef} className="w-full h-full" width={isMobile ? 300 : 500} height={96} />
         ) : audioBlob ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center">
-              <div className="text-2xl font-semibold tabular-nums">
-                {formatTime(Math.floor(playbackTime || 0))} / {formatTime(Math.floor(playbackDuration || recordingTime))}
+            <div className="flex h-full items-center justify-center px-3">
+              <div className="min-w-0 text-center">
+                <div className="text-xl font-semibold tabular-nums sm:text-2xl">
+                  {formatTime(Math.floor(playbackTime || 0))} / {formatTime(Math.floor(playbackDuration || recordingTime))}
+                </div>
+                <div className="text-[13px] text-muted-foreground break-words sm:text-sm">{isPlaying ? "Playing preview" : "Preview ready"}</div>
               </div>
-              <div className="text-sm text-muted-foreground">{isPlaying ? "Playing preview" : "Preview ready"}</div>
             </div>
-          </div>
-        ) : (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center text-muted-foreground">
-              {isMobile ? "Tap to record" : "Click to record"} your 30-second take
+          ) : (
+            <div className="flex h-full items-center justify-center px-3">
+              <div className="text-center text-[13px] text-muted-foreground break-words sm:text-sm">
+                {isMobile ? "Tap to record" : "Click to record"} your 30-second take
+              </div>
             </div>
-          </div>
         )}
 
         {isRecording && (
-          <div className="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full animate-pulse">
+          <div className="absolute right-2 top-2 rounded-full bg-red-500 px-2 py-1 text-[11px] text-white animate-pulse sm:text-xs">
             REC {formatTime(recordingTime)}
           </div>
         )}
       </div>
 
       {/* Controls */}
-      <div className="flex justify-center gap-4">
+      <div className="flex flex-wrap justify-center gap-3 sm:gap-4">
         {!isRecording && !audioBlob && (
           <Button
             size="lg"
             onClick={startRecording}
-            className="rounded-full h-16 w-16 flex items-center justify-center"
+            className="flex h-16 w-16 items-center justify-center rounded-full sm:h-[4.5rem] sm:w-[4.5rem]"
           >
-            <Mic className="h-6 w-6" />
+            <Mic className="h-6 w-6 sm:h-7 sm:w-7" />
           </Button>
         )}
 
@@ -354,43 +354,43 @@ export function AudioRecorder({
             size="lg"
             variant="destructive"
             onClick={stopRecording}
-            className="rounded-full h-16 w-16 flex items-center justify-center"
+            className="flex h-16 w-16 items-center justify-center rounded-full sm:h-[4.5rem] sm:w-[4.5rem]"
           >
-            <Square className="h-6 w-6" />
+            <Square className="h-6 w-6 sm:h-7 sm:w-7" />
           </Button>
         )}
 
         {!isRecording && audioBlob && !isUploading && (
           <>
-            <Button size="icon" variant="outline" onClick={resetRecorder} className="rounded-full h-12 w-12" aria-label="Re-record">
-              <RotateCcw className="h-5 w-5" />
+            <Button size="icon" variant="outline" onClick={resetRecorder} className="h-12 w-12 rounded-full sm:h-14 sm:w-14" aria-label="Re-record">
+              <RotateCcw className="h-5 w-5 sm:h-6 sm:w-6" />
             </Button>
 
-              <Button
-                size="icon"
-                variant={isPlaying ? "secondary" : "outline"}
-                onClick={isPlaying ? pauseAudio : playAudio}
-                className="rounded-full h-12 w-12"
-                aria-label={isPlaying ? "Pause playback" : "Play recording"}
-              >
-              {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
-            </Button>
+               <Button
+                 size="icon"
+                 variant={isPlaying ? "secondary" : "outline"}
+                 onClick={isPlaying ? pauseAudio : playAudio}
+                 className="h-12 w-12 rounded-full sm:h-14 sm:w-14"
+                 aria-label={isPlaying ? "Pause playback" : "Play recording"}
+               >
+               {isPlaying ? <Pause className="h-5 w-5 sm:h-6 sm:w-6" /> : <Play className="h-5 w-5 sm:h-6 sm:w-6" />}
+             </Button>
 
-            <Button size="icon" onClick={handleSubmit} className="rounded-full h-12 w-12" aria-label="Submit recording">
-              <Send className="h-5 w-5" />
+            <Button size="icon" onClick={handleSubmit} className="h-12 w-12 rounded-full sm:h-14 sm:w-14" aria-label="Submit recording">
+              <Send className="h-5 w-5 sm:h-6 sm:w-6" />
             </Button>
           </>
         )}
 
         {isUploading && (
-          <Button size="lg" disabled className="rounded-full h-16 w-16 flex items-center justify-center">
-            <Loader2 className="h-6 w-6 animate-spin" />
+          <Button size="lg" disabled className="flex h-16 w-16 items-center justify-center rounded-full sm:h-[4.5rem] sm:w-[4.5rem]">
+            <Loader2 className="h-6 w-6 animate-spin sm:h-7 sm:w-7" />
           </Button>
         )}
       </div>
 
       {audioBlob && !isUploading && (
-        <div className="text-center text-sm text-muted-foreground">
+        <div className="px-2 text-center text-[13px] leading-6 text-muted-foreground break-words sm:text-sm">
           {isPlaying
             ? `Playing preview ${formatTime(Math.floor(playbackTime))} / ${formatTime(Math.floor(playbackDuration || recordingTime))}`
             : submitState === "error"
@@ -400,7 +400,7 @@ export function AudioRecorder({
       )}
 
       {isUploading && (
-        <div className="text-center text-sm text-muted-foreground">
+        <div className="px-2 text-center text-[13px] leading-6 text-muted-foreground break-words sm:text-sm">
           Uploading your voice take. Keeping this recording here so you do not need to repeat it.
         </div>
       )}
