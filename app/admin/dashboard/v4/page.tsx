@@ -363,7 +363,7 @@ export default function AdminDashboardV4Page() {
         </section>
 
         <section className="mt-6 grid gap-4 lg:grid-cols-[260px_1fr_300px]">
-          <aside className="af-accent-card af-fade-up af-delay-1 rounded-2xl border p-4 lg:p-4">
+          <aside className="order-2 af-accent-card af-fade-up af-delay-1 rounded-2xl border p-4 lg:order-none lg:p-4">
             <h2 className="text-lg font-semibold text-balance">Quick Actions</h2>
             <div className="mt-3 grid gap-2 sm:grid">
               <Link href="/admin/responses" className="inline-flex items-center justify-between rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] px-3 py-2 text-sm hover:bg-[#efe4d3]">
@@ -391,7 +391,7 @@ export default function AdminDashboardV4Page() {
             </div>
           </aside>
 
-          <section className="af-accent-card af-fade-up af-delay-1 rounded-2xl border p-5">
+          <section className="order-1 af-accent-card af-fade-up af-delay-1 rounded-2xl border p-4 sm:p-5 lg:order-none">
             <h2 className="text-2xl font-semibold text-balance">Survey Stack</h2>
             <p className={`font-body mt-1 text-sm text-[#5c5146] text-pretty`}>
               One row per survey. Open a survey to review responses and decide your next change.
@@ -632,7 +632,7 @@ export default function AdminDashboardV4Page() {
             </article>
           </aside>
 
-          <section className="space-y-4 lg:hidden">
+          <section className="order-3 space-y-4 lg:hidden">
             <article className="af-accent-card af-fade-up af-delay-2 rounded-2xl border p-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -655,6 +655,22 @@ export default function AdminDashboardV4Page() {
                 {!themeCoverage.length ? (
                   <li className="rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] p-3 text-xs">
                     Run extraction on a few responses to see grouped themes here.
+                  </li>
+                ) : null}
+              </ul>
+            </article>
+            <article className="af-accent-card af-fade-up af-delay-2 rounded-2xl border p-4">
+              <h2 className="text-lg font-semibold text-balance">Today</h2>
+              <p className="font-body mt-1 text-xs text-[#5c5146]">Recent survey and response activity.</p>
+              <ul className="mt-3 space-y-2 text-sm text-[#5c5146]">
+                {timeline.slice(0, 3).map((event) => (
+                  <li key={event.id} className="rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] p-3">
+                    {humanizeDashboardEventMessage(event, surveyTitleById)}
+                  </li>
+                ))}
+                {!timeline.length ? (
+                  <li className="rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] p-3 text-xs">
+                    No activity yet. Publish a survey or collect a response to populate this feed.
                   </li>
                 ) : null}
               </ul>

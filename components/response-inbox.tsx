@@ -230,7 +230,7 @@ export function ResponseInbox({
   return (
     <div className="space-y-4">
       {/* Stats Overview */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+       <div className="hidden grid-cols-2 gap-4 md:grid md:grid-cols-4">
         <Card>
           <CardContent className="pt-4">
             <div className="text-2xl font-bold">{stats.total}</div>
@@ -308,14 +308,14 @@ export function ResponseInbox({
               response.highSignal && "border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-900/20",
               response.bookmarked && "border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-900/20"
             )}>
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between gap-4">
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                   {/* Left Section - Info */}
                   <div className="flex-1 space-y-2">
                      <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant="outline" className="text-xs">
-                        {response.surveyTitle}
-                      </Badge>
+                       <Badge variant="outline" className="text-xs">
+                         {response.surveyTitle}
+                       </Badge>
                       {response.durationBucket && (
                         <Badge className={cn("text-xs", getDurationBucketColor(response.durationBucket))}>
                           {getDurationBucketIcon(response.durationBucket)}
@@ -348,11 +348,11 @@ export function ResponseInbox({
                          {response.questionText || `Question ${response.questionId.toUpperCase()}`}
                        </p>
                      </div>
-                     
-                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {formatDuration(response.durationSeconds)}
+                      
+                      <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                       <span className="flex items-center gap-1">
+                         <Clock className="h-3 w-3" />
+                         {formatDuration(response.durationSeconds)}
                       </span>
                       <span className="flex items-center gap-1">
                         <Mic className="h-3 w-3" />
@@ -442,10 +442,10 @@ export function ResponseInbox({
                    </div>
 
                   {/* Right Section - Actions */}
-                   <div className="flex flex-col items-end gap-2 self-start">
+                   <div className="flex items-center gap-2 sm:flex-col sm:items-end sm:self-start">
                      <Button
-                       variant="outline"
-                       size="icon"
+                        variant="outline"
+                        size="icon"
                       onClick={() => void handlePlayToggle(response)}
                       title={playingId === response.id ? "Pause" : "Play"}
                     >
@@ -456,27 +456,27 @@ export function ResponseInbox({
                       )}
                     </Button>
                     
-                    <Button
-                      variant={response.flagged ? "destructive" : "ghost"}
-                      size="icon"
+                     <Button
+                       variant={response.flagged ? "destructive" : "ghost"}
+                       size="icon"
                       onClick={() => onFlagResponse?.(response.id, !response.flagged)}
                       title="Flag for review"
                     >
                       <Flag className="h-4 w-4" />
                     </Button>
                     
-                    <Button
-                      variant={response.highSignal ? "default" : "ghost"}
-                      size="icon"
+                     <Button
+                       variant={response.highSignal ? "default" : "ghost"}
+                       size="icon"
                       onClick={() => onMarkHighSignal?.(response.id, !response.highSignal)}
                       title="Mark as high signal"
                     >
                       <Star className="h-4 w-4" />
                     </Button>
                     
-                    <Button
-                      variant={response.bookmarked ? "secondary" : "ghost"}
-                      size="icon"
+                     <Button
+                       variant={response.bookmarked ? "secondary" : "ghost"}
+                       size="icon"
                       onClick={() => onBookmarkResponse?.(response.id, !response.bookmarked)}
                       title="Bookmark"
                      >
@@ -494,7 +494,7 @@ export function ResponseInbox({
 
       {/* Summary Footer */}
       {filteredResponses.length > 0 && (
-        <div className="text-center text-xs text-muted-foreground pt-4 border-t">
+        <div className="border-t pt-4 text-center text-xs text-muted-foreground">
           Showing {filteredResponses.length} of {responses.length} responses
           {activeFilter !== "all" && ` (filtered by ${activeFilter})`}
         </div>

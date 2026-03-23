@@ -5,7 +5,7 @@ import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { useRequireAdmin } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, CheckCircle2, ChevronRight, Copy, GripVertical, Plus, Rocket, Sparkles, Target, Trash2, Undo2 } from "lucide-react"
+import { ArrowLeft, CheckCircle2, ChevronRight, Copy, GripVertical, LayoutTemplate, Library, Plus, Rocket, Sparkles, Target, Trash2, Undo2 } from "lucide-react"
 import { trackEvent } from "@/lib/analytics"
 import { recordSurveyPublished } from "@/lib/behavior-metrics"
 import { AdminMobileNav } from "@/components/admin-mobile-nav"
@@ -591,7 +591,7 @@ export default function QuestionnairesV1Page() {
                     Name the conversation after the decision it should inform. A strong title feels like a working brief, not a generic feedback form.
                   </p>
                 </div>
-                <div className="rounded-[1.6rem] border border-[#cfbea4] bg-[#fff8f0] p-4">
+                <div className="hidden rounded-[1.6rem] border border-[#cfbea4] bg-[#fff8f0] p-4 sm:block">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#7a6146]">Publishing standard</p>
                   <p className="mt-2 text-lg font-semibold text-[#6e3316]">Short, pointed, replayable.</p>
                   <p className="font-body mt-2 text-sm leading-6 text-[#665746]">
@@ -631,30 +631,32 @@ export default function QuestionnairesV1Page() {
                   </div>
 
                   {/* Mobile Toggle - Only visible on small screens */}
-                  <div className="mb-4 flex rounded-xl border border-[#cfbea4] bg-[#fffdf8] p-1 sm:hidden">
-                    <button
-                      type="button"
-                      onClick={() => setShowTemplates(true)}
-                      className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition-all ${
-                        showTemplates
-                          ? "bg-[#b85e2d] text-[#fff6ed]"
-                          : "text-[#665746] hover:bg-[#f8efdf]"
-                      }`}
-                    >
-                      📋 Templates
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowTemplates(false)}
-                      className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition-all ${
-                        !showTemplates
-                          ? "bg-[#b85e2d] text-[#fff6ed]"
-                          : "text-[#665746] hover:bg-[#f8efdf]"
-                      }`}
-                    >
-                      🗂️ Categories
-                    </button>
-                  </div>
+                    <div className="mb-4 flex rounded-xl border border-[#cfbea4] bg-[#fffdf8] p-1 sm:hidden">
+                      <button
+                        type="button"
+                        onClick={() => setShowTemplates(true)}
+                        className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition-all ${
+                          showTemplates
+                            ? "bg-[#b85e2d] text-[#fff6ed]"
+                            : "text-[#665746] hover:bg-[#f8efdf]"
+                        }`}
+                      >
+                        <LayoutTemplate className="size-4" aria-hidden="true" />
+                        Templates
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowTemplates(false)}
+                        className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition-all ${
+                          !showTemplates
+                            ? "bg-[#b85e2d] text-[#fff6ed]"
+                            : "text-[#665746] hover:bg-[#f8efdf]"
+                        }`}
+                      >
+                        <Library className="size-4" aria-hidden="true" />
+                        Categories
+                      </button>
+                    </div>
 
                   {/* Survey Templates Section */}
                   <div className={showTemplates ? "" : "hidden sm:block"}>
@@ -752,6 +754,7 @@ export default function QuestionnairesV1Page() {
                         <span>Voice surveys work best with <strong>1-3 thoughtful questions</strong></span>
                       </li>
                       </ul>
+                      <p className="mt-3 text-xs text-[#7a6146] sm:hidden">Keep it to one friction moment and one concrete example.</p>
                     </div>
                     <div className="hidden rounded-[1.4rem] border border-[#d8c7b3] bg-[#f7ecde] p-4 lg:block">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#7a6146]">A good final sequence sounds like</p>
