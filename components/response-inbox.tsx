@@ -441,48 +441,54 @@ export function ResponseInbox({
                      ) : null}
                    </div>
 
-                  {/* Right Section - Actions */}
-                   <div className="flex items-center gap-2 sm:flex-col sm:items-end sm:self-start">
-                     <Button
-                        variant="outline"
-                        size="icon"
-                      onClick={() => void handlePlayToggle(response)}
-                      title={playingId === response.id ? "Pause" : "Play"}
-                    >
-                      {playingId === response.id ? (
-                        <Pause className="h-4 w-4" />
-                      ) : (
-                        <Play className="h-4 w-4" />
-                      )}
-                    </Button>
-                    
-                     <Button
-                       variant={response.flagged ? "destructive" : "ghost"}
-                       size="icon"
-                      onClick={() => onFlagResponse?.(response.id, !response.flagged)}
-                      title="Flag for review"
-                    >
-                      <Flag className="h-4 w-4" />
-                    </Button>
-                    
-                     <Button
-                       variant={response.highSignal ? "default" : "ghost"}
-                       size="icon"
-                      onClick={() => onMarkHighSignal?.(response.id, !response.highSignal)}
-                      title="Mark as high signal"
-                    >
-                      <Star className="h-4 w-4" />
-                    </Button>
-                    
-                     <Button
-                       variant={response.bookmarked ? "secondary" : "ghost"}
-                       size="icon"
-                      onClick={() => onBookmarkResponse?.(response.id, !response.bookmarked)}
-                      title="Bookmark"
+                   {/* Right Section - Actions */}
+                    <div className="flex items-center gap-1 sm:gap-2 sm:flex-col sm:items-end sm:self-start">
+                      <Button
+                         variant="outline"
+                         size="icon"
+                         className="h-8 w-8 sm:h-9 sm:w-9"
+                       onClick={() => void handlePlayToggle(response)}
+                       title={playingId === response.id ? "Pause" : "Play"}
                      >
-                       <Bookmark className="h-4 w-4" />
+                       {playingId === response.id ? (
+                         <Pause className="h-3 w-3 sm:h-4 sm:w-4" />
+                       ) : (
+                         <Play className="h-3 w-3 sm:h-4 sm:w-4" />
+                       )}
                      </Button>
-                   </div>
+                     
+                      <div className="flex gap-1 sm:flex-col sm:gap-2">
+                      <Button
+                        variant={response.flagged ? "destructive" : "ghost"}
+                        size="icon"
+                        className="h-7 w-7 sm:h-8 sm:w-8"
+                       onClick={() => onFlagResponse?.(response.id, !response.flagged)}
+                       title="Flag"
+                       >
+                       <Flag className="h-3 w-3" />
+                     </Button>
+                     
+                      <Button
+                        variant={response.highSignal ? "default" : "ghost"}
+                        size="icon"
+                        className="h-7 w-7 sm:h-8 sm:w-8"
+                       onClick={() => onMarkHighSignal?.(response.id, !response.highSignal)}
+                       title="High signal"
+                       >
+                       <Star className="h-3 w-3" />
+                     </Button>
+                     
+                      <Button
+                        variant={response.bookmarked ? "secondary" : "ghost"}
+                        size="icon"
+                        className="h-7 w-7 sm:h-8 sm:w-8"
+                       onClick={() => onBookmarkResponse?.(response.id, !response.bookmarked)}
+                       title="Bookmark"
+                       >
+                       <Bookmark className="h-3 w-3" />
+                     </Button>
+                      </div>
+                    </div>
                  </div>
                </CardContent>
              </Card>

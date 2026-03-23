@@ -548,10 +548,9 @@ export default function QuestionnairesV1Page() {
         <section className="mt-4 rounded-[1.3rem] border border-[#cfbea4] bg-[#fff8f0] p-3 sm:rounded-[1.6rem] sm:p-4 lg:hidden">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#7a6146]">Mobile flow</p>
-              <p className="mt-1 text-base font-semibold text-[#261c14] sm:text-lg">Step {mobileStep + 1} of {mobileSteps.length}: {mobileSteps[mobileStep]}</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#7a6146]">Step {mobileStep + 1} of {mobileSteps.length}: {mobileSteps[mobileStep]}</p>
             </div>
-            <p className="font-body text-sm text-[#665746]">{questions.length} {questions.length === 1 ? "prompt" : "prompts"}</p>
+            <p className="font-body text-xs text-[#665746]">{questions.length} prompts</p>
           </div>
           <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
             {mobileSteps.map((label, index) => (
