@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { z } from "zod"
-import { countUsers, createUser, toSafeUser } from "@/lib/server/auth-store"
+import { createUser, toSafeUser } from "@/lib/server/auth-store"
 import { issueSessionToken, setSessionCookie } from "@/lib/server/auth-session"
 import { getCorsHeaders, hasAllowedApiOrigin } from "@/lib/server/cors"
 import { applyRateLimit, getRequestClientIp } from "@/lib/server/rate-limit"
@@ -10,20 +10,6 @@ const signupSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8).max(128),
 })
-
-function isLocalDevelopmentRequest(request: Request): boolean {
-  const candidates = [request.url, request.headers.get("origin"), request.headers.get("referer")]
-
-  return candidates.some((value) => {
-    if (!value) return false
-    try {
-      const { hostname } = new URL(value)
-      return hostname === "localhost" || hostname === "127.0.0.1"
-    } catch {
-      return false
-    }
-  })
-}
 
 export async function POST(request: NextRequest) {
   const corsHeaders = getCorsHeaders(request, { methods: "POST, OPTIONS" })
@@ -60,10 +46,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const shouldBootstrapAdmin = process.env.NODE_ENV !== "production" && isLocalDevelopmentRequest(request) && (await countUsers()) === 0
     const user = await createUser({
       ...parsed.data,
-      role: shouldBootstrapAdmin ? "admin" : "user",
+      role: "admin",
     })
     const safeUser = toSafeUser(user)
     const token = issueSessionToken({
