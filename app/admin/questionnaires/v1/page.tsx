@@ -565,7 +565,7 @@ export default function QuestionnairesV1Page() {
               </button>
             ))}
           </div>
-          <p className="font-body mt-3 text-sm leading-6 text-[#665746]">
+          <p className="font-body mt-3 hidden text-sm leading-6 text-[#665746] sm:block">
             Focus on one decision at a time: name the survey, choose a source, arrange prompts, refine the wording, then publish.
           </p>
         </section>
@@ -622,7 +622,7 @@ export default function QuestionnairesV1Page() {
                         Templates give you a strong opening move. Categories help you add the missing tension, context, or desire without bloating the survey.
                       </p>
                     </div>
-                    <div className="rounded-[1.4rem] border border-[#d8c7b3] bg-[#fffdf8] p-4">
+                    <div className="hidden rounded-[1.4rem] border border-[#d8c7b3] bg-[#fffdf8] p-4 lg:block">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#7a6146]">Editor note</p>
                       <p className="mt-2 text-sm leading-6 text-[#665746]">
                         If the sequence drifts past three prompts, trim it. More questions usually lowers honesty and depth.
@@ -753,7 +753,7 @@ export default function QuestionnairesV1Page() {
                       </li>
                       </ul>
                     </div>
-                    <div className="rounded-[1.4rem] border border-[#d8c7b3] bg-[#f7ecde] p-4">
+                    <div className="hidden rounded-[1.4rem] border border-[#d8c7b3] bg-[#f7ecde] p-4 lg:block">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#7a6146]">A good final sequence sounds like</p>
                       <div className="mt-3 space-y-3">
                         <p className="text-sm font-semibold text-[#6e3316]">Context to friction to desired future</p>

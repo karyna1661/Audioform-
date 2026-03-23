@@ -281,7 +281,7 @@ export default function AdminResponsesPage() {
         </header>
 
         {/* Quick Stats */}
-        <section className="af-accent-card af-fade-up af-delay-1 mt-5 rounded-2xl border p-4">
+        <section className="af-accent-card af-fade-up af-delay-1 mt-5 rounded-2xl border p-3 sm:p-4">
           <div className="flex items-center gap-3">
             <AudioWaveform className="h-6 w-6 text-[#b85e2d]" />
             <div>
