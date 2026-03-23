@@ -339,24 +339,21 @@ export default function AdminDashboardV4Page() {
           </div>
         </header>
 
-        <section className="af-accent-card af-fade-up af-delay-1 mt-5 rounded-2xl border p-4 sm:p-4">
+        <section className="af-accent-card af-fade-up af-delay-1 mt-4 rounded-2xl border p-3 sm:mt-5 sm:p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-lg font-semibold text-balance">First-run checklist</h2>
-            <p className="hidden font-body text-xs text-[#5c5146] text-pretty sm:block">
-              Complete these three steps to reach first value fast.
-            </p>
+            <h2 className="text-base font-semibold text-balance sm:text-lg">First-run checklist</h2>
           </div>
-          <ul className="mt-3 grid gap-2 sm:grid-cols-3">
+          <ul className="mt-2 grid gap-2 sm:grid-cols-3 sm:mt-3">
             {onboardingChecklist.map((item) => (
-              <li key={item.id} className="rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] p-2.5 text-sm sm:p-3">
-                <p className="inline-flex items-center gap-2 font-semibold text-balance">
+              <li key={item.id} className="rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] p-2 sm:p-3">
+                <p className="inline-flex items-center gap-1.5 text-sm font-semibold text-balance sm:gap-2">
                   <CheckCircle2
-                    className={`size-4 ${item.done ? "text-[#2d5a17]" : "text-[#8c7f70]"}`}
+                    className="size-3.5 sm:size-4"
                     aria-hidden="true"
                   />
                   {item.label}
                 </p>
-                <p className="font-body mt-1 text-xs text-[#5c5146]">{item.done ? "Done" : "Next"}</p>
+                <p className="font-body mt-0.5 text-xs text-[#5c5146]">{item.done ? "Done" : "Next"}</p>
               </li>
             ))}
           </ul>
@@ -400,12 +397,12 @@ export default function AdminDashboardV4Page() {
             </div>
           </aside>
 
-          <section className="order-1 af-accent-card af-fade-up af-delay-1 rounded-2xl border p-4 sm:p-5 lg:order-none">
-            <h2 className="text-2xl font-semibold text-balance">Survey Stack</h2>
+          <section className="order-1 af-accent-card af-fade-up af-delay-1 rounded-2xl border p-3 sm:p-5 lg:order-none">
+            <h2 className="text-xl font-semibold text-balance sm:text-2xl">Survey Stack</h2>
             <p className={`font-body mt-1 text-sm text-[#5c5146] text-pretty`}>
               One row per survey. Open a survey to review responses and decide your next change.
             </p>
-            <article className="mt-4 rounded-xl border border-[#dbcdb8] bg-[#f3ecdf] p-4">
+            <article className="mt-3 rounded-xl border border-[#dbcdb8] bg-[#f3ecdf] p-3 sm:p-4">
               <p className="text-sm font-semibold text-balance">First Response Spotlight</p>
               <p className={`font-body mt-1 text-sm text-[#5c5146] text-pretty`}>
                 {ttfrSeconds == null
@@ -428,12 +425,12 @@ export default function AdminDashboardV4Page() {
             </article>
             <div className="mt-4 space-y-3">
                 {surveys.length === 0 ? (
-                <article className="rounded-xl border border-[#dbcdb8] bg-[#f9f4ea] p-4">
+                <article className="rounded-xl border border-[#dbcdb8] bg-[#f9f4ea] p-3 sm:p-4">
                   <p className="text-sm font-semibold text-balance">No surveys yet</p>
                   <p className={`font-body mt-1 text-sm text-[#5c5146]`}>
                     Start with one decision question and publish your first survey.
                   </p>
-                  <ol className={`font-body mt-3 space-y-1 text-sm text-[#5c5146]`}>
+                  <ol className={`font-body mt-2 space-y-1 text-sm text-[#5c5146]`}>
                     <li>1. Write one focused prompt.</li>
                     <li>2. Publish.</li>
                     <li>3. Collect and review first responses.</li>
@@ -451,7 +448,7 @@ export default function AdminDashboardV4Page() {
                 surveys.map((survey) => (
                 <article
                   key={survey.id}
-                  className="rounded-xl border border-[#dbcdb8] bg-[#f9f4ea] p-4 cursor-pointer hover:bg-[#f3e7d8]"
+                  className="rounded-xl border border-[#dbcdb8] bg-[#f9f4ea] p-3 sm:p-4 cursor-pointer hover:bg-[#f3e7d8]"
                   role="button"
                   tabIndex={0}
                   onClick={() => {
@@ -475,17 +472,17 @@ export default function AdminDashboardV4Page() {
                   }}
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h3 className="text-lg font-semibold text-balance">{survey.title}</h3>
-                    <span className="rounded-full bg-[#e6f0df] px-2 py-1 text-xs text-[#2d5a17]">{survey.status}</span>
+                    <h3 className="text-base font-semibold text-balance sm:text-lg">{survey.title}</h3>
+                    <span className="rounded-full bg-[#e6f0df] px-2 py-0.5 text-xs text-[#2d5a17]">{survey.status}</span>
                   </div>
-                  <div className={`font-body mt-3 grid gap-2 sm:grid-cols-3 text-sm text-[#5c5146]`}>
-                    <p className="inline-flex items-center gap-2">
-                      <Target className="size-4" aria-hidden="true" />
+                  <div className={`font-body mt-2 grid gap-1.5 sm:grid-cols-3 sm:gap-2 text-xs sm:text-sm text-[#5c5146]`}>
+                    <p className="inline-flex items-center gap-1 sm:gap-2">
+                      <Target className="size-3.5 sm:size-4" aria-hidden="true" />
                       {survey.questionCount} prompts
                     </p>
-                    <p className="inline-flex items-center gap-2 tabular-nums">
-                      <Calendar className="size-4" aria-hidden="true" />
-                      updated {new Date(survey.updatedAt).toLocaleDateString()}
+                    <p className="inline-flex items-center gap-1 sm:gap-2 tabular-nums">
+                      <Calendar className="size-3.5 sm:size-4" aria-hidden="true" />
+                      <span className="hidden sm:inline">updated </span>{new Date(survey.updatedAt).toLocaleDateString()}
                     </p>
                     <p className="tabular-nums">{responsesBySurvey[survey.id] ?? 0} responses</p>
                   </div>
@@ -557,15 +554,17 @@ export default function AdminDashboardV4Page() {
                     ) : null}
                     <Button
                       variant="outline"
-                      className="w-full border-[#e3c3b5] bg-[#fff0e9] text-[#8a3d2b] hover:bg-[#f7e2d8] sm:w-auto"
+                      className="h-8 w-full border-[#e3c3b5] bg-[#fff0e9] text-[#8a3d2b] hover:bg-[#f7e2d8] sm:h-9 sm:w-auto"
                       disabled={deletingSurveyId === survey.id}
                       onClick={() => setSurveyDeleteDialogId(survey.id)}
                     >
-                      <Trash2 className="mr-2 size-4" aria-hidden="true" />
-                      {deletingSurveyId === survey.id ? "Deleting..." : "Delete survey"}
+                      <Trash2 className="mr-1 size-3.5 sm:size-4" aria-hidden="true" />
+                      <span className="hidden sm:inline">
+                        {deletingSurveyId === survey.id ? "Deleting..." : "Delete"}
+                      </span>
                     </Button>
                   </div>
-                  <p className={`font-body mt-2 text-xs text-[#5c5146]`}>
+                  <p className={`font-body mt-2 text-xs text-[#5c5146] hidden sm:block`}>
                     Clip export/share lives in Moderation Queue after opening the top signal.
                   </p>
                 </article>
