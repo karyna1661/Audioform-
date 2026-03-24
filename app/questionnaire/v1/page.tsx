@@ -32,7 +32,6 @@ export async function generateMetadata({ searchParams }: PageProps): Promise<Met
   }
 
   const survey = await getPublishedSurveyById(surveyId)
-  const prompts = await getLatestPublishedSurveyQuestions(surveyId)
   const title = survey?.title?.trim() || "Audioform voice survey"
   const url = `${process.env.NEXT_PUBLIC_APP_URL || "https://audioform-production.up.railway.app"}/questionnaire/v1?surveyId=${encodeURIComponent(surveyId)}`
   const imageUrl = `/api/og/survey?surveyId=${encodeURIComponent(surveyId)}`

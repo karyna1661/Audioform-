@@ -314,20 +314,20 @@ export function AudioRecorder({
         ) : isRecording ? (
           <canvas ref={canvasRef} className="w-full h-full" width={isMobile ? 300 : 500} height={96} />
         ) : audioBlob ? (
-            <div className="flex h-full items-center justify-center px-3">
-              <div className="min-w-0 text-center">
-                <div className="text-xl font-semibold tabular-nums sm:text-2xl">
-                  {formatTime(Math.floor(playbackTime || 0))} / {formatTime(Math.floor(playbackDuration || recordingTime))}
-                </div>
-                <div className="text-[13px] text-muted-foreground break-words sm:text-sm">{isPlaying ? "Playing preview" : "Preview ready"}</div>
+          <div className="flex h-full items-center justify-center px-3">
+            <div className="min-w-0 text-center">
+              <div className="text-xl font-semibold tabular-nums sm:text-2xl">
+                {formatTime(Math.floor(playbackTime || 0))} / {formatTime(Math.floor(playbackDuration || recordingTime))}
               </div>
+              <div className="text-[13px] text-muted-foreground break-words sm:text-sm">{isPlaying ? "Playing preview" : "Preview ready"}</div>
             </div>
-          ) : (
-            <div className="flex h-full items-center justify-center px-3">
-              <div className="text-center text-[13px] text-muted-foreground break-words sm:text-sm">
-                {isMobile ? "Tap to record" : "Click to record"} your 30-second take
-              </div>
+          </div>
+        ) : (
+          <div className="flex h-full items-center justify-center px-3">
+            <div className="text-center text-[13px] text-muted-foreground break-words sm:text-sm">
+              {isMobile ? "Tap to record" : "Click to record"} your 30-second take
             </div>
+          </div>
         )}
 
         {isRecording && (
@@ -366,15 +366,15 @@ export function AudioRecorder({
               <RotateCcw className="h-5 w-5 sm:h-6 sm:w-6" />
             </Button>
 
-               <Button
-                 size="icon"
-                 variant={isPlaying ? "secondary" : "outline"}
-                 onClick={isPlaying ? pauseAudio : playAudio}
-                 className="h-12 w-12 rounded-full sm:h-14 sm:w-14"
-                 aria-label={isPlaying ? "Pause playback" : "Play recording"}
-               >
-               {isPlaying ? <Pause className="h-5 w-5 sm:h-6 sm:w-6" /> : <Play className="h-5 w-5 sm:h-6 sm:w-6" />}
-             </Button>
+              <Button
+                size="icon"
+                variant={isPlaying ? "secondary" : "outline"}
+                onClick={isPlaying ? pauseAudio : playAudio}
+                className="h-12 w-12 rounded-full sm:h-14 sm:w-14"
+                aria-label={isPlaying ? "Pause playback" : "Play recording"}
+              >
+              {isPlaying ? <Pause className="h-5 w-5 sm:h-6 sm:w-6" /> : <Play className="h-5 w-5 sm:h-6 sm:w-6" />}
+            </Button>
 
             <Button size="icon" onClick={handleSubmit} className="h-12 w-12 rounded-full sm:h-14 sm:w-14" aria-label="Submit recording">
               <Send className="h-5 w-5 sm:h-6 sm:w-6" />
