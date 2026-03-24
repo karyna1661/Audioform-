@@ -859,9 +859,14 @@ export default function QuestionnairesV1Page() {
                     <button
                       type="button"
                       onClick={() => {
-                        const nextQuestions = [...questions, "New prompt"]
-                        commitQuestionChange(nextQuestions, questions.length)
-                        setMobileStep(3)
+                        if (typeof window !== "undefined" && window.innerWidth < 1024) {
+                          setShowTemplates(false)
+                          setMobileStep(1)
+                        } else {
+                          const nextQuestions = [...questions, "New prompt"]
+                          commitQuestionChange(nextQuestions, questions.length)
+                          setMobileStep(3)
+                        }
                       }}
                       className="inline-flex min-h-20 items-center justify-center gap-2 rounded-xl border border-dashed border-[#c5b296] bg-[#f8efdf] text-sm text-[#665746]"
                     >
