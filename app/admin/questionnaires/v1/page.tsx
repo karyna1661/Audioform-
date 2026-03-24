@@ -5,7 +5,7 @@ import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { useRequireAdmin } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, CheckCircle2, ChevronRight, Copy, GripVertical, LayoutTemplate, Library, Plus, Rocket, Sparkles, Target, Trash2, Undo2 } from "lucide-react"
+import { ArrowLeft, CheckCircle2, ChevronRight, Copy, GripVertical, Heart, LayoutTemplate, Library, Lightbulb, Plus, Rocket, Search, Sparkles, Star, Target, Trash2, Undo2 } from "lucide-react"
 import { trackEvent } from "@/lib/analytics"
 import { recordSurveyPublished } from "@/lib/behavior-metrics"
 import { AdminMobileNav } from "@/components/admin-mobile-nav"
@@ -20,7 +20,7 @@ const questionCategories = [
     id: "ux",
     label: "User Experience",
     description: "Confusion, friction, and usability insights",
-    icon: "🎯",
+    icon: Target,
     questions: [
       "What confused you the most when you first used this product?",
       "At what moment did you almost stop using it?",
@@ -32,7 +32,7 @@ const questionCategories = [
     id: "product",
     label: "Product Feedback",
     description: "Missing features and improvement areas",
-    icon: "💡",
+    icon: Lightbulb,
     questions: [
       "What problem were you hoping this product would solve?",
       "What feels missing right now?",
@@ -44,7 +44,7 @@ const questionCategories = [
     id: "feature",
     label: "Feature Ideas",
     description: "Discovery of needed capabilities",
-    icon: "✨",
+    icon: Sparkles,
     questions: [
       "What feature would make this product indispensable for you?",
       "What do you currently use instead of this product?",
@@ -56,7 +56,7 @@ const questionCategories = [
     id: "market",
     label: "Market Validation",
     description: "Competitive landscape and alternatives",
-    icon: "🔍",
+    icon: Search,
     questions: [
       "How are you currently solving this problem?",
       "What frustrates you about existing solutions?",
@@ -68,7 +68,7 @@ const questionCategories = [
     id: "satisfaction",
     label: "Customer Satisfaction",
     description: "Emotional response and loyalty signals",
-    icon: "❤️",
+    icon: Heart,
     questions: [
       "What was your reaction when you first saw this product?",
       "What increased or decreased your confidence?",
@@ -79,7 +79,7 @@ const questionCategories = [
     id: "insight",
     label: "Open Insight",
     description: "Broad exploration and storytelling",
-    icon: "🌟",
+    icon: Star,
     questions: [
       "Tell me about the last time you tried to get feedback from users. What was frustrating about it?",
       "What's the most important outcome you're trying to achieve?",
@@ -699,7 +699,12 @@ export default function QuestionnairesV1Page() {
                           <details key={category.id} className="group rounded-[1.25rem] border border-[#cfbea4] bg-[#fffdf8] p-4">
                             <summary className="flex cursor-pointer list-none items-center justify-between">
                               <div className="flex items-center gap-2">
-                                <span className="inline-flex size-9 items-center justify-center rounded-full border border-[#d8c7b3] bg-[#f8efdf] text-base">{category.icon}</span>
+                                <span className="inline-flex size-9 items-center justify-center rounded-full border border-[#d8c7b3] bg-[#f8efdf] text-[#b85e2d]">
+                                  {(() => {
+                                    const Icon = category.icon
+                                    return <Icon className="size-4" />
+                                  })()}
+                                </span>
                                 <div className="text-left">
                                   <p className="text-sm font-semibold text-[#6e3316]">{category.label}</p>
                                   <p className="font-body text-xs leading-5 text-[#665746]">{category.description}</p>
