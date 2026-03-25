@@ -3,7 +3,8 @@ import { getStoredResponseById } from "@/lib/server/response-store"
 import { getTranscriptByResponseId } from "@/lib/server/transcript-store"
 import { getInsightByTranscriptId } from "@/lib/server/insight-store"
 
-export const runtime = "edge"
+// Remove Edge runtime since getStoredResponseById relies on node:fs and node:crypto
+// export const runtime = "edge"
 
 function formatDuration(seconds?: number | null): string {
   if (!seconds && seconds !== 0) return "Unknown"
