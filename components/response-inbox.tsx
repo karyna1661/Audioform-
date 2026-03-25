@@ -363,20 +363,50 @@ export function ResponseInbox({
                      </span>
                     </div>
 
+                      {response.transcript ? (
+                        <div className="rounded-2xl border border-[#dbcdb8] bg-[#fffdf8] p-2 sm:p-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge variant="outline" className="border-[#cfbea4] bg-[#fff6ed] text-[#7a6146] text-xs">
+                              Transcript {response.transcript.status !== "completed" ? response.transcript.status : ""}
+                            </Badge>
+                          </div>
+                          {response.transcript.text ? (
+                            <p className="mt-1.5 sm:mt-2 text-xs sm:text-sm leading-5 text-[#3c3026] line-clamp-3">{response.transcript.text}</p>
+                          ) : response.transcript.errorMessage ? (
+                            <p className="mt-1.5 sm:mt-2 text-xs text-[#8a3d2b]">{response.transcript.errorMessage}</p>
+                          ) : (
+                            <p className="mt-1.5 sm:mt-2 text-xs text-[#665746]">Processing...</p>
+                         )}
+                        </div>
+                      ) : null}
+
                       {response.insight ? (
                         <div className="rounded-2xl border border-[#dbcdb8] bg-[#fffaf3] p-2 sm:p-3">
-                          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                            <Badge variant="outline" className="border-[#cfbea4] bg-[#fff6ed] text-[#7a6146] text-xs">
-                              Insight
-                            </Badge>
-                            {response.insight.primaryTheme ? (
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                               <Badge variant="outline" className="border-[#cfbea4] bg-[#fff6ed] text-[#7a6146] text-xs">
-                                {response.insight.primaryTheme}
+                                AI Summary
                               </Badge>
-                            ) : null}
-                            <span className={cn("text-xs font-medium", getSignalTone(response.insight.signalScore))}>
-                              {response.insight.signalScore ?? "-"}/100
-                            </span>
+                              {response.insight.primaryTheme ? (
+                                <Badge variant="outline" className="border-[#cfbea4] bg-[#fff6ed] text-[#7a6146] text-xs">
+                                  {response.insight.primaryTheme}
+                                </Badge>
+                              ) : null}
+                              <span className={cn("text-xs font-medium", getSignalTone(response.insight.signalScore))}>
+                                {response.insight.signalScore ?? "-"}/100
+                              </span>
+                            </div>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="h-7 text-xs border-[#cfbea4] bg-[#fff6ed] text-[#7a6146] hover:bg-[#efe4d3]"
+                              onClick={() => {
+                                const url = `${window.location.origin}/api/og/insight?responseId=${response.id}`
+                                window.open(url, "_blank")
+                              }}
+                            >
+                              Share Card
+                            </Button>
                           </div>
                            {truncatedSummary ? (
                              <>
@@ -400,21 +430,6 @@ export function ResponseInbox({
                           {response.insight.quotes?.[0] ? (
                             <p className="mt-1.5 sm:mt-2 text-xs italic text-[#665746] line-clamp-2">"{response.insight.quotes[0]}"</p>
                           ) : null}
-                        </div>
-                      ) : response.transcript ? (
-                        <div className="rounded-2xl border border-[#dbcdb8] bg-[#fffaf3] p-2 sm:p-3">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Badge variant="outline" className="border-[#cfbea4] bg-[#fff6ed] text-[#7a6146] text-xs">
-                              Transcript {response.transcript.status}
-                            </Badge>
-                          </div>
-                          {response.transcript.text ? (
-                            <p className="mt-1.5 sm:mt-2 text-xs sm:text-sm leading-5 text-[#3c3026] line-clamp-3">{response.transcript.text}</p>
-                          ) : response.transcript.errorMessage ? (
-                            <p className="mt-1.5 sm:mt-2 text-xs text-[#8a3d2b]">{response.transcript.errorMessage}</p>
-                          ) : (
-                            <p className="mt-1.5 sm:mt-2 text-xs text-[#665746]">Processing...</p>
-                         )}
                         </div>
                       ) : null}
 

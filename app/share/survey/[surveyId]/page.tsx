@@ -4,18 +4,20 @@ import { getLatestPublishedSurveyQuestions, getPublishedSurveyById } from "@/lib
 
 type PageProps = {
   params: Promise<{ surveyId: string }>
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://audioform-production.up.railway.app"
 
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: PageProps): Promise<Metadata> {
   const { surveyId } = await params
+  const { v } = await searchParams
   const survey = await getPublishedSurveyById(surveyId)
 
   const title = survey?.title?.trim() || "Audioform voice survey"
   const description = "Powered by Audioform. Answer by voice in under a minute."
-  const url = `${appUrl}/share/survey/${encodeURIComponent(surveyId)}`
-  const imageUrl = `${appUrl}/api/og/survey?surveyId=${encodeURIComponent(surveyId)}`
+  const url = `${appUrl}/share/survey/${encodeURIComponent(surveyId)}${v ? `?v=${v}` : ""}`
+  const imageUrl = `${appUrl}/api/og/survey?surveyId=${encodeURIComponent(surveyId)}${v ? `&v=${v}` : ""}&ext=.png`
 
   return {
     title,
@@ -48,8 +50,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 }
 
-export default async function ShareSurveyPage({ params }: PageProps) {
+export default async function ShareSurveyPage({ params, searchParams }: PageProps) {
   const { surveyId } = await params
+  const { v } = await searchParams
   const survey = await getPublishedSurveyById(surveyId)
   const prompts = await getLatestPublishedSurveyQuestions(surveyId)
 
