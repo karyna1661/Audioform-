@@ -1,10 +1,8 @@
 import { ImageResponse } from "next/og"
-import { getStoredResponseById } from "@/lib/server/response-store"
 import { getTranscriptByResponseId } from "@/lib/server/transcript-store"
 import { getInsightByTranscriptId } from "@/lib/server/insight-store"
 
-// Remove Edge runtime since getStoredResponseById relies on node:fs and node:crypto
-// export const runtime = "edge"
+export const runtime = "edge"
 
 function formatDuration(seconds?: number | null): string {
   if (!seconds && seconds !== 0) return "Unknown"
@@ -12,6 +10,47 @@ function formatDuration(seconds?: number | null): string {
   const mins = Math.floor(seconds / 60)
   const secs = Math.round(seconds % 60)
   return `${mins}:${secs.toString().padStart(2, '0')}`
+}
+
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  const parts = token.split(".")
+  if (parts.length < 2) return null
+  try {
+    const payload = parts[1].replace(/-/g, "+").replace(/_/g, "/")
+    const padded = payload + "=".repeat((4 - (payload.length % 4)) % 4)
+    return JSON.parse(Buffer.from(padded, "base64").toString("utf8")) as Record<string, unknown>
+  } catch {
+    return null
+  }
+}
+
+function resolveSupabaseConfig(): { url: string; key: string } {
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE || ""
+  const explicitUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || ""
+  if (explicitUrl && key) return { url: explicitUrl.replace(/\/+$/, ""), key }
+  const payload = key ? decodeJwtPayload(key) : null
+  const ref = typeof payload?.ref === "string" ? payload.ref : ""
+  if (ref && key) return { url: `https://${ref}.supabase.co`, key }
+  throw new Error("Missing Supabase config")
+}
+
+async function getResponseDurationSeconds(responseId: string): Promise<number | null> {
+  try {
+    const { url, key } = resolveSupabaseConfig()
+    const res = await fetch(`${url}/rest/v1/response_records?id=eq.${encodeURIComponent(responseId)}&select=duration_seconds&limit=1`, {
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+      },
+      cache: "no-store",
+    })
+    if (!res.ok) return null
+    const data = await res.json()
+    return data[0]?.duration_seconds ?? null
+  } catch {
+    return null
+  }
 }
 
 export async function GET(request: Request) {
@@ -22,14 +61,14 @@ export async function GET(request: Request) {
     return new Response("Missing responseId", { status: 400 })
   }
 
-  const response = await getStoredResponseById(responseId)
+  const durationSeconds = await getResponseDurationSeconds(responseId)
   const transcript = await getTranscriptByResponseId(responseId)
   const insight = transcript ? await getInsightByTranscriptId(transcript.id) : null
 
   const summary = insight?.summary || "Processing insight..."
   const quote = insight?.quotes?.[0] || ""
   const theme = insight?.primaryTheme || ""
-  const duration = formatDuration(response?.durationSeconds)
+  const duration = formatDuration(durationSeconds)
 
   return new ImageResponse(
     (

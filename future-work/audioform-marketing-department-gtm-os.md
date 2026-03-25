@@ -239,3 +239,19 @@ Legend:
 3. Every content piece must be searchable, shareable, or both.
 4. Every week must produce one customer-language update to messaging docs.
 5. If messaging sounds enterprise-generic, rewrite before publish.
+
+## 14) Founder Social Content Cadence
+
+When generating or scheduling social content, rotate through these 7 core pillars to build a multifaceted public image:
+1. **User behavior:** Tweet about what users do a lot.
+2. **Product stage:** Tweet about the product and exactly what stage we are in (e.g., beta, scalability phase).
+3. **Engineering stress:** Once in a while, tweet about adding features that will intentionally stress out the engineering team.
+4. **Investor updates:** Tweet about what’s going on with investors.
+5. **Partnerships:** Tweet about the kind of partners we are looking to work with.
+6. **Public company building:** Build the public image about the company and let people know they can ask questions.
+7. **Ecosystem involvement:** Get involved in the ecosystem we are building in:
+   - Tweet about the cool things technical founders are doing and how you genuinely love it.
+   - Tweet about interesting meetings that offer unique insights into the business/field.
+   - Tweet about our products and ecosystem—the things we love, the things we find unbelievable.
+   - Tweet about non-technical guidance: marketing, distribution, sales.
+   - Tweet about personal stuff connected to the business but that doesn't reveal too much.
