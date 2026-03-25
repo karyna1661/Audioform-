@@ -150,7 +150,7 @@ export default function Home() {
               Ask one focused question. Hear conviction. Decide your next move.
             </motion.h1>
           </motion.div>
-          <div className="font-body mt-5 max-w-2xl text-pretty text-base leading-relaxed text-[#5c5146] sm:text-lg">
+          <div className="block font-body mt-5 max-w-2xl text-pretty text-base leading-relaxed text-[#5c5146] sm:text-lg">
             <motion.p
               initial={prefersReducedMotion ? undefined : { opacity: 0, y: 16 }}
               animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}

@@ -257,7 +257,7 @@ export default function AdminResponsesPage() {
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <div>
+            <div className="block">
               <p className={`font-body text-sm text-[#5c5146] text-pretty`}>
                 Signal Inbox
               </p>

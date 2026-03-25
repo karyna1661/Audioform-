@@ -378,7 +378,7 @@ function RuleRow({
 }) {
   return (
     <div className="flex items-center justify-between gap-3 rounded-xl border border-[#dbcdb8] bg-[#f9f4ea] p-3">
-      <div>
+      <div className="block">
         <Label htmlFor={id} className="text-sm font-semibold">
           {title}
         </Label>
