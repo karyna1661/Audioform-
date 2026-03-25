@@ -499,7 +499,7 @@ export default function QuestionnairesV1Page() {
       <div className="af-panel af-fade-up mx-auto max-w-7xl rounded-[1.7rem] border border-[#cfbea4] p-3 sm:rounded-[2.2rem] sm:p-6">
         <header className="af-fade-up af-delay-1 border-b border-[#cfbea4] pb-5">
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
-            <div className="max-w-3xl">
+            <div className="block max-w-3xl">
               <p className="font-body text-xs font-semibold uppercase tracking-[0.22em] text-[#7a6146]">Research Desk</p>
               <h1 className="mt-3 text-[clamp(1.85rem,7.5vw,3rem)] font-semibold leading-[0.96] text-balance">
                 Build a voice survey that yields decision-grade signal.
@@ -705,7 +705,7 @@ export default function QuestionnairesV1Page() {
                                     return <Icon className="size-4" />
                                   })()}
                                 </span>
-                                <div className="text-left">
+                                <div className="block text-left">
                                   <p className="text-sm font-semibold text-[#6e3316]">{category.label}</p>
                                   <p className="font-body text-xs leading-5 text-[#665746]">{category.description}</p>
                                 </div>
@@ -762,7 +762,7 @@ export default function QuestionnairesV1Page() {
                     </div>
                     <div className="hidden rounded-[1.4rem] border border-[#d8c7b3] bg-[#f7ecde] p-4 lg:block">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#7a6146]">A good final sequence sounds like</p>
-                      <div className="mt-3 space-y-3">
+                      <div className="block mt-3 space-y-3">
                         <p className="text-sm font-semibold text-[#6e3316]">Context to friction to desired future</p>
                         <p className="font-body text-sm leading-6 text-[#665746]">
                           That arc keeps respondents grounded in reality, gives you the moment of tension, and ends with a useful direction instead of vague praise.

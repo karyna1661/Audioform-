@@ -93,7 +93,7 @@ export default function LoginPage() {
         </aside>
 
         <section className="p-6 sm:p-8">
-          <div className="max-w-md pt-10 sm:pt-12 lg:pt-20">
+          <div className="block max-w-md pt-10 sm:pt-12 lg:pt-20">
             <h2 className="text-3xl font-semibold text-balance">Welcome back</h2>
             <p className="font-body mt-2 text-[#5c5146] text-pretty">Enter your details to reopen your signal loop.</p>
 

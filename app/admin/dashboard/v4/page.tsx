@@ -310,7 +310,7 @@ export default function AdminDashboardV4Page() {
           </Button>
         </div>
         <header className="flex flex-wrap items-start justify-between gap-3 border-b border-[#dbcdb8] pb-4">
-          <div>
+          <div className="block">
             <p className={`font-body text-sm text-[#5c5146] text-pretty`}>Builder workspace</p>
             <h1 className="text-[clamp(1.55rem,6vw,1.9rem)] font-semibold text-balance">Signal Inbox</h1>
             <p className={`font-body mt-1 text-sm text-[#5c5146] text-pretty`}>Hi {user?.name}, hear clear signal and decide your next product move faster.</p>
@@ -598,7 +598,7 @@ export default function AdminDashboardV4Page() {
           <section className="order-3 space-y-4 lg:hidden">
             <article className="af-accent-card af-fade-up af-delay-2 rounded-2xl border p-4">
               <div className="flex items-start justify-between gap-3">
-                <div>
+                <div className="block">
                   <h2 className="text-lg font-semibold text-balance">Insight Extractor</h2>
                   <p className="font-body mt-1 text-xs text-[#5c5146]">Theme groups and extractor health.</p>
                 </div>
@@ -673,7 +673,7 @@ export default function AdminDashboardV4Page() {
 
 function Metric({ label, value, helper }: { label: string; value: string; helper?: string }) {
   return (
-    <div className="rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] p-3">
+    <div className="block rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] p-3">
       <p className="text-sm text-[#5c5146]">{label}</p>
       <p className="mt-1 text-3xl font-semibold tabular-nums">{value}</p>
       {helper ? <p className="mt-1 text-xs text-[#5c5146]">{helper}</p> : null}

@@ -305,7 +305,7 @@ export function AudioRecorder({
       <div className="relative h-24 overflow-hidden rounded-[1rem] bg-muted sm:h-28">
         {isUploading ? (
             <div className="flex h-full items-center justify-center px-4">
-              <div className="w-full max-w-md animate-pulse space-y-2" aria-live="polite">
+              <div className="block w-full max-w-md animate-pulse space-y-2" aria-live="polite">
               <div className="h-2.5 w-3/4 rounded-full bg-[#d9cdbd]" />
               <div className="h-2.5 w-full rounded-full bg-[#e5d9ca]" />
               <div className="h-2.5 w-5/6 rounded-full bg-[#d9cdbd]" />
@@ -315,7 +315,7 @@ export function AudioRecorder({
           <canvas ref={canvasRef} className="w-full h-full" width={isMobile ? 300 : 500} height={96} />
         ) : audioBlob ? (
           <div className="flex h-full items-center justify-center px-3">
-            <div className="min-w-0 text-center">
+            <div className="block min-w-0 text-center">
               <div className="text-xl font-semibold tabular-nums sm:text-2xl">
                 {formatTime(Math.floor(playbackTime || 0))} / {formatTime(Math.floor(playbackDuration || recordingTime))}
               </div>
