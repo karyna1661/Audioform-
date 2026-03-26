@@ -576,6 +576,51 @@ export default function AdminDashboardV4Page() {
 
           <aside className="space-y-4 hidden lg:block">
             <article className="af-accent-card af-fade-up af-delay-2 rounded-2xl border p-4">
+              <h2 className="text-lg font-semibold text-balance">Insight Extractor</h2>
+              <p className="font-body mt-1 text-xs text-[#5c5146]">
+                Track transcript throughput, failed runs, and the strongest repeated themes.
+              </p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <Metric label="Transcripts" value={`${extractorMetrics.withTranscript}`} />
+                <Metric label="Insights" value={`${extractorMetrics.withInsight}`} />
+                <Metric label="Pending" value={`${extractorMetrics.transcriptPending}`} />
+                <Metric label="Failed" value={`${extractorMetrics.transcriptFailed}`} />
+              </div>
+              <div className="mt-4">
+                <p className="text-sm font-semibold text-balance">Top themes</p>
+                <ul className="font-body mt-2 space-y-2 text-sm text-[#5c5146]">
+                  {themeCoverage.length ? (
+                    themeCoverage.map(({ theme, count, coverage }) => (
+                      <li key={theme} className="rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] px-3 py-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="font-medium capitalize text-[#261c14]">{theme}</span>
+                          <span className="tabular-nums text-xs text-[#7a6146]">{count} mentions</span>
+                        </div>
+                        <div className="mt-2 h-2 rounded-full bg-[#e7dccb]">
+                          <div className="h-2 rounded-full bg-[#b85e2d]" style={{ width: `${Math.min(100, coverage)}%` }} />
+                        </div>
+                        <p className="mt-1 text-xs text-[#7a6146]">Appears in {coverage}% of extracted insights</p>
+                      </li>
+                    ))
+                  ) : extractorMetrics.transcriptPending > 0 ? (
+                    <li className="rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] p-3">
+                      Themes will appear as pending transcript runs finish.
+                    </li>
+                  ) : (
+                    <li className="rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] p-3">
+                      Run extraction on a few responses to generate the first grouped themes.
+                    </li>
+                  )}
+                </ul>
+              </div>
+              {extractorMetrics.transcriptFailed > 0 ? (
+                <div className="mt-4 rounded-lg border border-[#e3c3b5] bg-[#fff0e9] px-3 py-2 text-xs text-[#8a3d2b]">
+                  {extractorMetrics.transcriptFailed} extraction run{extractorMetrics.transcriptFailed === 1 ? " needs" : "s need"} retry from the response inbox.
+                </div>
+              ) : null}
+            </article>
+
+            <article className="af-accent-card af-fade-up af-delay-2 rounded-2xl border p-4">
               <h2 className="text-lg font-semibold text-balance">Today</h2>
               <p className={`font-body mt-1 text-xs text-[#5c5146]`}>
                 Real-time activity feed from survey, response, and reminder events.
