@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Disable streaming metadata so HTML-limited crawlers like WhatsApp
+  // receive Open Graph tags in the initial <head>.
+  htmlLimitedBots: /.*/,
   images: {
     unoptimized: true,
   },

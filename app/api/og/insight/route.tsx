@@ -9,7 +9,7 @@ function formatDuration(seconds?: number | null): string {
   if (seconds < 60) return `${Math.round(seconds)}s`
   const mins = Math.floor(seconds / 60)
   const secs = Math.round(seconds % 60)
-  return `${mins}:${secs.toString().padStart(2, '0')}`
+  return `${mins}:${secs.toString().padStart(2, "0")}`
 }
 
 function decodeJwtPayload(token: string): Record<string, unknown> | null {
@@ -18,7 +18,9 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
   try {
     const payload = parts[1].replace(/-/g, "+").replace(/_/g, "/")
     const padded = payload + "=".repeat((4 - (payload.length % 4)) % 4)
-    return JSON.parse(Buffer.from(padded, "base64").toString("utf8")) as Record<string, unknown>
+    const decoded =
+      typeof Buffer !== "undefined" ? Buffer.from(padded, "base64").toString("utf8") : atob(padded)
+    return JSON.parse(decoded) as Record<string, unknown>
   } catch {
     return null
   }
@@ -37,14 +39,17 @@ function resolveSupabaseConfig(): { url: string; key: string } {
 async function getResponseDurationSeconds(responseId: string): Promise<number | null> {
   try {
     const { url, key } = resolveSupabaseConfig()
-    const res = await fetch(`${url}/rest/v1/response_records?id=eq.${encodeURIComponent(responseId)}&select=duration_seconds&limit=1`, {
-      headers: {
-        apikey: key,
-        Authorization: `Bearer ${key}`,
-        "Content-Type": "application/json",
+    const res = await fetch(
+      `${url}/rest/v1/response_records?id=eq.${encodeURIComponent(responseId)}&select=duration_seconds&limit=1`,
+      {
+        headers: {
+          apikey: key,
+          Authorization: `Bearer ${key}`,
+          "Content-Type": "application/json",
+        },
+        cache: "no-store",
       },
-      cache: "no-store",
-    })
+    )
     if (!res.ok) return null
     const data = await res.json()
     return data[0]?.duration_seconds ?? null
@@ -100,24 +105,35 @@ export async function GET(request: Request) {
             <div style={{ width: 16, height: 16, borderRadius: 999, background: "#b85e2d" }} />
             Audioform Insight
           </div>
-          
+
           {theme && (
-            <div style={{ 
-              display: "flex", 
-              padding: "6px 16px", 
-              borderRadius: 999, 
-              background: "#fff6ed", 
-              border: "1px solid #cfbea4", 
-              color: "#7a6146", 
-              fontSize: 20, 
-              width: "fit-content",
-              textTransform: "capitalize"
-            }}>
+            <div
+              style={{
+                display: "flex",
+                padding: "6px 16px",
+                borderRadius: 999,
+                background: "#fff6ed",
+                border: "1px solid #cfbea4",
+                color: "#7a6146",
+                fontSize: 20,
+                width: "fit-content",
+                textTransform: "capitalize",
+              }}
+            >
               {theme}
             </div>
           )}
 
-          <div style={{ fontSize: 44, fontWeight: 700, lineHeight: 1.15, maxWidth: 980, color: "#261c14", marginTop: 12 }}>
+          <div
+            style={{
+              fontSize: 44,
+              fontWeight: 700,
+              lineHeight: 1.15,
+              maxWidth: 980,
+              color: "#261c14",
+              marginTop: 12,
+            }}
+          >
             {summary}
           </div>
 
@@ -136,10 +152,10 @@ export async function GET(request: Request) {
               }}
             >
               <div style={{ fontSize: 20, letterSpacing: "0.14em", textTransform: "uppercase", color: "#8a6a4c" }}>
-                Direct Quote ({duration})
+                {`Direct Quote (${duration})`}
               </div>
               <div style={{ fontSize: 32, lineHeight: 1.3, fontStyle: "italic", color: "#3c3026" }}>
-                "{quote}"
+                {`"${quote}"`}
               </div>
             </div>
           )}

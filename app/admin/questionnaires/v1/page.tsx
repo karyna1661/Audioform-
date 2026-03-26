@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { ArrowLeft, CheckCircle2, ChevronRight, Copy, GripVertical, Heart, LayoutTemplate, Library, Lightbulb, Plus, Rocket, Search, Sparkles, Star, Target, Trash2, Undo2 } from "lucide-react"
 import { trackEvent } from "@/lib/analytics"
 import { recordSurveyPublished } from "@/lib/behavior-metrics"
+import { buildSurveyShareUrl } from "@/lib/share-links"
 import { AdminMobileNav } from "@/components/admin-mobile-nav"
 import { SurveyLoadingSkeleton } from "@/components/survey-loading-skeleton"
 
@@ -476,9 +477,9 @@ export default function QuestionnairesV1Page() {
   const mobileGridSectionClass = (step: number) => (mobileStep === step ? "grid" : "hidden lg:grid")
   const surveyLink =
     publishedSurveyId
-      ? `${typeof window !== "undefined" ? window.location.origin : ""}/share/survey/${encodeURIComponent(
-          publishedSurveyId,
-        )}?v=${Date.now()}`
+      ? buildSurveyShareUrl(typeof window !== "undefined" ? window.location.origin : "", publishedSurveyId, {
+          version: Date.now(),
+        })
       : ""
   const embedLink =
     publishedSurveyId && creatorId

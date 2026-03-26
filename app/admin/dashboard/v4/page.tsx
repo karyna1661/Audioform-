@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { ArrowLeft, ArrowUpRight, Calendar, CheckCircle2, Mic, Target, Trash2 } from "lucide-react"
 import { trackEvent } from "@/lib/analytics"
 import { shouldTrackCreatorRevisitWithin7d } from "@/lib/behavior-metrics"
+import { buildSurveyShareUrl } from "@/lib/share-links"
 import { SurveyLoadingSkeleton } from "@/components/survey-loading-skeleton"
 import { AdminMobileNav } from "@/components/admin-mobile-nav"
 import {
@@ -494,9 +495,9 @@ export default function AdminDashboardV4Page() {
                         onClick={async (event) => {
                           event.stopPropagation()
                           if (typeof window === "undefined") return
-                          const link = `${window.location.origin}/share/survey/${encodeURIComponent(
-                            survey.id,
-                          )}?v=${new Date(survey.updatedAt).getTime()}`
+                          const link = buildSurveyShareUrl(window.location.origin, survey.id, {
+                            version: survey.updatedAt,
+                          })
                           try {
                             await navigator.clipboard.writeText(link)
                             setUiMessage(`Survey link copied for "${survey.title}".`)

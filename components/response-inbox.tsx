@@ -401,7 +401,7 @@ export function ResponseInbox({
                               size="sm" 
                               className="h-7 text-xs border-[#cfbea4] bg-[#fff6ed] text-[#7a6146] hover:bg-[#efe4d3]"
                               onClick={() => {
-                                const url = `${window.location.origin}/api/og/insight?responseId=${response.id}`
+                                const url = `${window.location.origin}/share/insight/${encodeURIComponent(response.id)}`
                                 window.open(url, "_blank")
                               }}
                             >

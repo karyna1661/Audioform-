@@ -7,6 +7,7 @@ import { motion, useReducedMotion } from "motion/react"
 import { trackEvent } from "@/lib/analytics"
 import { useAuth } from "@/lib/auth-context"
 import { getActiveSurveyId } from "@/lib/behavior-metrics"
+import { buildSurveySharePath } from "@/lib/share-links"
 
 export default function Home() {
   const { status } = useAuth()
@@ -21,7 +22,7 @@ export default function Home() {
   // Homepage feedback survey - always points to official Audioform feedback survey
   const feedbackSurveyId = process.env.NEXT_PUBLIC_AUDIOFORM_FEEDBACK_SURVEY_ID
   const homepageQuestionnaireHref = feedbackSurveyId
-    ? `/share/survey/${encodeURIComponent(feedbackSurveyId)}`
+    ? buildSurveySharePath(feedbackSurveyId)
     : "/questionnaire/v1"
   
   // Admin dashboard preview - points to user's active survey
