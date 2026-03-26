@@ -30,7 +30,10 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
   try {
     const payload = parts[1].replace(/-/g, "+").replace(/_/g, "/")
     const padded = payload + "=".repeat((4 - (payload.length % 4)) % 4)
-    return JSON.parse(Buffer.from(padded, "base64").toString("utf8")) as Record<string, unknown>
+    const decoded = typeof Buffer !== "undefined"
+      ? Buffer.from(padded, "base64").toString("utf8")
+      : atob(padded)
+    return JSON.parse(decoded) as Record<string, unknown>
   } catch {
     return null
   }
