@@ -116,6 +116,10 @@ function getSignalTone(score?: number | null): string {
   return "text-[#7a6146]"
 }
 
+function normalizeComparableText(value?: string | null): string {
+  return (value ?? "").replace(/\s+/g, " ").trim().toLowerCase()
+}
+
 export function ResponseInbox({ 
   responses,
   onPlayResponse,
@@ -298,9 +302,13 @@ export function ResponseInbox({
             (() => {
               const isExpanded = Boolean(expandedInsightIds[response.id])
               const fullSummary = response.insight?.summary ?? null
+              const quote = response.insight?.quotes?.[0] ?? null
               const truncatedSummary = fullSummary && fullSummary.length > 160 && !isExpanded
                 ? `${fullSummary.slice(0, 157)}...`
                 : fullSummary
+              const normalizedSummary = normalizeComparableText(fullSummary)
+              const normalizedQuote = normalizeComparableText(quote)
+              const showQuote = Boolean(quote) && normalizedQuote !== normalizedSummary
               return (
               <Card key={response.id} className={cn(
                 "transition-colors",
@@ -427,8 +435,8 @@ export function ResponseInbox({
                                ) : null}
                              </>
                            ) : null}
-                          {response.insight.quotes?.[0] ? (
-                            <p className="mt-1.5 sm:mt-2 text-xs italic text-[#665746] line-clamp-2">"{response.insight.quotes[0]}"</p>
+                          {showQuote ? (
+                            <p className="mt-1.5 sm:mt-2 text-xs italic text-[#665746] line-clamp-2">"{quote}"</p>
                           ) : null}
                         </div>
                       ) : null}

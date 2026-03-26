@@ -27,16 +27,66 @@ function extractThemes(text: string): string[] {
   return matches.slice(0, 3)
 }
 
-function summarize(text: string): string {
-  const compact = text.replace(/\s+/g, " ").trim()
-  if (compact.length <= 180) return compact
-  return `${compact.slice(0, 177)}...`
+function normalizeWhitespace(text: string): string {
+  return text.replace(/\s+/g, " ").trim()
 }
 
-function extractQuotes(text: string): string[] {
-  const compact = text.replace(/\s+/g, " ").trim()
-  if (!compact) return []
-  return [compact.length <= 160 ? compact : `${compact.slice(0, 157)}...`]
+function splitIntoSentences(text: string): string[] {
+  return normalizeWhitespace(text)
+    .split(/(?<=[.!?])\s+/)
+    .map((sentence) => sentence.trim())
+    .filter(Boolean)
+}
+
+function sentenceScore(sentence: string, themes: string[]): number {
+  const lower = sentence.toLowerCase()
+  let score = 0
+
+  if (sentence.length >= 45 && sentence.length <= 150) score += 3
+  if (/[.!?]$/.test(sentence)) score += 1
+  if (sentence.includes('"') || sentence.includes("'")) score += 1
+  if (themes.some((theme) => lower.includes(theme))) score += 2
+  if (/(because|but|so|when|after|before|instead)/.test(lower)) score += 1
+  if (/(confusing|unclear|frustrating|hard|slow|stuck|difficult|love|great|easy|helpful)/.test(lower)) score += 1
+
+  return score
+}
+
+function summarize(text: string, themes: string[], sentiment: "positive" | "negative" | "neutral"): string {
+  const compact = normalizeWhitespace(text)
+  if (!compact) return "Voice feedback captured."
+
+  const themeLabel =
+    themes.length >= 2
+      ? `${themes[0]} and ${themes[1]}`
+      : themes[0] ?? null
+
+  const toneLead =
+    sentiment === "negative"
+      ? "The respondent describes friction"
+      : sentiment === "positive"
+        ? "The respondent highlights a positive experience"
+        : "The respondent focuses on"
+
+  if (themeLabel) {
+    const summary = `${toneLead} around ${themeLabel}.`
+    if (summary.length <= 140) return summary
+  }
+
+  const firstSentence = splitIntoSentences(compact)[0] ?? compact
+  const trimmedSentence = firstSentence.length <= 120 ? firstSentence : `${firstSentence.slice(0, 117)}...`
+  return `Key point: ${trimmedSentence}`
+}
+
+function extractQuotes(text: string, themes: string[]): string[] {
+  const sentences = splitIntoSentences(text)
+  if (!sentences.length) return []
+
+  const ranked = [...sentences].sort((a, b) => sentenceScore(b, themes) - sentenceScore(a, themes))
+  const best = ranked[0]
+  if (!best) return []
+
+  return [best.length <= 160 ? best : `${best.slice(0, 157)}...`]
 }
 
 function calculateSignalScore(text: string, themes: string[]): number {
@@ -49,8 +99,8 @@ export async function extractAndStoreInsight(transcript: StoredTranscript) {
   const text = transcript.transcriptText?.trim() || ""
   const themes = extractThemes(text)
   const sentiment = pickSentiment(text)
-  const summary = summarize(text)
-  const quotes = extractQuotes(text)
+  const summary = summarize(text, themes, sentiment.sentiment)
+  const quotes = extractQuotes(text, themes)
   const signalScore = calculateSignalScore(text, themes)
 
   return upsertInsightResult({

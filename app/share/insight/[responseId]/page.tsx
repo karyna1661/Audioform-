@@ -9,6 +9,10 @@ type PageProps = {
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://audioform-production.up.railway.app"
 
+function normalizeComparableText(value: string | null | undefined): string {
+  return (value ?? "").replace(/\s+/g, " ").trim().toLowerCase()
+}
+
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { responseId } = await params
   const transcript = await getTranscriptByResponseId(responseId)
@@ -62,6 +66,11 @@ export default async function ShareInsightPage({ params }: PageProps) {
   const quote = insight?.quotes?.[0]?.trim() || null
   const theme = insight?.primaryTheme?.trim() || null
   const transcriptText = transcript?.transcriptText?.trim() || null
+  const normalizedTranscript = normalizeComparableText(transcriptText)
+  const normalizedQuote = normalizeComparableText(quote)
+  const showTranscript =
+    Boolean(transcriptText) &&
+    (!normalizedQuote || !normalizedTranscript.includes(normalizedQuote) || normalizedTranscript.length - normalizedQuote.length > 80)
 
   return (
     <main className="min-h-dvh bg-[#f3ecdf] p-4 sm:p-6">
@@ -77,11 +86,13 @@ export default async function ShareInsightPage({ params }: PageProps) {
           </div>
         ) : null}
 
-        {transcriptText ? (
-          <div className="mt-6 rounded-2xl border border-[#cfbea4] bg-[#fffdf8] p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7a6146]">Transcript</p>
-            <p className="mt-2 text-sm leading-7 text-[#665746]">{transcriptText}</p>
-          </div>
+        {showTranscript ? (
+          <details className="mt-6 rounded-2xl border border-[#cfbea4] bg-[#fffdf8] p-4">
+            <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.16em] text-[#7a6146]">
+              Full transcript
+            </summary>
+            <p className="mt-3 text-sm leading-7 text-[#665746]">{transcriptText}</p>
+          </details>
         ) : null}
 
         <p className="mt-5 text-sm leading-6 text-[#665746]">
