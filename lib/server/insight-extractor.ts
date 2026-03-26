@@ -95,25 +95,165 @@ function calculateSignalScore(text: string, themes: string[]): number {
   return Math.max(25, Math.min(100, 25 + lengthBoost + themeBoost))
 }
 
-export async function extractAndStoreInsight(transcript: StoredTranscript) {
-  const text = transcript.transcriptText?.trim() || ""
+function toSentenceCase(value: string): string {
+  const trimmed = normalizeWhitespace(value)
+  if (!trimmed) return ""
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1)
+}
+
+function buildHeuristicInsight(text: string) {
   const themes = extractThemes(text)
   const sentiment = pickSentiment(text)
   const summary = summarize(text, themes, sentiment.sentiment)
   const quotes = extractQuotes(text, themes)
   const signalScore = calculateSignalScore(text, themes)
 
-  return upsertInsightResult({
-    transcriptId: transcript.id,
-    responseId: transcript.responseId,
+  return {
     summary,
+    quotes,
     primaryTheme: themes[0] ?? null,
     themes,
     sentiment: sentiment.sentiment,
     sentimentScore: sentiment.score,
     signalScore,
-    quotes,
     provider: "audioform-heuristic",
-    extractorVersion: "v1",
+    extractorVersion: "v2",
+  }
+}
+
+function normalizeForInclusion(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[“”]/g, '"')
+    .replace(/[‘’]/g, "'")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+function coerceQuoteFromTranscript(text: string, quote: string | null | undefined, themes: string[]): string[] {
+  const candidate = normalizeWhitespace(quote ?? "")
+  if (!candidate) return extractQuotes(text, themes)
+
+  const transcriptSentences = splitIntoSentences(text)
+  const normalizedCandidate = normalizeForInclusion(candidate)
+  const exactSentence = transcriptSentences.find((sentence) =>
+    normalizeForInclusion(sentence).includes(normalizedCandidate),
+  )
+
+  if (exactSentence) {
+    return [exactSentence.length <= 160 ? exactSentence : `${exactSentence.slice(0, 157)}...`]
+  }
+
+  const partialMatch = transcriptSentences.find((sentence) => {
+    const normalizedSentence = normalizeForInclusion(sentence)
+    const probe = normalizedCandidate.slice(0, Math.min(50, normalizedCandidate.length))
+    return probe.length >= 18 && normalizedSentence.includes(probe)
+  })
+
+  if (partialMatch) {
+    return [partialMatch.length <= 160 ? partialMatch : `${partialMatch.slice(0, 157)}...`]
+  }
+
+  return extractQuotes(text, themes)
+}
+
+async function generateAiInsight(text: string) {
+  if (!process.env.OPENAI_API_KEY) return null
+
+  const fallback = buildHeuristicInsight(text)
+  const model = process.env.OPENAI_INSIGHT_MODEL || process.env.OPENAI_TEXT_MODEL || "gpt-4o-mini"
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model,
+      response_format: { type: "json_object" },
+      temperature: 0.2,
+      messages: [
+        {
+          role: "system",
+          content:
+            "You turn voice-feedback transcripts into shareable insight cards. Return strict JSON with keys: summary, quote, primaryTheme, themes, sentiment. " +
+            "Rules: summary must be a grammatical paraphrase of what was said, not a transcript copy, and no more than 2 short lines / 160 characters. " +
+            "quote must be an exact excerpt from the transcript, under 140 characters. primaryTheme should be 1-3 words. themes should contain up to 3 concise lower-case themes. " +
+            "sentiment must be positive, negative, or neutral. Stay faithful to the transcript.",
+        },
+        {
+          role: "user",
+          content: `Transcript:\n${text}`,
+        },
+      ],
+    }),
+    cache: "no-store",
+  })
+
+  if (!response.ok) {
+    const message = await response.text().catch(() => "")
+    throw new Error(`OpenAI insight summary failed (${response.status}): ${message.slice(0, 280)}`)
+  }
+
+  const data = (await response.json()) as {
+    choices?: Array<{
+      message?: {
+        content?: string
+      }
+    }>
+  }
+  const rawContent = data.choices?.[0]?.message?.content ?? ""
+  const parsed = JSON.parse(rawContent) as {
+    summary?: string
+    quote?: string
+    primaryTheme?: string
+    themes?: string[]
+    sentiment?: "positive" | "negative" | "neutral"
+  }
+
+  const themes = Array.isArray(parsed.themes)
+    ? parsed.themes.map((theme) => normalizeWhitespace(theme).toLowerCase()).filter(Boolean).slice(0, 3)
+    : fallback.themes
+  const sentiment =
+    parsed.sentiment === "positive" || parsed.sentiment === "negative" || parsed.sentiment === "neutral"
+      ? parsed.sentiment
+      : fallback.sentiment
+  const summary = normalizeWhitespace(parsed.summary ?? "") || fallback.summary
+  const quotes = coerceQuoteFromTranscript(text, parsed.quote, themes)
+  const primaryTheme = normalizeWhitespace(parsed.primaryTheme ?? "") || themes[0] || fallback.primaryTheme || null
+
+  return {
+    summary: toSentenceCase(summary),
+    quotes,
+    primaryTheme,
+    themes,
+    sentiment,
+    sentimentScore: fallback.sentimentScore,
+    signalScore: fallback.signalScore,
+    provider: "openai-summary",
+    extractorVersion: "v3",
+  }
+}
+
+export async function extractAndStoreInsight(transcript: StoredTranscript) {
+  const text = transcript.transcriptText?.trim() || ""
+  const extracted = text
+    ? await generateAiInsight(text).catch(() => null)
+    : null
+  const fallback = buildHeuristicInsight(text)
+  const insight = extracted ?? fallback
+
+  return upsertInsightResult({
+    transcriptId: transcript.id,
+    responseId: transcript.responseId,
+    summary: insight.summary,
+    primaryTheme: insight.primaryTheme,
+    themes: insight.themes,
+    sentiment: insight.sentiment,
+    sentimentScore: insight.sentimentScore,
+    signalScore: insight.signalScore,
+    quotes: insight.quotes,
+    provider: insight.provider,
+    extractorVersion: insight.extractorVersion,
   })
 }
