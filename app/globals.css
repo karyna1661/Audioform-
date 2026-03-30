@@ -27,24 +27,137 @@ body {
   }
   .af-shell {
     background:
+      linear-gradient(rgba(255, 251, 245, 0.56), rgba(255, 251, 245, 0.56)),
       radial-gradient(1200px 420px at 82% -8%, rgba(184, 94, 45, 0.16), transparent 62%),
       radial-gradient(900px 360px at -12% 102%, rgba(210, 151, 74, 0.12), transparent 58%),
       #f3ecdf;
   }
   .af-panel {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
     border-color: #dbcdb8;
     background:
       linear-gradient(165deg, rgba(255, 250, 242, 0.92) 0%, rgba(249, 244, 234, 0.96) 100%);
     box-shadow: 0 20px 60px rgba(90, 60, 24, 0.08);
   }
+  .af-panel::before,
+  .af-accent-card::before,
+  .af-chip::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.08;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180' viewBox='0 0 180 180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='0.75'/%3E%3C/svg%3E");
+    mix-blend-mode: multiply;
+    z-index: -1;
+  }
+  .af-panel::after {
+    content: "";
+    position: absolute;
+    inset: auto;
+    pointer-events: none;
+    right: -4rem;
+    top: -4rem;
+    width: 14rem;
+    height: 14rem;
+    border-radius: 9999px;
+    background: rgba(229, 210, 181, 0.9);
+    filter: blur(52px);
+    z-index: -1;
+  }
   .af-accent-card {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
     border-color: #d4bea2;
     background:
       linear-gradient(150deg, rgba(255, 246, 237, 0.98) 0%, rgba(247, 236, 221, 0.9) 100%);
   }
+  .af-accent-card::after {
+    content: "";
+    position: absolute;
+    pointer-events: none;
+    inset: auto;
+    left: -2rem;
+    bottom: -3rem;
+    width: 8rem;
+    height: 8rem;
+    border-radius: 9999px;
+    background: rgba(230, 181, 147, 0.5);
+    filter: blur(34px);
+    z-index: -1;
+  }
   .af-chip {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
     background: linear-gradient(145deg, rgba(255, 247, 238, 1) 0%, rgba(244, 227, 205, 0.9) 100%);
     border-color: #d7c0a4;
+  }
+  .af-chip::after {
+    content: "";
+    position: absolute;
+    pointer-events: none;
+    inset: auto;
+    right: -1.5rem;
+    top: -1.5rem;
+    width: 5rem;
+    height: 5rem;
+    border-radius: 9999px;
+    background: rgba(230, 181, 147, 0.3);
+    filter: blur(24px);
+    z-index: -1;
+  }
+  .af-noise-wrap {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+  }
+  .af-noise-wrap::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.065;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220' viewBox='0 0 220 220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)' opacity='0.9'/%3E%3C/svg%3E");
+    mix-blend-mode: multiply;
+    z-index: -1;
+  }
+  .af-sprinkle {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+  }
+  .af-sprinkle::after {
+    content: "";
+    position: absolute;
+    pointer-events: none;
+    inset: auto;
+    bottom: -5.5rem;
+    left: 34%;
+    width: 15rem;
+    height: 15rem;
+    transform: translateX(-50%);
+    border-radius: 9999px;
+    background: rgba(230, 181, 147, 0.78);
+    filter: blur(58px);
+    z-index: -1;
+  }
+  .af-sprinkle-soft::after {
+    content: "";
+    position: absolute;
+    pointer-events: none;
+    inset: auto;
+    top: -3rem;
+    right: -2rem;
+    width: 9rem;
+    height: 9rem;
+    border-radius: 9999px;
+    background: rgba(229, 210, 181, 0.62);
+    filter: blur(44px);
+    z-index: -1;
   }
   .af-fade-up {
     animation: afFadeUp 0.42s ease-out both;

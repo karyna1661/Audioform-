@@ -1,5 +1,6 @@
 import { ImageResponse } from "next/og"
 import { getLatestPublishedSurveyQuestions, getPublishedSurveyById } from "@/lib/server/survey-store"
+import { isUuidLike } from "@/lib/share-links"
 
 export const runtime = "edge"
 
@@ -7,8 +8,9 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const surveyId = searchParams.get("surveyId")?.trim()
 
-  const survey = surveyId ? await getPublishedSurveyById(surveyId) : null
-  const prompts = surveyId ? await getLatestPublishedSurveyQuestions(surveyId) : []
+  const resolvedSurveyId = surveyId && isUuidLike(surveyId) ? surveyId : null
+  const survey = resolvedSurveyId ? await getPublishedSurveyById(resolvedSurveyId) : null
+  const prompts = resolvedSurveyId ? await getLatestPublishedSurveyQuestions(resolvedSurveyId) : []
 
   const title = survey?.title?.trim() || "Audioform voice survey"
   const firstPrompt = prompts[0]?.trim() || "Share one concrete moment by voice."
@@ -25,7 +27,7 @@ export async function GET(request: Request) {
           justifyContent: "space-between",
           padding: "56px",
           background: "linear-gradient(135deg, #f7f0e4 0%, #efe0c7 52%, #f8f4ed 100%)",
-          color: "#261c14",
+          color: "var(--af-color-primary)",
           fontFamily: "sans-serif",
         }}
       >
@@ -61,7 +63,7 @@ export async function GET(request: Request) {
             <div style={{ fontSize: 22, letterSpacing: "0.14em", textTransform: "uppercase", color: "#8a6a4c" }}>
               First prompt preview
             </div>
-            <div style={{ fontSize: 38, lineHeight: 1.22 }}>{prompt}</div>
+            <div style={{ fontSize: 42, fontWeight: 600, lineHeight: 1.18 }}>{prompt}</div>
           </div>
         </div>
 

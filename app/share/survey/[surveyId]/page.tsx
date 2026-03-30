@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { getLatestPublishedSurveyQuestions, getPublishedSurveyById } from "@/lib/server/survey-store"
+import { isUuidLike } from "@/lib/share-links"
 
 type PageProps = {
   params: Promise<{ surveyId: string }>
@@ -12,7 +13,7 @@ const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://audioform-production.
 export async function generateMetadata({ params, searchParams }: PageProps): Promise<Metadata> {
   const { surveyId } = await params
   const { v } = await searchParams
-  const survey = await getPublishedSurveyById(surveyId)
+  const survey = isUuidLike(surveyId) ? await getPublishedSurveyById(surveyId) : null
 
   const title = survey?.title?.trim() || "Audioform voice survey"
   const description = "Powered by Audioform. Answer by voice in under a minute."
@@ -50,18 +51,17 @@ export async function generateMetadata({ params, searchParams }: PageProps): Pro
   }
 }
 
-export default async function ShareSurveyPage({ params, searchParams }: PageProps) {
+export default async function ShareSurveyPage({ params }: PageProps) {
   const { surveyId } = await params
-  const { v } = await searchParams
-  const survey = await getPublishedSurveyById(surveyId)
-  const prompts = await getLatestPublishedSurveyQuestions(surveyId)
+  const survey = isUuidLike(surveyId) ? await getPublishedSurveyById(surveyId) : null
+  const prompts = survey ? await getLatestPublishedSurveyQuestions(surveyId) : []
 
   if (!survey) {
     return (
       <main className="min-h-dvh bg-[#f3ecdf] p-4 sm:p-6">
         <section className="mx-auto max-w-3xl rounded-[1.5rem] border border-[#dbcdb8] bg-[#f9f4ea] p-6 sm:rounded-[2rem] sm:p-8">
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#7a6146]">Audioform survey</p>
-          <h1 className="mt-3 text-3xl font-semibold text-balance text-[#261c14]">This survey link is unavailable.</h1>
+          <h1 className="mt-3 text-3xl font-semibold text-balance text-[var(--af-color-primary)]">This survey link is unavailable.</h1>
           <p className="mt-3 text-sm leading-6 text-[#665746]">
             Ask the creator to republish the survey and share a fresh link.
           </p>
@@ -78,17 +78,23 @@ export default async function ShareSurveyPage({ params, searchParams }: PageProp
     <main className="min-h-dvh bg-[#f3ecdf] p-4 sm:p-6">
       <section className="mx-auto max-w-3xl rounded-[1.5rem] border border-[#dbcdb8] bg-[#f9f4ea] p-6 sm:rounded-[2rem] sm:p-8">
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#7a6146]">Audioform survey</p>
-        <h1 className="mt-3 text-3xl font-semibold text-balance text-[#261c14]">{survey.title}</h1>
-        <p className="mt-2 text-sm text-[#665746]">{questionCount} {questionCount === 1 ? "prompt" : "prompts"} • Voice response</p>
 
-        <div className="mt-6 rounded-2xl border border-[#cfbea4] bg-[#fff8f0] p-4">
+        <div className="mt-5 rounded-[1.75rem] border border-[#cfbea4] bg-[#fff8f0] p-5 sm:p-6">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7a6146]">First prompt preview</p>
-          <p className="mt-2 text-lg font-medium leading-8 text-[#261c14]">{firstPrompt}</p>
+          <p className="mt-3 text-2xl font-semibold leading-[1.35] text-[var(--af-color-primary)] sm:text-3xl">
+            {firstPrompt}
+          </p>
         </div>
 
-        <p className="mt-5 text-sm leading-6 text-[#665746]">
-          You will answer by voice. Most people finish in under one minute.
-        </p>
+        <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-[#665746]">
+          <span className="rounded-full border border-[#dbcdb8] bg-[#fffdf8] px-3 py-1">
+            {questionCount} {questionCount === 1 ? "prompt" : "prompts"}
+          </span>
+          <span className="rounded-full border border-[#dbcdb8] bg-[#fffdf8] px-3 py-1">Voice response</span>
+          <span>Most people finish in under one minute.</span>
+        </div>
+
+        <h1 className="mt-6 text-2xl font-semibold text-balance text-[var(--af-color-primary)]">{survey.title}</h1>
 
         <div className="mt-6">
           <Link

@@ -6,11 +6,19 @@ import { useEffect, useMemo, useState } from "react"
 import { useAuth } from "@/lib/auth-context"
 import { useRequireAdmin } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, ArrowUpRight, Calendar, CheckCircle2, Mic, Target, Trash2 } from "lucide-react"
+import { ArrowLeft, ArrowUpRight, Calendar, CheckCircle2, Code2, Copy, Mic, QrCode, Target, Trash2 } from "lucide-react"
 import { trackEvent } from "@/lib/analytics"
 import { shouldTrackCreatorRevisitWithin7d } from "@/lib/behavior-metrics"
+import { buildSurveyShareUrl } from "@/lib/share-links"
 import { SurveyLoadingSkeleton } from "@/components/survey-loading-skeleton"
 import { AdminMobileNav } from "@/components/admin-mobile-nav"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,7 +35,7 @@ type SurveyItem = {
   id: string
   title: string
   questionCount: number
-  status: "draft" | "published"
+  status: "draft" | "published" | "live" | "closed"
   updatedAt: string
   publishedAt: string | null
 }
@@ -76,6 +84,10 @@ function humanizeDashboardEventMessage(
   return event.message
 }
 
+function isShareableSurveyStatus(status: SurveyItem["status"]) {
+  return status === "published" || status === "live"
+}
+
 export default function AdminDashboardV4Page() {
   const router = useRouter()
   const { user, status } = useRequireAdmin()
@@ -87,6 +99,7 @@ export default function AdminDashboardV4Page() {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [deletingSurveyId, setDeletingSurveyId] = useState<string | null>(null)
   const [surveyDeleteDialogId, setSurveyDeleteDialogId] = useState<string | null>(null)
+  const [shareDialogSurveyId, setShareDialogSurveyId] = useState<string | null>(null)
   const [uiMessage, setUiMessage] = useState<string | null>(null)
 
   useEffect(() => {
@@ -118,7 +131,7 @@ export default function AdminDashboardV4Page() {
         if (user?.id && shouldTrackCreatorRevisitWithin7d(user.id, "dashboard")) {
           trackEvent("creator_returned_within_7d", { surface: "dashboard" })
         }
-        const firstPublished = loadedSurveys.find((survey) => survey.status === "published")
+        const firstPublished = loadedSurveys.find((survey) => isShareableSurveyStatus(survey.status))
         if (firstPublished?.id) {
           trackEvent("first_response_viewed", { survey_id: firstPublished.id })
         }
@@ -214,12 +227,12 @@ export default function AdminDashboardV4Page() {
   }, [groupedThemes, extractorMetrics.withInsight])
   const publishedRate = useMemo(() => {
     if (!surveys.length) return 0
-    return Math.round((surveys.filter((s) => s.status === "published").length / surveys.length) * 100)
+    return Math.round((surveys.filter((s) => isShareableSurveyStatus(s.status)).length / surveys.length) * 100)
   }, [surveys])
 
   const ttfrSeconds = useMemo(() => {
     const candidates = surveys
-      .filter((survey) => survey.status === "published" && survey.publishedAt)
+      .filter((survey) => isShareableSurveyStatus(survey.status) && survey.publishedAt)
       .map((survey) => {
         const publishedAtMs = new Date(survey.publishedAt as string).getTime()
         const firstResponseMs = firstResponseBySurvey[survey.id]
@@ -232,7 +245,7 @@ export default function AdminDashboardV4Page() {
   }, [surveys, firstResponseBySurvey])
 
   const publishedSurveys = useMemo(
-    () => surveys.filter((survey) => survey.status === "published"),
+    () => surveys.filter((survey) => isShareableSurveyStatus(survey.status)),
     [surveys],
   )
   const activeSurveyId = publishedSurveys[0]?.id ?? null
@@ -268,6 +281,20 @@ export default function AdminDashboardV4Page() {
     if (ttfrSeconds == null) return "Awaiting first response"
     return "Based on first response timestamp"
   }, [ttfrSeconds])
+
+  const buildShareLink = (surveyId: string, updatedAt?: string | null) => {
+    if (typeof window === "undefined") return ""
+    return buildSurveyShareUrl(window.location.origin, surveyId, {
+      version: updatedAt ?? undefined,
+    })
+  }
+
+  const buildQrCodeUrl = (surveyId: string) => {
+    const survey = surveys.find((item) => item.id === surveyId)
+    return `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(
+      buildShareLink(surveyId, survey?.updatedAt),
+    )}`
+  }
 
   const handleDeleteSurvey = async (surveyId: string) => {
     setDeletingSurveyId(surveyId)
@@ -383,15 +410,15 @@ export default function AdminDashboardV4Page() {
             <h2 className="text-lg font-semibold text-balance">Decision KPIs</h2>
             <div className="mt-3 grid grid-cols-3 gap-2">
               <div className="text-center">
-                <p className="text-lg font-semibold text-[#261c14]">{publishedRate}%</p>
+                <p className="text-lg font-semibold text-[var(--af-color-primary)]">{publishedRate}%</p>
                 <p className="text-xs text-[#5c5146]">Published</p>
               </div>
               <div className="text-center">
-                <p className="text-lg font-semibold text-[#261c14]">{uniqueRespondents}</p>
+                <p className="text-lg font-semibold text-[var(--af-color-primary)]">{uniqueRespondents}</p>
                 <p className="text-xs text-[#5c5146]">Respondents</p>
               </div>
               <div className="text-center">
-                <p className="text-lg font-semibold text-[#261c14]">{ttfrLabel}</p>
+                <p className="text-lg font-semibold text-[var(--af-color-primary)]">{ttfrLabel}</p>
                 <p className="text-xs text-[#5c5146]">TTFR</p>
               </div>
             </div>
@@ -473,7 +500,17 @@ export default function AdminDashboardV4Page() {
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <h3 className="text-base font-semibold text-balance sm:text-lg">{survey.title}</h3>
-                    <span className="rounded-full bg-[#e6f0df] px-2 py-0.5 text-xs text-[#2d5a17]">{survey.status}</span>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs ${
+                        isShareableSurveyStatus(survey.status)
+                          ? "bg-[#e6f0df] text-[#2d5a17]"
+                          : survey.status === "closed"
+                            ? "bg-[#efe4d3] text-[#7a6146]"
+                            : "bg-[#f4ead9] text-[#8a5a33]"
+                      }`}
+                    >
+                      {survey.status}
+                    </span>
                   </div>
                   <div className={`font-body mt-2 grid gap-1.5 sm:grid-cols-3 sm:gap-2 text-xs sm:text-sm text-[#5c5146]`}>
                     <p className="inline-flex items-center gap-1 sm:gap-2">
@@ -487,16 +524,14 @@ export default function AdminDashboardV4Page() {
                     <p className="tabular-nums">{responsesBySurvey[survey.id] ?? 0} responses</p>
                   </div>
                   <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-                    {survey.status === "published" ? (
+                    {isShareableSurveyStatus(survey.status) ? (
                       <Button
                         variant="outline"
                         className="w-full border-[#dbcdb8] bg-[#fff6ed] sm:w-auto"
                         onClick={async (event) => {
                           event.stopPropagation()
                           if (typeof window === "undefined") return
-                          const link = `${window.location.origin}/share/survey/${encodeURIComponent(
-                            survey.id,
-                          )}?v=${new Date(survey.updatedAt).getTime()}`
+                          const link = buildShareLink(survey.id, survey.updatedAt)
                           try {
                             await navigator.clipboard.writeText(link)
                             setUiMessage(`Survey link copied for "${survey.title}".`)
@@ -506,10 +541,11 @@ export default function AdminDashboardV4Page() {
                           }
                         }}
                       >
+                        <Copy className="mr-2 size-4" aria-hidden="true" />
                         Copy survey link
                       </Button>
                     ) : null}
-                    {survey.status === "published" && user?.id ? (
+                    {isShareableSurveyStatus(survey.status) && user?.id ? (
                       <Button
                         variant="outline"
                         className="w-full border-[#dbcdb8] bg-[#fff6ed] sm:w-auto"
@@ -531,7 +567,21 @@ export default function AdminDashboardV4Page() {
                           }
                         }}
                       >
+                        <Code2 className="mr-2 size-4" aria-hidden="true" />
                         Copy iframe code
+                      </Button>
+                    ) : null}
+                    {isShareableSurveyStatus(survey.status) ? (
+                      <Button
+                        variant="outline"
+                        className="w-full border-[#dbcdb8] bg-[#fff6ed] sm:w-auto"
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          setShareDialogSurveyId(survey.id)
+                        }}
+                      >
+                        <QrCode className="mr-2 size-4" aria-hidden="true" />
+                        QR code
                       </Button>
                     ) : null}
                     {survey.status === "draft" ? (
@@ -565,7 +615,9 @@ export default function AdminDashboardV4Page() {
                     </Button>
                   </div>
                   <p className={`font-body mt-2 text-xs text-[#5c5146] hidden sm:block`}>
-                    Clip export/share lives in Moderation Queue after opening the top signal.
+                    {isShareableSurveyStatus(survey.status)
+                      ? "Copy the live link, iframe, or QR from this row when you are ready to distribute."
+                      : "Clip export/share lives in Moderation Queue after opening the top signal."}
                   </p>
                 </article>
                 ))
@@ -574,6 +626,51 @@ export default function AdminDashboardV4Page() {
           </section>
 
           <aside className="space-y-4 hidden lg:block">
+            <article className="af-accent-card af-fade-up af-delay-2 rounded-2xl border p-4">
+              <h2 className="text-lg font-semibold text-balance">Insight Extractor</h2>
+              <p className="font-body mt-1 text-xs text-[#5c5146]">
+                Track transcript throughput, failed runs, and the strongest repeated themes.
+              </p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <Metric label="Transcripts" value={`${extractorMetrics.withTranscript}`} />
+                <Metric label="Insights" value={`${extractorMetrics.withInsight}`} />
+                <Metric label="Pending" value={`${extractorMetrics.transcriptPending}`} />
+                <Metric label="Failed" value={`${extractorMetrics.transcriptFailed}`} />
+              </div>
+              <div className="mt-4">
+                <p className="text-sm font-semibold text-balance">Top themes</p>
+                <ul className="font-body mt-2 space-y-2 text-sm text-[#5c5146]">
+                  {themeCoverage.length ? (
+                    themeCoverage.map(({ theme, count, coverage }) => (
+                      <li key={theme} className="rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] px-3 py-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="font-medium capitalize text-[var(--af-color-primary)]">{theme}</span>
+                          <span className="tabular-nums text-xs text-[#7a6146]">{count} mentions</span>
+                        </div>
+                        <div className="mt-2 h-2 rounded-full bg-[#e7dccb]">
+                          <div className="h-2 rounded-full bg-[#b85e2d]" style={{ width: `${Math.min(100, coverage)}%` }} />
+                        </div>
+                        <p className="mt-1 text-xs text-[#7a6146]">Appears in {coverage}% of extracted insights</p>
+                      </li>
+                    ))
+                  ) : extractorMetrics.transcriptPending > 0 ? (
+                    <li className="rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] p-3">
+                      Themes will appear as pending transcript runs finish.
+                    </li>
+                  ) : (
+                    <li className="rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] p-3">
+                      Run extraction on a few responses to generate the first grouped themes.
+                    </li>
+                  )}
+                </ul>
+              </div>
+              {extractorMetrics.transcriptFailed > 0 ? (
+                <div className="mt-4 rounded-lg border border-[#e3c3b5] bg-[#fff0e9] px-3 py-2 text-xs text-[#8a3d2b]">
+                  {extractorMetrics.transcriptFailed} extraction run{extractorMetrics.transcriptFailed === 1 ? " needs" : "s need"} retry from the response inbox.
+                </div>
+              ) : null}
+            </article>
+
             <article className="af-accent-card af-fade-up af-delay-2 rounded-2xl border p-4">
               <h2 className="text-lg font-semibold text-balance">Today</h2>
               <p className={`font-body mt-1 text-xs text-[#5c5146]`}>
@@ -611,7 +708,7 @@ export default function AdminDashboardV4Page() {
               <ul className="mt-3 space-y-2 text-sm text-[#5c5146]">
                 {themeCoverage.slice(0, 3).map(({ theme, count }) => (
                   <li key={theme} className="flex items-center justify-between rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] px-3 py-2">
-                    <span className="capitalize text-[#261c14]">{theme}</span>
+                    <span className="capitalize text-[var(--af-color-primary)]">{theme}</span>
                     <span className="text-xs tabular-nums">{count}</span>
                   </li>
                 ))}
@@ -665,6 +762,73 @@ export default function AdminDashboardV4Page() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={!!shareDialogSurveyId} onOpenChange={(open) => !open && setShareDialogSurveyId(null)}>
+        <DialogContent className="border-[#dbcdb8] bg-[#f9f4ea] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Survey QR handoff</DialogTitle>
+            <DialogDescription>
+              Scan the code or copy the direct link for quick sharing.
+            </DialogDescription>
+          </DialogHeader>
+          {shareDialogSurveyId ? (
+            <div className="space-y-4">
+              <div className="mx-auto w-fit rounded-[1.5rem] border border-[#dbcdb8] bg-[#fffdf8] p-4">
+                <img
+                  src={buildQrCodeUrl(shareDialogSurveyId)}
+                  alt="QR code for survey share link"
+                  width={240}
+                  height={240}
+                  className="size-[240px]"
+                />
+              </div>
+              <Button
+                variant="outline"
+                className="w-full border-[#dbcdb8] bg-[#fff7ee]"
+                onClick={async () => {
+                  const survey = surveys.find((item) => item.id === shareDialogSurveyId)
+                  const link = buildShareLink(shareDialogSurveyId, survey?.updatedAt)
+                  try {
+                    await navigator.clipboard.writeText(link)
+                    setUiMessage(`Survey link copied for "${survey?.title ?? "survey"}".`)
+                  } catch {
+                    setUiMessage("Could not copy survey link. Copy it from the QR dialog instead.")
+                  }
+                }}
+              >
+                <Copy className="mr-2 size-4" aria-hidden="true" />
+                Copy direct link
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full border-[#dbcdb8] bg-[#fff7ee]"
+                onClick={async () => {
+                  const survey = surveys.find((item) => item.id === shareDialogSurveyId)
+                  const qrUrl = buildQrCodeUrl(shareDialogSurveyId)
+                  try {
+                    const response = await fetch(qrUrl)
+                    const blob = await response.blob()
+                    const objectUrl = window.URL.createObjectURL(blob)
+                    const anchor = document.createElement("a")
+                    anchor.href = objectUrl
+                    anchor.download = `${survey?.title?.trim().replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "").toLowerCase() || "audioform-survey"}-qr.png`
+                    document.body.appendChild(anchor)
+                    anchor.click()
+                    anchor.remove()
+                    window.URL.revokeObjectURL(objectUrl)
+                    setUiMessage(`QR code downloaded for "${survey?.title ?? "survey"}".`)
+                  } catch {
+                    setUiMessage("Could not download QR code. Please try again.")
+                  }
+                }}
+              >
+                <QrCode className="mr-2 size-4" aria-hidden="true" />
+                Download QR code
+              </Button>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
 
       <AdminMobileNav />
     </main>
