@@ -1,6 +1,13 @@
 # TODO
 
 ## Active
+- [x] Create mobile-first redesign PRD from desktop JTBD audit and current mobile structural issues.
+- [x] Define 2 distinct mobile product directions that keep shared design tokens but separate mobile IA/layout from desktop.
+- [x] Map current desktop components/buttons to mobile-native patterns and eliminate nested-component anti-patterns.
+- [x] Recommend one mobile direction for implementation and define phased execution plan.
+- [x] Build first Pocket Studio mobile foundation components and apply them to core mobile entry/respondent/dashboard flows.
+- [x] Continue Pocket Studio rollout to signal queue, survey creation, notifications, and share hub.
+- [x] Continue Pocket Studio cleanup for placeholder admin pages and any deeper mobile detail splits.
 - [x] Inspect current survey generator UX and identify the main AI-slop issues.
 - [x] Apply skill-led redesign pass to survey generator using frontend/design skills.
 - [x] Run verification and summarize Railway/staging implications plus survey ID next step.
@@ -113,3 +120,13 @@
 - Upload-loop hardening review: recorder now keeps the recorded take visible during slow uploads, embedded survey pages now use the same init/upload pipeline as the main questionnaire instead of the heavier legacy single-request path, upload timeouts were raised for slow mobile networks, and the inbox now surfaces a simple "Start Here" listen-first digest.
 - Checklist audit review: updated `future-work/audioform-beta-readiness-checklist.md` and `future-work/audioform-v1-implementation-checklist.md` to reflect the current codebase; remaining gaps are primarily server-side admin authz, incomplete analytics wiring, compare-route gating, mock showcase metrics, and broader ops/scalability hardening.
 - Hardening + instrumentation review: admin APIs now reject non-admin sessions server-side, compare routes redirect to the chosen live flows, notification/respondent/revisit analytics events are wired end-to-end, the respondent flow now nudges sub-10-second takes without blocking submission, stale mock revenue/traction claims were removed from the visual command center, and Supabase/SMTP/OpenAI provider paths now use timeout/retry plus structured error logging.
+- Mobile redesign PRD review: added `docs/product/MOBILE_APP_REDESIGN_PRD.md` with two mobile directions (`Pocket Studio`, `Field Loop`), shared-token rules, route scope, and phased execution recommendation.
+- Pocket Studio implementation review: added reusable mobile shell primitives and applied the first mobile-first pass to login, signup, forgot-password, respondent survey, thank-you, builder dashboard, and the mobile admin nav so these surfaces no longer depend on compressed desktop composition patterns.
+- Pocket Studio builder-loop review: mobile signal queue, notifications, share hub, and survey builder now have dedicated mobile branches with simplified action stacks, labeled controls, and reduced nested-panel composition instead of relying on compressed desktop layouts.
+- Pocket Studio continuity review: placeholder admin routes now act as mobile-first holding pages, and the `/admin/responses` route itself now uses a Pocket Studio mobile wrapper so the Signal queue no longer sits inside a desktop outer shell on phones.
+- Pocket Studio hardening review: mobile Signal now supports a dedicated response detail state instead of forcing all deep review into queue cards, queue actions have explicit accessibility labels, and the settings/profile/help routes now function as stronger mobile guidance surfaces instead of passive placeholders.
+- Verification review: `npm run lint` is currently repo-blocked because the project still uses `next lint` under Next 16, and `npm run build` validated env successfully but was blocked by an existing `.next/lock` from another build process rather than a compile failure in this mobile slice.
+- Verification review: `tsconfig.json` now excludes `worktrees/*`, and `npx tsc --noEmit` completes successfully for the main workspace again.
+- Verification review: browser QA is still limited in this shell-only environment, so the remaining check is a live mobile/device pass on the running app rather than another repo-level code fix.
+- Studio + Player replatform review: creator home now opens as a Listen workspace with ranked release cards, preview-first playback, respondent public-listening opt-in is wired through upload and thank-you unlock, a shared listening session keeps the player alive across creator routes, and release detail now exposes a stronger player-led review surface instead of only an inbox list.
+- Verification review: `npm run build` and `npx tsc --noEmit` both pass after the Studio + Player replatform changes; remaining non-blocking warnings are existing Next 16 config/deprecation notices plus the repo's older TypeScript version advisory.

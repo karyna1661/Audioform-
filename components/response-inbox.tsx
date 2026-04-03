@@ -19,6 +19,8 @@ import {
 } from "lucide-react"
 import { getDurationBucketLabel } from "@/lib/response-duration"
 import { cn } from "@/lib/utils"
+import { useIsMobile } from "@/components/ui/use-mobile"
+import { PocketSection } from "@/components/mobile/pocket-shell"
 
 type ResponseWithMetadata = {
   id: string
@@ -36,6 +38,7 @@ type ResponseWithMetadata = {
   flagged: boolean
   highSignal: boolean
   bookmarked: boolean
+  publicPlaylistEligible?: boolean
   moderationUpdatedAt: string | null
   timestamp: string
   transcript?: {
@@ -65,16 +68,68 @@ type ResponseInboxProps = {
   onFlagResponse?: (responseId: string, flagged: boolean) => void
   onMarkHighSignal?: (responseId: string, highSignal: boolean) => void
   onBookmarkResponse?: (responseId: string, bookmarked: boolean) => void
+  onTogglePublicPlaylist?: (responseId: string, enabled: boolean) => void
   onExtractInsight?: (responseId: string) => void
   extractingInsightId?: string | null
+  onOpenResponseDetail?: (responseId: string) => void
+}
+
+function waitForAudioCanPlay(audio: HTMLAudioElement, timeoutMs = 4000) {
+  return new Promise<void>((resolve, reject) => {
+    if (audio.readyState >= 3) {
+      resolve()
+      return
+    }
+
+    let settled = false
+    const cleanup = () => {
+      audio.removeEventListener("canplay", handleCanPlay)
+      audio.removeEventListener("error", handleError)
+      window.clearTimeout(timer)
+    }
+
+    const handleCanPlay = () => {
+      if (settled) return
+      settled = true
+      cleanup()
+      resolve()
+    }
+
+    const handleError = () => {
+      if (settled) return
+      settled = true
+      cleanup()
+      reject(new Error("Audio failed before it could play."))
+    }
+
+    const timer = window.setTimeout(() => {
+      if (settled) return
+      settled = true
+      cleanup()
+      reject(new Error("Timed out waiting for audio to become playable."))
+    }, timeoutMs)
+
+    audio.addEventListener("canplay", handleCanPlay, { once: true })
+    audio.addEventListener("error", handleError, { once: true })
+  })
 }
 
 function formatDuration(seconds?: number | null): string {
-  if (!seconds && seconds !== 0) return "Unknown"
+  if (!seconds && seconds !== 0) return "Voice"
   if (seconds < 60) return `${Math.round(seconds)}s`
   const mins = Math.floor(seconds / 60)
   const secs = Math.round(seconds % 60)
   return `${mins}:${secs.toString().padStart(2, '0')}`
+}
+
+function describeTakeLength(response: ResponseWithMetadata): string {
+  if (typeof response.durationSeconds === "number") {
+    return `${formatDuration(response.durationSeconds)} voice take`
+  }
+  if (response.durationBucket) {
+    return `${response.durationBucket} voice take`
+  }
+  return "Voice take"
 }
 
 function formatFileSize(bytes: number): string {
@@ -116,15 +171,24 @@ function getSignalTone(score?: number | null): string {
   return "text-[#7a6146]"
 }
 
+function getTranscriptStatusLabel(status: "pending" | "completed" | "failed"): string {
+  if (status === "pending") return "in progress"
+  if (status === "failed") return "needs retry"
+  return ""
+}
+
 export function ResponseInbox({ 
   responses,
   onPlayResponse,
   onFlagResponse,
   onMarkHighSignal,
   onBookmarkResponse,
+  onTogglePublicPlaylist,
   onExtractInsight,
   extractingInsightId = null,
+  onOpenResponseDetail,
 }: ResponseInboxProps) {
+  const isMobile = useIsMobile()
   const [playingId, setPlayingId] = useState<string | null>(null)
   const [audioErrorById, setAudioErrorById] = useState<Record<string, string>>({})
   const [activeFilter, setActiveFilter] = useState<"all" | "flagged" | "highsignal">("all")
@@ -186,9 +250,9 @@ export function ResponseInbox({
   const digestLabel = useMemo(() => {
     if (!featuredResponse) return null
     if (featuredResponse.questionText) {
-      return `Start with the ${formatDuration(featuredResponse.durationSeconds)} take on "${featuredResponse.questionText}".`
+      return `Start with the ${describeTakeLength(featuredResponse).toLowerCase()} on "${featuredResponse.questionText}".`
     }
-    return `Start with the ${formatDuration(featuredResponse.durationSeconds)} take from ${featuredResponse.surveyTitle}.`
+    return `Start with the ${describeTakeLength(featuredResponse).toLowerCase()} from ${featuredResponse.surveyTitle}.`
   }, [featuredResponse])
 
   const handlePlayToggle = async (response: ResponseWithMetadata) => {
@@ -207,10 +271,20 @@ export function ResponseInbox({
       audio.pause()
       audio.src = response.playbackUrl
       audio.load()
+      await waitForAudioCanPlay(audio)
       await audio.play()
       setPlayingId(response.id)
       onPlayResponse?.(response.id)
-    } catch {
+    } catch (error) {
+      console.error("[response-inbox] playback failed", {
+        responseId: response.id,
+        playbackUrl: response.playbackUrl,
+        readyState: audio.readyState,
+        networkState: audio.networkState,
+        mediaErrorCode: audio.error?.code ?? null,
+        mediaErrorMessage: audio.error?.message ?? null,
+        message: error instanceof Error ? error.message : String(error),
+      })
       setPlayingId(null)
       setAudioErrorById((current) => ({
         ...current,
@@ -220,11 +294,267 @@ export function ResponseInbox({
   }
 
   const buildResponseHeading = (response: ResponseWithMetadata): string => {
-    const duration = formatDuration(response.durationSeconds)
+    const lengthLabel = describeTakeLength(response)
     if (response.questionText) {
-      return `${duration} voice response`
+      return lengthLabel
     }
-    return `${duration} response to ${response.questionId.toUpperCase()}`
+    return `${lengthLabel} from ${response.questionId.toUpperCase()}`
+  }
+
+  if (isMobile) {
+    return (
+      <div className="space-y-4">
+        {featuredResponse ? (
+          <PocketSection
+            title="Start here"
+            description={digestLabel ?? "Open the strongest take first."}
+            className="bg-[#fff6ed]"
+          >
+            <div className="grid grid-cols-3 gap-2">
+              <div className="rounded-2xl border border-[#dbcdb8] bg-[#fffdf8] px-3 py-3 text-center">
+                <p className="text-lg font-semibold text-[var(--af-color-primary)]">{stats.total}</p>
+                <p className="text-[11px] text-[#7a6146]">Takes</p>
+              </div>
+              <div className="rounded-2xl border border-[#dbcdb8] bg-[#fffdf8] px-3 py-3 text-center">
+                <p className="text-lg font-semibold text-[#25613a]">{stats.highSignal}</p>
+                <p className="text-[11px] text-[#7a6146]">High signal</p>
+              </div>
+              <div className="rounded-2xl border border-[#dbcdb8] bg-[#fffdf8] px-3 py-3 text-center">
+                <p className="text-lg font-semibold text-[var(--af-color-primary)]">{stats.deep}</p>
+                <p className="text-[11px] text-[#7a6146]">Deep</p>
+              </div>
+            </div>
+          </PocketSection>
+        ) : null}
+
+        <Tabs
+          value={activeFilter}
+          onValueChange={(value) => setActiveFilter(value as "all" | "flagged" | "highsignal")}
+          className="w-full"
+        >
+          <TabsList className="grid h-auto w-full grid-cols-3 rounded-[1.2rem] border border-[#dbcdb8] bg-[#fff8f0] p-1">
+            <TabsTrigger value="all" className="rounded-[0.9rem] text-xs">All takes</TabsTrigger>
+            <TabsTrigger value="flagged" className="rounded-[0.9rem] text-xs">Flagged</TabsTrigger>
+            <TabsTrigger value="highsignal" className="rounded-[0.9rem] text-xs">High signal</TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        <div className="space-y-3">
+          {filteredResponses.length === 0 ? (
+            <PocketSection title="No takes yet" description="New voice takes will appear here as soon as they land.">
+              <div className="flex flex-col items-center justify-center py-6 text-center text-[#7a6146]">
+                <AudioWaveform className="mb-3 h-10 w-10 opacity-50" />
+                <p className="text-sm">Nothing matches this filter right now.</p>
+              </div>
+            </PocketSection>
+          ) : (
+            filteredResponses.map((response) => {
+              const isExpanded = Boolean(expandedInsightIds[response.id])
+              const fullSummary = response.insight?.summary ?? null
+              const truncatedSummary = fullSummary && fullSummary.length > 160 && !isExpanded
+                ? `${fullSummary.slice(0, 157)}...`
+                : fullSummary
+
+              return (
+                <PocketSection key={response.id} className={cn(
+                  response.flagged && "border-red-200 bg-red-50",
+                  response.highSignal && "border-green-200 bg-green-50",
+                  response.bookmarked && "border-blue-200 bg-blue-50",
+                )}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="outline" className="text-xs px-1.5 py-0.5">
+                          {response.surveyTitle}
+                        </Badge>
+                        {response.durationBucket ? (
+                          <Badge className={cn("text-xs px-1.5 py-0.5", getDurationBucketColor(response.durationBucket))}>
+                            {getDurationBucketIcon(response.durationBucket)}
+                            <span className="ml-1 capitalize">{response.durationBucket}</span>
+                          </Badge>
+                        ) : null}
+                      </div>
+                      <h3 className="mt-3 text-base font-semibold text-[var(--af-color-primary)]">{buildResponseHeading(response)}</h3>
+                      <p className="mt-1 text-sm text-[#5c5146]">{response.questionText || `Question ${response.questionId.toUpperCase()}`}</p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-10 w-10 shrink-0 border-[#dbcdb8] bg-[#fffdf8]"
+                      onClick={() => void handlePlayToggle(response)}
+                      title={playingId === response.id ? "Pause" : "Play"}
+                      aria-label={playingId === response.id ? `Pause take from ${response.surveyTitle}` : `Play take from ${response.surveyTitle}`}
+                    >
+                      {playingId === response.id ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                    </Button>
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-[#7a6146]">
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {formatDuration(response.durationSeconds)}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Mic className="h-3 w-3" />
+                      {formatFileSize(response.fileSize)}
+                    </span>
+                    <span>{new Date(response.timestamp).toLocaleDateString()}</span>
+                  </div>
+
+                  {onOpenResponseDetail ? (
+                    <Button
+                      variant="outline"
+                      className="mt-3 h-10 w-full border-[#dbcdb8] bg-[#fffdf8]"
+                      onClick={() => onOpenResponseDetail(response.id)}
+                    >
+                      Open take detail
+                    </Button>
+                  ) : null}
+
+                  {response.transcript ? (
+                    <div className="mt-3 rounded-2xl border border-[#dbcdb8] bg-[#fffdf8] p-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="outline" className="border-[#cfbea4] bg-[#fff6ed] text-[#7a6146] text-xs">
+                          Transcript {getTranscriptStatusLabel(response.transcript.status)}
+                        </Badge>
+                      </div>
+                      {response.transcript.text ? (
+                        <p className="mt-2 text-sm leading-6 text-[var(--af-color-primary)]">{response.transcript.text}</p>
+                      ) : response.transcript.errorMessage ? (
+                        <p className="mt-2 text-xs text-[#8a3d2b]">{response.transcript.errorMessage}</p>
+                      ) : (
+                        <p className="mt-2 text-xs text-[#665746]">Processing...</p>
+                      )}
+                    </div>
+                  ) : null}
+
+                  {response.insight ? (
+                    <div className="mt-3 rounded-2xl border border-[#dbcdb8] bg-[#fffaf3] p-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="outline" className="border-[#cfbea4] bg-[#fff6ed] text-[#7a6146] text-xs">
+                          AI Summary
+                        </Badge>
+                        {response.insight.primaryTheme ? (
+                          <Badge variant="outline" className="border-[#cfbea4] bg-[#fff6ed] text-[#7a6146] text-xs">
+                            {response.insight.primaryTheme}
+                          </Badge>
+                        ) : null}
+                        <span className={cn("text-xs font-medium", getSignalTone(response.insight.signalScore))}>
+                          {response.insight.signalScore ?? "-"}/100
+                        </span>
+                      </div>
+                      {truncatedSummary ? (
+                        <>
+                          <p className="mt-2 text-sm leading-6 text-[var(--af-color-primary)]">{truncatedSummary}</p>
+                          {fullSummary && fullSummary.length > 160 ? (
+                            <button
+                              type="button"
+                              className="mt-2 text-xs font-medium text-[#8a431f] hover:underline"
+                              onClick={() =>
+                                setExpandedInsightIds((current) => ({
+                                  ...current,
+                                  [response.id]: !current[response.id],
+                                }))
+                              }
+                            >
+                              {isExpanded ? "Less" : "More"}
+                            </button>
+                          ) : null}
+                        </>
+                      ) : null}
+                      {response.insight.quotes?.[0] ? (
+                        <p className="mt-2 text-xs italic text-[#665746]">"{response.insight.quotes[0]}"</p>
+                      ) : null}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-3 h-9 w-full border-[#cfbea4] bg-[#fff6ed] text-[#7a6146] hover:bg-[#efe4d3]"
+                        onClick={() => {
+                          const url = `${window.location.origin}/share/insight/${encodeURIComponent(response.id)}`
+                          window.open(url, "_blank")
+                        }}
+                      >
+                        Share card
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="mt-3">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-9 w-full border-[#cfbea4] bg-[#fff6ed] text-[#7a6146]"
+                        disabled={!onExtractInsight || extractingInsightId === response.id}
+                        onClick={() => onExtractInsight?.(response.id)}
+                      >
+                        {extractingInsightId === response.id
+                          ? "Extracting..."
+                          : response.transcript?.status === "failed"
+                            ? "Retry AI summary"
+                            : "Generate AI summary"}
+                      </Button>
+                    </div>
+                  )}
+
+                  <div className="mt-3 grid grid-cols-3 gap-2">
+                    <Button
+                      variant={response.highSignal ? "default" : "outline"}
+                      className={cn(
+                        "h-10 border-[#dbcdb8]",
+                        response.highSignal ? "bg-[#2d5a17] text-[#fff6ed] hover:bg-[#244812]" : "bg-[#fffdf8]",
+                      )}
+                      onClick={() => onMarkHighSignal?.(response.id, !response.highSignal)}
+                      aria-label={response.highSignal ? `Remove high-signal mark for take from ${response.surveyTitle}` : `Mark take from ${response.surveyTitle} as high signal`}
+                    >
+                      <Star className="mr-1 h-3.5 w-3.5" />
+                      Signal
+                    </Button>
+                    <Button
+                      variant={response.bookmarked ? "secondary" : "outline"}
+                      className="h-10 border-[#dbcdb8] bg-[#fffdf8]"
+                      onClick={() => onBookmarkResponse?.(response.id, !response.bookmarked)}
+                      aria-label={response.bookmarked ? `Remove saved mark for take from ${response.surveyTitle}` : `Save take from ${response.surveyTitle}`}
+                    >
+                      <Bookmark className="mr-1 h-3.5 w-3.5" />
+                      Save
+                    </Button>
+                    <Button
+                      variant={response.flagged ? "destructive" : "outline"}
+                      className={cn("h-10 border-[#dbcdb8]", !response.flagged && "bg-[#fffdf8]")}
+                      onClick={() => onFlagResponse?.(response.id, !response.flagged)}
+                      aria-label={response.flagged ? `Remove flag from take from ${response.surveyTitle}` : `Flag take from ${response.surveyTitle}`}
+                    >
+                      <Flag className="mr-1 h-3.5 w-3.5" />
+                      Flag
+                    </Button>
+                  </div>
+
+                  {onTogglePublicPlaylist ? (
+                    <Button
+                      variant="outline"
+                      className="mt-2 h-10 w-full border-[#dbcdb8] bg-[#fffdf8]"
+                      onClick={() => onTogglePublicPlaylist(response.id, !response.publicPlaylistEligible)}
+                    >
+                      {response.publicPlaylistEligible ? "Remove take from public playlist" : "Add take to public playlist"}
+                    </Button>
+                  ) : null}
+
+                  {audioErrorById[response.id] ? (
+                    <p className="mt-3 text-xs text-[#8a3d2b]">{audioErrorById[response.id]}</p>
+                  ) : null}
+                </PocketSection>
+              )
+            })
+          )}
+        </div>
+
+        {filteredResponses.length > 0 ? (
+          <div className="border-t border-[#dbcdb8] pt-3 text-center text-xs text-[#7a6146]">
+            Showing {filteredResponses.length} of {responses.length} takes
+            {activeFilter !== "all" ? ` (${activeFilter})` : ""}
+          </div>
+        ) : null}
+      </div>
+    )
   }
 
   return (
@@ -234,7 +564,7 @@ export function ResponseInbox({
         <Card>
           <CardContent className="pt-4">
             <div className="text-2xl font-bold">{stats.total}</div>
-            <p className="text-xs text-muted-foreground">Total Responses</p>
+            <p className="text-xs text-muted-foreground">Total Takes</p>
           </CardContent>
         </Card>
         <Card>
@@ -260,11 +590,11 @@ export function ResponseInbox({
       {featuredResponse ? (
         <Card className="border-[#dbcdb8] bg-[#fff6ed]">
           <CardContent className="pt-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-[#8a431f]">Start Here</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-[#8a431f]">Archive lead take</p>
             <p className="mt-2 text-base font-semibold text-foreground">{digestLabel}</p>
             <p className="mt-1 text-sm text-muted-foreground">
               {stats.deep > 0
-                ? `${stats.deep} deeper response${stats.deep === 1 ? " is" : "s are"} already in the inbox, so creators can scan where to listen first.`
+                ? `${stats.deep} deeper take${stats.deep === 1 ? " is" : "s are"} already here, so creators can hear the richest signal first.`
                 : "This is the first lightweight insight layer before full AI summaries."}
             </p>
           </CardContent>
@@ -280,9 +610,9 @@ export function ResponseInbox({
         className="w-full"
       >
         <TabsList className="ml-auto flex w-fit items-center gap-1">
-          <TabsTrigger value="all" className="shrink-0">All</TabsTrigger>
+          <TabsTrigger value="all" className="shrink-0">All archived takes</TabsTrigger>
           <TabsTrigger value="flagged" className="shrink-0">Flagged</TabsTrigger>
-          <TabsTrigger value="highsignal" className="shrink-0">High Signal</TabsTrigger>
+          <TabsTrigger value="highsignal" className="shrink-0">High signal</TabsTrigger>
         </TabsList>
       </Tabs>
 
@@ -291,7 +621,7 @@ export function ResponseInbox({
         {filteredResponses.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground">
             <AudioWaveform className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>No responses found</p>
+            <p>No takes found</p>
           </div>
         ) : (
           filteredResponses.map((response) => (
@@ -367,11 +697,11 @@ export function ResponseInbox({
                         <div className="rounded-2xl border border-[#dbcdb8] bg-[#fffdf8] p-2 sm:p-3">
                           <div className="flex flex-wrap items-center gap-2">
                             <Badge variant="outline" className="border-[#cfbea4] bg-[#fff6ed] text-[#7a6146] text-xs">
-                              Transcript {response.transcript.status !== "completed" ? response.transcript.status : ""}
+                              Transcript {getTranscriptStatusLabel(response.transcript.status)}
                             </Badge>
                           </div>
                           {response.transcript.text ? (
-                            <p className="mt-1.5 sm:mt-2 text-xs sm:text-sm leading-5 text-[#3c3026] line-clamp-3">{response.transcript.text}</p>
+                            <p className="mt-1.5 sm:mt-2 text-xs sm:text-sm leading-5 text-[var(--af-color-primary)] line-clamp-3">{response.transcript.text}</p>
                           ) : response.transcript.errorMessage ? (
                             <p className="mt-1.5 sm:mt-2 text-xs text-[#8a3d2b]">{response.transcript.errorMessage}</p>
                           ) : (
@@ -401,7 +731,7 @@ export function ResponseInbox({
                               size="sm" 
                               className="h-7 text-xs border-[#cfbea4] bg-[#fff6ed] text-[#7a6146] hover:bg-[#efe4d3]"
                               onClick={() => {
-                                const url = `${window.location.origin}/api/og/insight?responseId=${response.id}`
+                                const url = `${window.location.origin}/share/insight/${encodeURIComponent(response.id)}`
                                 window.open(url, "_blank")
                               }}
                             >
@@ -410,7 +740,7 @@ export function ResponseInbox({
                           </div>
                            {truncatedSummary ? (
                              <>
-                               <p className="mt-1.5 sm:mt-2 text-xs sm:text-sm leading-5 sm:leading-6 text-[#3c3026] line-clamp-2">{truncatedSummary}</p>
+                               <p className="mt-1.5 sm:mt-2 text-xs sm:text-sm leading-5 sm:leading-6 text-[var(--af-color-primary)] line-clamp-2">{truncatedSummary}</p>
                                {fullSummary && fullSummary.length > 160 ? (
                                  <button
                                    type="button"
@@ -445,8 +775,8 @@ export function ResponseInbox({
                            {extractingInsightId === response.id
                              ? "Extracting..."
                              : response.transcript?.status === "failed"
-                               ? "Retry extraction"
-                               : "Extract insight"}
+                               ? "Retry AI summary"
+                               : "Generate AI summary"}
                          </Button>
                        </div>
                      ) : null}
@@ -464,6 +794,7 @@ export function ResponseInbox({
                          className="h-8 w-8 sm:h-9 sm:w-9"
                        onClick={() => void handlePlayToggle(response)}
                        title={playingId === response.id ? "Pause" : "Play"}
+                       aria-label={playingId === response.id ? `Pause take from ${response.surveyTitle}` : `Play take from ${response.surveyTitle}`}
                      >
                        {playingId === response.id ? (
                          <Pause className="h-3 w-3 sm:h-4 sm:w-4" />
@@ -479,6 +810,7 @@ export function ResponseInbox({
                         className="h-7 w-7 sm:h-8 sm:w-8"
                        onClick={() => onFlagResponse?.(response.id, !response.flagged)}
                        title="Flag"
+                       aria-label={response.flagged ? `Remove flag from take from ${response.surveyTitle}` : `Flag take from ${response.surveyTitle}`}
                        >
                        <Flag className="h-3 w-3" />
                      </Button>
@@ -489,19 +821,33 @@ export function ResponseInbox({
                         className="h-7 w-7 sm:h-8 sm:w-8"
                        onClick={() => onMarkHighSignal?.(response.id, !response.highSignal)}
                        title="High signal"
+                       aria-label={response.highSignal ? `Remove high-signal mark for take from ${response.surveyTitle}` : `Mark take from ${response.surveyTitle} as high signal`}
                        >
                        <Star className="h-3 w-3" />
                      </Button>
                      
-                      <Button
+                     <Button
                         variant={response.bookmarked ? "secondary" : "ghost"}
                         size="icon"
                         className="h-7 w-7 sm:h-8 sm:w-8"
                        onClick={() => onBookmarkResponse?.(response.id, !response.bookmarked)}
                        title="Bookmark"
+                       aria-label={response.bookmarked ? `Remove saved mark for take from ${response.surveyTitle}` : `Save take from ${response.surveyTitle}`}
                        >
                        <Bookmark className="h-3 w-3" />
                      </Button>
+                     {onTogglePublicPlaylist ? (
+                       <Button
+                         variant={response.publicPlaylistEligible ? "default" : "ghost"}
+                         size="icon"
+                         className="h-7 w-7 sm:h-8 sm:w-8"
+                         onClick={() => onTogglePublicPlaylist(response.id, !response.publicPlaylistEligible)}
+                         title={response.publicPlaylistEligible ? "Remove take from public playlist" : "Add take to public playlist"}
+                         aria-label={response.publicPlaylistEligible ? `Remove take from public playlist` : `Add take to public playlist`}
+                       >
+                         <AudioWaveform className="h-3 w-3" />
+                       </Button>
+                     ) : null}
                       </div>
                     </div>
                  </div>
@@ -516,7 +862,7 @@ export function ResponseInbox({
       {/* Summary Footer */}
       {filteredResponses.length > 0 && (
         <div className="border-t pt-4 text-center text-xs text-muted-foreground">
-          Showing {filteredResponses.length} of {responses.length} responses
+          Showing {filteredResponses.length} of {responses.length} takes
           {activeFilter !== "all" && ` (filtered by ${activeFilter})`}
         </div>
       )}

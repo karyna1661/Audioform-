@@ -14,8 +14,8 @@ export default function Home() {
   const { status } = useAuth()
   const prefersReducedMotion = useReducedMotion()
   const [isHydrated, setIsHydrated] = useState(false)
-  const lineOne = "Ask one focused question. Collect voice signal. Decide what to ship next."
-  const lineTwo = "Audioform turns short responses into decision-ready signal."
+  const lineOne = "Shape better prompts in Studio. Hear ranked takes in Listen. Decide what to ship next."
+  const lineTwo = "Audioform turns short voice feedback into decision-ready signal without making research feel like paperwork."
   const [typedLineOne, setTypedLineOne] = useState(prefersReducedMotion ? lineOne : "")
   const [typedLineTwo, setTypedLineTwo] = useState(prefersReducedMotion ? lineTwo : "")
   const signalLoopHref = status === "authenticated" ? "/admin/dashboard/v4" : "/signup"
@@ -153,7 +153,7 @@ export default function Home() {
                 animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0, scale: 1 }}
                 transition={{ duration: 0.5, ease: "easeOut" }}
               >
-                Collect answers people can actually feel.
+                Hear the signal behind every answer.
               </motion.h1>
               <div className="mt-5 max-w-xl border-l-2 border-[#e3c3a5] pl-4 sm:mt-7 sm:pl-5">
                 <p className="font-body text-sm uppercase tracking-[0.12em] text-[#8a5a33]">
@@ -177,20 +177,24 @@ export default function Home() {
                 </motion.p>
                 </div>
               </div>
+              <p className="mt-5 max-w-xl text-sm leading-relaxed text-[#6a5a49] sm:text-base">
+                Studio helps you shape better prompts. Listen helps you hear ranked takes fast, so voice feedback becomes a
+                human signal stream instead of another tool you have to decode.
+              </p>
               <div className="mt-6 flex flex-col gap-3 sm:mt-8 sm:flex-row sm:flex-wrap">
                 <Link
                   href={signalLoopHref}
                   onClick={() => trackEvent("creator_clicked_start", { entry_point: "home_open_dashboard" })}
                   className="af-glow-hover w-full rounded-full bg-[#b85e2d] px-5 py-3 text-center text-sm font-medium text-[#fff6ed] hover:bg-[#a85327] sm:w-auto"
                 >
-                  Create your survey
+                  Open Studio
                 </Link>
                 <Link
                   href={homepageQuestionnaireHref}
                   onClick={() => trackEvent("creator_clicked_start", { entry_point: "home_try_voice_survey" })}
                   className="af-chip af-glow-hover inline-flex w-full items-center justify-center gap-2 rounded-full border px-5 py-3 text-center text-sm font-medium text-[#1f1b17] hover:bg-[#f5ebdd] sm:w-auto sm:justify-start"
                 >
-                  Preview respondent flow
+                  Preview the voice flow
                   <ChevronRight className="size-4" aria-hidden="true" />
                 </Link>
               </div>
@@ -205,8 +209,8 @@ export default function Home() {
                 <div className="rounded-[1.35rem] bg-transparent px-0 py-0 sm:rounded-[1.55rem] sm:border sm:border-[#eadbc7] sm:bg-[#fffdf9] sm:px-4 sm:py-4 lg:px-5">
                   <div className="hidden items-center justify-between gap-3 border-b border-[#eee1cf] pb-3 sm:flex">
                     <div>
-                      <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#8f6438]">Voice room view</p>
-                      <p className="mt-1 text-xs text-[#7a6146]">Conversation, signal, and synthesis in one frame.</p>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#8f6438]">Signal room view</p>
+                      <p className="mt-1 text-xs text-[#7a6146]">Live conversation flowing into listening, ranking, and synthesis.</p>
                     </div>
                     <div className="rounded-full border border-[#e2d2bc] bg-[#fff8ef] px-2.5 py-1 text-[10px] uppercase tracking-[0.16em] text-[#9a7857]">
                       live concept
@@ -231,7 +235,7 @@ export default function Home() {
           <div className="mt-5 grid gap-2 sm:mt-7 sm:grid-cols-2">
             {[
               "Define the decision you need to make this week.",
-              "Collect 30-second takes that reveal conviction and friction.",
+              "Use Studio to shape the prompt, then use Listen to replay the strongest takes first.",
             ].map((line) => (
               <div
                 key={line}
@@ -247,18 +251,18 @@ export default function Home() {
           {[
             {
               icon: <Mic className="size-5" aria-hidden="true" />,
-              title: "Frame one decision",
-              text: "Start with one product decision and ask prompts that reveal real tension, not polite noise.",
+              title: "Shape the ask in Studio",
+              text: "Start with one product decision and build prompts that surface real tension instead of polite noise.",
             },
             {
               icon: <AudioWaveform className="size-5" aria-hidden="true" />,
-              title: "Capture conviction in voice",
-              text: "Hear confidence, hesitation, and friction that text comments usually hide.",
+              title: "Hear ranked takes in Listen",
+              text: "Replay conviction, hesitation, and friction in voice so the strongest signal reaches you first.",
             },
             {
               icon: <Sparkles className="size-5" aria-hidden="true" />,
-              title: "Decide what to ship next",
-              text: "Replay strongest responses, identify the blocking tension, and commit to the next action.",
+              title: "Move from signal to decision",
+              text: "Turn voice feedback into the next product call without getting buried in another review workflow.",
             },
           ].map((item) => (
             <article key={item.title} className="af-accent-card af-glow-hover af-fade-up af-delay-3 rounded-3xl border p-6">

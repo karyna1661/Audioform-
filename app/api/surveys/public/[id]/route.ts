@@ -18,6 +18,8 @@ export async function GET(
       intent: string | null
       templatePack: string | null
       questionCount: number
+      publicListeningEnabled: boolean
+      status: string
       questions: string[]
     } }>(cacheKey)
 
@@ -39,6 +41,8 @@ export async function GET(
         intent: survey.intent,
         templatePack: survey.templatePack,
         questionCount: survey.questionCount,
+        publicListeningEnabled: survey.publicListeningEnabled,
+        status: survey.status,
         questions,
       },
     }

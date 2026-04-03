@@ -18,7 +18,10 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
   try {
     const payload = parts[1].replace(/-/g, "+").replace(/_/g, "/")
     const padded = payload + "=".repeat((4 - (payload.length % 4)) % 4)
-    return JSON.parse(Buffer.from(padded, "base64").toString("utf8")) as Record<string, unknown>
+    const decoded = typeof Buffer !== "undefined" 
+      ? Buffer.from(padded, "base64").toString("utf8")
+      : atob(padded)
+    return JSON.parse(decoded) as Record<string, unknown>
   } catch {
     return null
   }
@@ -81,7 +84,7 @@ export async function GET(request: Request) {
           justifyContent: "space-between",
           padding: "56px",
           background: "linear-gradient(135deg, #f7f0e4 0%, #efe0c7 52%, #f8f4ed 100%)",
-          color: "#261c14",
+          color: "var(--af-color-primary)",
           fontFamily: "sans-serif",
         }}
       >
@@ -117,7 +120,7 @@ export async function GET(request: Request) {
             </div>
           )}
 
-          <div style={{ fontSize: 44, fontWeight: 700, lineHeight: 1.15, maxWidth: 980, color: "#261c14", marginTop: 12 }}>
+          <div style={{ fontSize: 44, fontWeight: 700, lineHeight: 1.15, maxWidth: 980, color: "var(--af-color-primary)", marginTop: 12 }}>
             {summary}
           </div>
 
@@ -136,10 +139,10 @@ export async function GET(request: Request) {
               }}
             >
               <div style={{ fontSize: 20, letterSpacing: "0.14em", textTransform: "uppercase", color: "#8a6a4c" }}>
-                Direct Quote ({duration})
+                {`Direct Quote (${duration})`}
               </div>
-              <div style={{ fontSize: 32, lineHeight: 1.3, fontStyle: "italic", color: "#3c3026" }}>
-                "{quote}"
+              <div style={{ fontSize: 32, lineHeight: 1.3, fontStyle: "italic", color: "var(--af-color-primary)" }}>
+                {`"${quote}"`}
               </div>
             </div>
           )}

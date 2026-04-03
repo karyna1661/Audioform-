@@ -15,10 +15,13 @@ import { cn } from "@/lib/utils"
 import { SurveyLoadingSkeleton } from "@/components/survey-loading-skeleton"
 import { AdminMobileNav } from "@/components/admin-mobile-nav"
 import { trackEvent } from "@/lib/analytics"
+import { useIsMobile } from "@/components/ui/use-mobile"
+import { PocketActionStack, PocketSection, PocketShell } from "@/components/mobile/pocket-shell"
 
 
 export default function NotificationsPage() {
   const { status } = useRequireAdmin()
+  const isMobile = useIsMobile()
   const [isLoading, setIsLoading] = useState(false)
   const [isSavingRules, setIsSavingRules] = useState(false)
   const [isSavingTemplate, setIsSavingTemplate] = useState(false)
@@ -151,6 +154,191 @@ export default function NotificationsPage() {
       throw new Error((data as { error?: string }).error || "Failed to save notification settings.")
     }
     setSuccess(message)
+  }
+
+  if (isMobile) {
+    return (
+      <>
+        <PocketShell
+          eyebrow="Builder alerts"
+          title="Email notifications"
+          description="Save the rules, keep the template clear, then send one live test."
+        >
+          {success ? (
+            <Alert className="mb-4 border-[#dbcdb8] bg-[#f9f4ea]">
+              <Mail className="h-4 w-4" />
+              <AlertTitle>Saved</AlertTitle>
+              <AlertDescription>
+                {success}
+                {previewUrl ? (
+                  <a
+                    href={previewUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-2 inline-flex items-center gap-1 text-sm text-[#8a431f] hover:underline"
+                  >
+                    View email preview
+                    <ExternalLink className="size-3" aria-hidden="true" />
+                  </a>
+                ) : null}
+              </AlertDescription>
+            </Alert>
+          ) : null}
+
+          {error ? (
+            <Alert variant="destructive" className="mb-4" aria-live="assertive">
+              <Mail className="h-4 w-4" />
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>
+                {error}
+                <p className="font-body mt-2 text-xs">
+                  Check recipient format, then verify SMTP settings in your environment if this continues.
+                </p>
+              </AlertDescription>
+            </Alert>
+          ) : null}
+
+          <PocketSection title="Delivery rules" description="Turn alerts on only where they help you act faster.">
+            <div className="space-y-3">
+              <RuleRow
+                id="rule-new-response-mobile"
+                title="New response"
+                description="Notify when any response lands."
+                checked={notificationSettings.newResponse}
+                onCheckedChange={() => handleToggle("newResponse")}
+              />
+              <RuleRow
+                id="rule-completed-mobile"
+                title="Completed questionnaire"
+                description="Notify when a full survey session finishes."
+                checked={notificationSettings.completedQuestionnaire}
+                onCheckedChange={() => handleToggle("completedQuestionnaire")}
+              />
+              <RuleRow
+                id="rule-daily-mobile"
+                title="Daily summary"
+                description="Send one daily digest of activity."
+                checked={notificationSettings.dailySummary}
+                onCheckedChange={() => handleToggle("dailySummary")}
+              />
+              <RuleRow
+                id="rule-weekly-mobile"
+                title="Weekly summary"
+                description="Send a weekly overview."
+                checked={notificationSettings.weeklySummary}
+                onCheckedChange={() => handleToggle("weeklySummary")}
+              />
+            </div>
+            <Button
+              className="mt-4 w-full bg-[#b85e2d] text-[#fff6ed] hover:bg-[#a05227]"
+              disabled={isSavingRules}
+              onClick={async () => {
+                setIsSavingRules(true)
+                setSuccess(null)
+                setError(null)
+                try {
+                  await persistConfig("Notification rules saved.")
+                } catch (err: any) {
+                  setError(err.message || "Failed to save notification rules.")
+                } finally {
+                  setIsSavingRules(false)
+                }
+              }}
+            >
+              {isSavingRules ? "Saving..." : "Save rules"}
+            </Button>
+          </PocketSection>
+
+          <PocketSection title="Template" description="Keep one clear message style for every response alert." className="mt-4">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="template-subject-mobile">Subject</Label>
+                <Input id="template-subject-mobile" value={emailSubject} onChange={(e) => setEmailSubject(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="template-body-mobile">Body</Label>
+                <Textarea
+                  id="template-body-mobile"
+                  className="font-body min-h-[160px] text-pretty"
+                  value={emailBody}
+                  onChange={(e) => setEmailBody(e.target.value)}
+                />
+              </div>
+              <div className="rounded-xl border border-[#dbcdb8] bg-[#f9f4ea] p-3">
+                <p className="text-sm font-semibold text-balance">Available variables</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Badge variant="outline">[Questionnaire Name]</Badge>
+                  <Badge variant="outline">[Respondent Name]</Badge>
+                  <Badge variant="outline">[Submission Date]</Badge>
+                  <Badge variant="outline">[Response Count]</Badge>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                className="w-full border-[#dbcdb8] bg-[#f9f4ea]"
+                disabled={isSavingTemplate}
+                onClick={async () => {
+                  setIsSavingTemplate(true)
+                  setSuccess(null)
+                  setError(null)
+                  try {
+                    await persistConfig("Template saved.")
+                    trackEvent("notification_template_saved", {
+                      template_type: "response_alert",
+                      recipient_count: emailRecipients.split(",").map((email) => email.trim()).filter(Boolean).length,
+                    })
+                  } catch (err: any) {
+                    setError(err.message || "Failed to save template.")
+                  } finally {
+                    setIsSavingTemplate(false)
+                  }
+                }}
+              >
+                {isSavingTemplate ? "Saving..." : "Save template"}
+              </Button>
+            </div>
+          </PocketSection>
+
+          <PocketSection title="Test console" description="Send one test before you trust the rules." className="mt-4 bg-[#fff6ed]">
+            <PocketActionStack>
+              <div className="space-y-2">
+                <Label htmlFor="test-recipients-mobile">Recipients</Label>
+                <Input
+                  id="test-recipients-mobile"
+                  placeholder="name@example.com, team@example.com"
+                  value={emailRecipients}
+                  onChange={(e) => setEmailRecipients(e.target.value)}
+                  aria-invalid={!!error}
+                />
+                <p className="font-body text-xs text-[#5c5146]">Use commas for multiple recipients.</p>
+              </div>
+              <button
+                type="button"
+                onClick={handleSendTestEmail}
+                disabled={isLoading || !emailRecipients.trim()}
+                className={cn(
+                  "inline-flex min-h-11 w-full items-center justify-center rounded-xl px-4 py-2 text-sm font-medium",
+                  "bg-[#b85e2d] text-[#fff6ed] hover:bg-[#a05227] disabled:opacity-50",
+                )}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 size-4 animate-spin" aria-hidden="true" />
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <Send className="mr-2 size-4" aria-hidden="true" />
+                    Send test email
+                  </>
+                )}
+              </button>
+            </PocketActionStack>
+          </PocketSection>
+        </PocketShell>
+        <AdminMobileNav />
+      </>
+    )
   }
 
   return (

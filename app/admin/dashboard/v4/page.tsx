@@ -1,35 +1,18 @@
 "use client"
 
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
-import { useAuth } from "@/lib/auth-context"
+import { useRouter } from "next/navigation"
+import { ArrowRight, Headphones, Mic, Radio, Sparkles } from "lucide-react"
 import { useRequireAdmin } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, ArrowUpRight, Calendar, CheckCircle2, Code2, Copy, Mic, QrCode, Target, Trash2 } from "lucide-react"
-import { trackEvent } from "@/lib/analytics"
-import { shouldTrackCreatorRevisitWithin7d } from "@/lib/behavior-metrics"
-import { buildSurveyShareUrl } from "@/lib/share-links"
 import { SurveyLoadingSkeleton } from "@/components/survey-loading-skeleton"
+import { PocketActionStack, PocketSection, PocketShell } from "@/components/mobile/pocket-shell"
+import { useIsMobile } from "@/components/ui/use-mobile"
 import { AdminMobileNav } from "@/components/admin-mobile-nav"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-
+import { AudioSequencePlayer, type ListeningTrack } from "@/components/listen/audio-sequence-player"
+import { useListeningSession } from "@/components/listen/listening-session-provider"
+import { trackEvent } from "@/lib/analytics"
 
 type SurveyItem = {
   id: string
@@ -38,810 +21,378 @@ type SurveyItem = {
   status: "draft" | "published" | "live" | "closed"
   updatedAt: string
   publishedAt: string | null
+  publicListeningEnabled?: boolean
 }
 
 type ResponseItem = {
   id: string
   surveyId: string
-  userId: string | null
-  timestamp: string
-  transcript?: {
-    id: string
-    status: "pending" | "completed" | "failed"
-    text: string | null
-    provider: string | null
-    errorMessage: string | null
-  } | null
-  insight?: {
-    id: string
-    summary: string | null
-    primaryTheme: string | null
-    themes: string[]
-    sentiment: string | null
-    sentimentScore: number | null
-    signalScore: number | null
-    quotes: string[]
-    provider: string | null
-    extractorVersion: string | null
-  } | null
-}
-
-type DashboardEventItem = {
-  id: string
-  message: string
-  surveyId?: string | null
-}
-
-function humanizeDashboardEventMessage(
-  event: DashboardEventItem,
-  surveyTitleById: Map<string, string>,
-): string {
-  if (!event.message) return "New activity"
-  const bySurveyId = event.surveyId ? surveyTitleById.get(event.surveyId) : null
-  if (bySurveyId) {
-    return event.message.replace(/for survey [a-z0-9-]+/i, `for ${bySurveyId}`)
+  surveyTitle: string
+  durationSeconds?: number | null
+  playbackUrl: string
+  highSignal: boolean
+  bookmarked: boolean
+  flagged: boolean
+  publicPlaylistEligible?: boolean
+  listening?: {
+    rank: number
+    hotTake: string
+    momentumTags: string[]
+    previewClipRange?: { startSeconds: number; endSeconds: number } | null
+    collectionMembership?: string[]
+    epInclusion?: boolean
   }
-  return event.message
+  insight?: {
+    primaryTheme: string | null
+  } | null
+  transcript?: {
+    text: string | null
+  } | null
 }
 
-function isShareableSurveyStatus(status: SurveyItem["status"]) {
-  return status === "published" || status === "live"
+type ReleaseCard = {
+  id: string
+  title: string
+  subtitle: string
+  responseCount: number
+  estimatedMinutes: number
+  status: SurveyItem["status"]
+  publicListeningEnabled: boolean
+  topTracks: ListeningTrack[]
+}
+
+function buildTrack(response: ResponseItem): ListeningTrack {
+  return {
+    id: response.id,
+    title: response.surveyTitle,
+    subtitle: response.insight?.primaryTheme || "Auto-ranked voice take",
+    playbackUrl: response.playbackUrl,
+    durationSeconds: response.durationSeconds,
+    transcript: response.transcript?.text ?? null,
+    listening: {
+      rank: response.listening?.rank ?? 50,
+      hotTake: response.listening?.hotTake ?? "Fresh voice take from this release.",
+      momentumTags: response.listening?.momentumTags ?? [],
+      previewClipRange: response.listening?.previewClipRange ?? null,
+    },
+  }
 }
 
 export default function AdminDashboardV4Page() {
   const router = useRouter()
-  const { user, status } = useRequireAdmin()
-  const { signOut } = useAuth()
+  const isMobile = useIsMobile()
+  const { status, user } = useRequireAdmin()
+  const listeningSession = useListeningSession()
   const [surveys, setSurveys] = useState<SurveyItem[]>([])
   const [responses, setResponses] = useState<ResponseItem[]>([])
-  const [timeline, setTimeline] = useState<DashboardEventItem[]>([])
-  const [bootLoading, setBootLoading] = useState(true)
-  const [loadError, setLoadError] = useState<string | null>(null)
-  const [deletingSurveyId, setDeletingSurveyId] = useState<string | null>(null)
-  const [surveyDeleteDialogId, setSurveyDeleteDialogId] = useState<string | null>(null)
-  const [shareDialogSurveyId, setShareDialogSurveyId] = useState<string | null>(null)
-  const [uiMessage, setUiMessage] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [message, setMessage] = useState<string | null>(null)
+  const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null)
 
   useEffect(() => {
     if (status !== "authenticated") return
+    let cancelled = false
 
-      let cancelled = false
-
-    const loadData = async () => {
+    const load = async () => {
+      setLoading(true)
       try {
-        const [surveyRes, activityRes] = await Promise.all([
+        const [surveyRes, responseRes] = await Promise.all([
           fetch("/api/surveys", { credentials: "include", cache: "no-store" }),
-          fetch("/api/dashboard/activity", { credentials: "include", cache: "no-store" }),
+          fetch("/api/responses?limit=80", { credentials: "include", cache: "no-store" }),
         ])
 
-        if (!surveyRes.ok || !activityRes.ok) {
-          throw new Error("Failed to load dashboard data.")
+        if (!surveyRes.ok || !responseRes.ok) {
+          throw new Error("Failed to load listening workspace.")
         }
 
         const surveyJson = (await surveyRes.json()) as { surveys?: SurveyItem[] }
-        const activityJson = (await activityRes.json()) as { events?: DashboardEventItem[] }
+        const responseJson = (await responseRes.json()) as { responses?: ResponseItem[] }
 
-        const loadedSurveys = surveyJson.surveys ?? []
         if (!cancelled) {
-          setSurveys(loadedSurveys)
-          setTimeline(activityJson.events ?? [])
-        }
-
-        trackEvent("response_inbox_opened")
-        if (user?.id && shouldTrackCreatorRevisitWithin7d(user.id, "dashboard")) {
-          trackEvent("creator_returned_within_7d", { surface: "dashboard" })
-        }
-        const firstPublished = loadedSurveys.find((survey) => isShareableSurveyStatus(survey.status))
-        if (firstPublished?.id) {
-          trackEvent("first_response_viewed", { survey_id: firstPublished.id })
+          setSurveys(surveyJson.surveys ?? [])
+          setResponses(responseJson.responses ?? [])
+          setSelectedTrackId(responseJson.responses?.[0]?.id ?? null)
         }
       } catch (error) {
-        if (!cancelled) {
-          setLoadError(error instanceof Error ? error.message : "Failed to load dashboard.")
-        }
+        if (!cancelled) setMessage(error instanceof Error ? error.message : "Failed to load listening workspace.")
+      } finally {
+        if (!cancelled) setLoading(false)
       }
     }
 
-    const loadResponses = async () => {
-      try {
-        const responseRes = await fetch("/api/responses?limit=50", {
-          credentials: "include",
-          cache: "no-store",
-        })
-        if (!responseRes.ok) return
-        const responseJson = (await responseRes.json()) as { responses?: ResponseItem[] }
-        if (!cancelled) {
-          setResponses(responseJson.responses ?? [])
-        }
-      } catch {
-        // Non-blocking.
-      }
-    }
+    void load()
+    trackEvent("response_inbox_opened", { surface: "listen_home" })
 
-    const loadBoot = async () => {
-      setBootLoading(true)
-      await Promise.allSettled([loadData(), loadResponses()])
-      setBootLoading(false)
-    }
-
-    void loadBoot()
-    const intervalId = window.setInterval(() => {
-      if (document.visibilityState === "visible") {
-        void loadResponses()
-      }
-    }, 10000)
-
-    router.prefetch("/admin/questionnaires/v1")
-    router.prefetch("/admin/responses")
-    router.prefetch("/admin/notifications")
     return () => {
       cancelled = true
-      window.clearInterval(intervalId)
     }
-  }, [status, router, user?.id])
+  }, [status])
 
-  const responsesBySurvey = useMemo(() => {
-    return responses.reduce<Record<string, number>>((acc, item) => {
-      acc[item.surveyId] = (acc[item.surveyId] ?? 0) + 1
-      return acc
-    }, {})
-  }, [responses])
+  const releaseCards = useMemo<ReleaseCard[]>(() => {
+    return surveys.map((survey) => {
+      const releaseResponses = responses
+        .filter((response) => response.surveyId === survey.id)
+        .sort((a, b) => (b.listening?.rank ?? 0) - (a.listening?.rank ?? 0))
 
-  const firstResponseBySurvey = useMemo(() => {
-    return responses.reduce<Record<string, number>>((acc, item) => {
-      const ts = new Date(item.timestamp).getTime()
-      if (!Number.isFinite(ts)) return acc
-      if (!acc[item.surveyId] || ts < acc[item.surveyId]) {
-        acc[item.surveyId] = ts
+      return {
+        id: survey.id,
+        title: survey.title,
+        subtitle:
+          releaseResponses[0]?.listening?.hotTake ||
+          (survey.publicListeningEnabled
+            ? "Public listening is enabled for this release."
+            : "Studio release ready for ranked listening."),
+        responseCount: releaseResponses.length,
+        estimatedMinutes: Math.max(1, Math.round(releaseResponses.reduce((sum, item) => sum + (item.durationSeconds ?? 0), 0) / 60)),
+        status: survey.status,
+        publicListeningEnabled: Boolean(survey.publicListeningEnabled),
+        topTracks: releaseResponses.slice(0, 5).map(buildTrack),
       }
-      return acc
-    }, {})
-  }, [responses])
-
-  const uniqueRespondents = useMemo(() => new Set(responses.map((item) => item.userId)).size, [responses])
-  const extractorMetrics = useMemo(() => {
-    const withTranscript = responses.filter((item) => item.transcript).length
-    const transcriptPending = responses.filter((item) => item.transcript?.status === "pending").length
-    const transcriptFailed = responses.filter((item) => item.transcript?.status === "failed").length
-    const withInsight = responses.filter((item) => item.insight).length
-    return { withTranscript, transcriptPending, transcriptFailed, withInsight }
-  }, [responses])
-  const groupedThemes = useMemo(() => {
-    const counts = new Map<string, number>()
-    for (const response of responses) {
-      for (const theme of response.insight?.themes ?? []) {
-        counts.set(theme, (counts.get(theme) ?? 0) + 1)
-      }
-    }
-    return Array.from(counts.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-  }, [responses])
-  const themeCoverage = useMemo(() => {
-    const base = extractorMetrics.withInsight || 1
-    return groupedThemes.map(([theme, count]) => ({
-      theme,
-      count,
-      coverage: Math.max(1, Math.round((count / base) * 100)),
-    }))
-  }, [groupedThemes, extractorMetrics.withInsight])
-  const publishedRate = useMemo(() => {
-    if (!surveys.length) return 0
-    return Math.round((surveys.filter((s) => isShareableSurveyStatus(s.status)).length / surveys.length) * 100)
-  }, [surveys])
-
-  const ttfrSeconds = useMemo(() => {
-    const candidates = surveys
-      .filter((survey) => isShareableSurveyStatus(survey.status) && survey.publishedAt)
-      .map((survey) => {
-        const publishedAtMs = new Date(survey.publishedAt as string).getTime()
-        const firstResponseMs = firstResponseBySurvey[survey.id]
-        if (!Number.isFinite(publishedAtMs) || !firstResponseMs) return null
-        return Math.max(0, Math.round((firstResponseMs - publishedAtMs) / 1000))
-      })
-      .filter((value): value is number => value !== null)
-    if (!candidates.length) return null
-    return Math.min(...candidates)
-  }, [surveys, firstResponseBySurvey])
-
-  const publishedSurveys = useMemo(
-    () => surveys.filter((survey) => isShareableSurveyStatus(survey.status)),
-    [surveys],
-  )
-  const activeSurveyId = publishedSurveys[0]?.id ?? null
-  const onboardingChecklist = useMemo(
-    () => [
-      {
-        id: "first-survey",
-        label: "Create your first survey",
-        done: surveys.length > 0,
-      },
-      {
-        id: "publish",
-        label: "Publish one survey",
-        done: publishedSurveys.length > 0,
-      },
-      {
-        id: "first-response",
-        label: "Collect one voice response",
-        done: responses.length > 0,
-      },
-    ],
-    [surveys.length, publishedSurveys.length, responses.length],
-  )
-  const surveyTitleById = useMemo(() => new Map(surveys.map((survey) => [survey.id, survey.title])), [surveys])
-
-  const ttfrLabel = useMemo(() => {
-    if (ttfrSeconds == null) return "Pending"
-    if (ttfrSeconds < 60) return `${ttfrSeconds}s`
-    return `${Math.round(ttfrSeconds / 60)}m`
-  }, [ttfrSeconds])
-
-  const ttfrTrendLabel = useMemo(() => {
-    if (ttfrSeconds == null) return "Awaiting first response"
-    return "Based on first response timestamp"
-  }, [ttfrSeconds])
-
-  const buildShareLink = (surveyId: string, updatedAt?: string | null) => {
-    if (typeof window === "undefined") return ""
-    return buildSurveyShareUrl(window.location.origin, surveyId, {
-      version: updatedAt ?? undefined,
     })
+  }, [responses, surveys])
+
+  const allTracks = useMemo(
+    () => responses
+      .slice()
+      .sort((a, b) => (b.listening?.rank ?? 0) - (a.listening?.rank ?? 0))
+      .map(buildTrack),
+    [responses],
+  )
+
+  const featuredTracks = allTracks.slice(0, 5)
+  const continueTracks = selectedTrackId
+    ? [allTracks.find((track) => track.id === selectedTrackId), ...allTracks.filter((track) => track.id !== selectedTrackId)].filter(Boolean) as ListeningTrack[]
+    : allTracks
+
+  if (status === "loading" || loading) {
+    return <SurveyLoadingSkeleton label="Loading listening workspace..." />
   }
 
-  const buildQrCodeUrl = (surveyId: string) => {
-    const survey = surveys.find((item) => item.id === surveyId)
-    return `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(
-      buildShareLink(surveyId, survey?.updatedAt),
-    )}`
-  }
+  if (isMobile) {
+    return (
+      <>
+        <PocketShell
+          eyebrow="Listen"
+          title={`Welcome back${user?.name ? `, ${user.name}` : ""}.`}
+          description="Open the strongest takes first, then drop into Studio when you want to shape the next release."
+        >
+          {message ? (
+            <p className="mb-4 rounded-2xl border border-[#cfbea4] bg-[#fff8f0] px-4 py-3 text-sm text-[#8a3d2b]">{message}</p>
+          ) : null}
 
-  const handleDeleteSurvey = async (surveyId: string) => {
-    setDeletingSurveyId(surveyId)
-    setLoadError(null)
-    try {
-      const response = await fetch(`/api/surveys?id=${encodeURIComponent(surveyId)}`, {
-        method: "DELETE",
-        credentials: "include",
-      })
-      if (!response.ok) throw new Error("Failed to delete survey.")
-      setSurveys((prev) => prev.filter((survey) => survey.id !== surveyId))
-      setResponses((prev) => prev.filter((item) => item.surveyId !== surveyId))
-      setTimeline((prev) => prev.filter((event) => event.surveyId !== surveyId))
-      setSurveyDeleteDialogId(null)
-    } catch (error) {
-      setLoadError(error instanceof Error ? error.message : "Failed to delete survey.")
-    } finally {
-      setDeletingSurveyId(null)
-    }
-  }
+          <PocketSection
+            title="Top 5 takes you should hear first"
+            description="Preview mode is on by default so the first 30 seconds feel like momentum, not work."
+            className="bg-[#fff6ed]"
+          >
+            <AudioSequencePlayer
+              tracks={featuredTracks}
+              title="Now listening"
+              description="Hook-first ranking with preview snippets."
+              previewByDefault
+              compact
+              persistSession
+              sessionSource="listen-home"
+              onSelectTrack={setSelectedTrackId}
+            />
+          </PocketSection>
 
-  if (status === "loading" || (status === "authenticated" && bootLoading)) {
-    return <SurveyLoadingSkeleton label="Loading signal inbox..." />
+          <PocketSection title="Keep the loop moving" description="Listen first. Move into Studio only when you know what to tighten.">
+            <PocketActionStack>
+              <Button className="w-full bg-[#b85e2d] text-[#fff6ed] hover:bg-[#a05227]" onClick={() => router.push("/admin/questionnaires/v1")}>
+                Open Studio
+              </Button>
+              <Button variant="outline" className="w-full border-[#dbcdb8] bg-[#fffdf8]" onClick={() => router.push("/admin/responses")}>
+                Open release detail
+              </Button>
+              <Button variant="outline" className="w-full border-[#dbcdb8] bg-[#fffdf8]" onClick={() => router.push("/admin/share")}>
+                Share a release
+              </Button>
+            </PocketActionStack>
+          </PocketSection>
+
+          <PocketSection title="Releases" description="Each release is a listening object now, not a dashboard row." className="mt-4">
+            <div className="space-y-3">
+              {releaseCards.map((release) => (
+                <article key={release.id} className="rounded-[1.25rem] border border-[#dbcdb8] bg-[#fffdf8] p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-base font-semibold text-[var(--af-color-primary)]">{release.title}</h3>
+                      <p className="mt-1 text-sm text-[#5c5146]">{release.responseCount} tracks • {release.estimatedMinutes} min listen</p>
+                    </div>
+                    <span className="rounded-full bg-[#f3ecdf] px-2 py-1 text-[11px] text-[#7a6146]">{release.status}</span>
+                  </div>
+                  <p className="mt-3 text-sm text-[#665746]">{release.subtitle}</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button
+                      variant="outline"
+                      className="border-[#dbcdb8] bg-[#fff6ed]"
+                      onClick={() => {
+                        const trackId = release.topTracks[0]?.id ?? null
+                        setSelectedTrackId(trackId)
+                        if (trackId && release.topTracks.length > 0) {
+                          void listeningSession.loadQueue(release.topTracks, {
+                            selectedTrackId: trackId,
+                            autoplay: true,
+                            previewMode: true,
+                            source: `release:${release.id}`,
+                          })
+                        }
+                      }}
+                    >
+                      <Headphones className="mr-2 size-4" />
+                      Play release
+                    </Button>
+                    <Button variant="outline" className="border-[#dbcdb8] bg-[#fffdf8]" onClick={() => router.push(`/admin/responses?surveyId=${encodeURIComponent(release.id)}`)}>
+                      Release detail
+                    </Button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </PocketSection>
+        </PocketShell>
+        <AdminMobileNav />
+      </>
+    )
   }
 
   return (
-    <main className={`af-shell min-h-dvh p-3 pb-28 sm:p-6 sm:pb-6`}>
-      <div className="af-panel af-fade-up mx-auto max-w-7xl rounded-[1.2rem] border p-3 sm:rounded-[2rem] sm:p-6">
-        <div className="mb-2 flex justify-end sm:hidden">
-          <Button
-            variant="outline"
-            className="border-[#dbcdb8] bg-[#f3ecdf]"
-            onClick={async () => {
-              await signOut()
-              router.push("/login")
-            }}
-          >
-            <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
-            Sign out
-          </Button>
-        </div>
-        <header className="flex flex-wrap items-start justify-between gap-3 border-b border-[#dbcdb8] pb-4">
-          <div className="block">
-            <p className={`font-body text-sm text-[#5c5146] text-pretty`}>Builder workspace</p>
-            <h1 className="text-[clamp(1.55rem,6vw,1.9rem)] font-semibold text-balance">Signal Inbox</h1>
-            <p className={`font-body mt-1 text-sm text-[#5c5146] text-pretty`}>Hi {user?.name}, hear clear signal and decide your next product move faster.</p>
-            {uiMessage ? <p className={`font-body mt-1 text-sm text-[#5c5146]`}>{uiMessage}</p> : null}
-            {loadError ? <p className={`font-body mt-1 text-sm text-[#8a3d2b]`}>{loadError}</p> : null}
-          </div>
-          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-start sm:self-start">
-            <Button
-              variant="outline"
-              className="hidden border-[#dbcdb8] bg-[#f3ecdf] sm:inline-flex"
-              onClick={async () => {
-                await signOut()
-                router.push("/login")
-              }}
-            >
-              <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
-              Sign out
-            </Button>
-            <a
-              href="/admin/questionnaires/v1"
-              className="hidden h-10 w-full items-center justify-center rounded-md bg-[#b85e2d] px-4 py-2 text-sm font-medium text-[#fff6ed] transition-colors hover:bg-[#a05227] sm:inline-flex sm:w-auto"
-            >
-              <Mic className="mr-2 size-4" aria-hidden="true" />
-              Create new survey
-            </a>
-          </div>
-        </header>
-
-        <section className="af-accent-card af-fade-up af-delay-1 mt-4 rounded-2xl border p-3 sm:mt-5 sm:p-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-base font-semibold text-balance sm:text-lg">First-run checklist</h2>
-          </div>
-          <ul className="mt-2 grid gap-2 sm:grid-cols-3 sm:mt-3">
-            {onboardingChecklist.map((item) => (
-              <li key={item.id} className="rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] p-2 sm:p-3">
-                <p className="inline-flex items-center gap-1.5 text-sm font-semibold text-balance sm:gap-2">
-                  <CheckCircle2
-                    className="size-3.5 sm:size-4"
-                    aria-hidden="true"
-                  />
-                  {item.label}
-                </p>
-                <p className="font-body mt-0.5 text-xs text-[#5c5146]">{item.done ? "Done" : "Next"}</p>
-              </li>
-            ))}
-          </ul>
-        </section>
-
-        <section className="mt-6 grid gap-4 lg:grid-cols-[260px_1fr_300px]">
-          <aside className="order-2 af-accent-card af-fade-up af-delay-1 rounded-2xl border p-4 lg:order-none lg:p-4">
-            <h2 className="text-lg font-semibold text-balance">Quick Actions</h2>
-            <div className="mt-3 grid gap-2 sm:grid">
-              <Link href="/admin/responses" className="inline-flex items-center justify-between rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] px-3 py-2 text-sm hover:bg-[#efe4d3]">
-                Moderate queue (response-level)
-                <ArrowUpRight className="size-4" aria-hidden="true" />
-              </Link>
-              <Link href="/admin/notifications" className="hidden rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] px-3 py-2 text-sm hover:bg-[#efe4d3] sm:block">
-                Configure creator notifications
-              </Link>
-              <Link
-                href={activeSurveyId ? `/questionnaire/v1?surveyId=${encodeURIComponent(activeSurveyId)}` : "/admin/questionnaires/v1"}
-                className="rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] px-3 py-2 text-sm hover:bg-[#efe4d3]"
-              >
-                Open respondent flow preview
-              </Link>
-            </div>
-
-            <div className="my-4 border-t border-[#dbcdb8]" />
-
-            <h2 className="text-lg font-semibold text-balance">Decision KPIs</h2>
-            <div className="mt-3 grid grid-cols-3 gap-2">
-              <div className="text-center">
-                <p className="text-lg font-semibold text-[var(--af-color-primary)]">{publishedRate}%</p>
-                <p className="text-xs text-[#5c5146]">Published</p>
-              </div>
-              <div className="text-center">
-                <p className="text-lg font-semibold text-[var(--af-color-primary)]">{uniqueRespondents}</p>
-                <p className="text-xs text-[#5c5146]">Respondents</p>
-              </div>
-              <div className="text-center">
-                <p className="text-lg font-semibold text-[var(--af-color-primary)]">{ttfrLabel}</p>
-                <p className="text-xs text-[#5c5146]">TTFR</p>
-              </div>
-            </div>
-          </aside>
-
-          <section className="order-1 af-accent-card af-fade-up af-delay-1 rounded-2xl border p-3 sm:p-5 lg:order-none">
-            <h2 className="text-xl font-semibold text-balance sm:text-2xl">Survey Stack</h2>
-            <p className={`font-body mt-1 text-sm text-[#5c5146] text-pretty`}>
-              One row per survey. Open a survey to review responses and decide your next change.
+    <main className="min-h-dvh bg-[#f3ecdf] p-6">
+      <div className="mx-auto max-w-7xl">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="text-xs uppercase tracking-[0.18em] text-[#8a431f]">Listen</p>
+            <h1 className="mt-2 text-5xl font-semibold text-balance text-[var(--af-color-primary)]">Hear the strongest signal first.</h1>
+            <p className="mt-3 max-w-3xl text-base text-[#5c5146]">
+              Audioform now opens as a listening workspace. Preview-first playback gets you into the best takes fast, then Studio helps you shape the next release.
             </p>
-            <article className="mt-3 rounded-xl border border-[#dbcdb8] bg-[#f3ecdf] p-3 sm:p-4">
-              <p className="text-sm font-semibold text-balance">First Response Spotlight</p>
-              <p className={`font-body mt-1 text-sm text-[#5c5146] text-pretty`}>
-                {ttfrSeconds == null
-                  ? "No first response yet. Share your survey link to get first signal."
-                  : `First response arrived in ${ttfrLabel}.`}
-              </p>
-              <Button
-                variant="outline"
-                className="mt-3 border-[#dbcdb8] bg-[#fff6ed]"
-                onClick={() => {
-                  const surveyId = publishedSurveys[0]?.id
-                  if (!surveyId) return
-                  trackEvent("response_replayed", { survey_id: surveyId, source: "first_response_spotlight" })
-                  router.push(`/admin/responses?surveyId=${encodeURIComponent(surveyId)}&focus=first-response`)
-                }}
-                disabled={!publishedSurveys[0]?.id}
-              >
-                Replay first response
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <Link href="/admin/questionnaires/v1">
+              <Button className="bg-[#b85e2d] text-[#fff6ed] hover:bg-[#a05227]">
+                <Mic className="mr-2 size-4" />
+                Open Studio
               </Button>
+            </Link>
+            <Link href="/admin/share">
+              <Button variant="outline" className="border-[#dbcdb8] bg-[#fffdf8]">
+                <Radio className="mr-2 size-4" />
+                Share release
+              </Button>
+            </Link>
+          </div>
+        </div>
+
+        <div className="mt-8 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+          <AudioSequencePlayer
+            tracks={continueTracks}
+            title="Now listening"
+            description="Preview mode is on. The first track should hook in under 10 seconds."
+            previewByDefault
+            persistSession
+            sessionSource="listen-home"
+            onSelectTrack={setSelectedTrackId}
+          />
+
+          <section className="space-y-4">
+            <article className="rounded-[1.75rem] border border-[#dbcdb8] bg-[#fff8f0] p-5">
+              <p className="text-xs uppercase tracking-[0.18em] text-[#8a431f]">Why this opens differently</p>
+              <ul className="mt-4 space-y-3 text-sm text-[#5c5146]">
+                <li className="rounded-2xl border border-[#dbcdb8] bg-[#fffdf8] px-4 py-3">Preview-first playback keeps the first 30 seconds fast and varied.</li>
+                <li className="rounded-2xl border border-[#dbcdb8] bg-[#fffdf8] px-4 py-3">Momentum tags surface takes that feel alive, not just technically complete.</li>
+                <li className="rounded-2xl border border-[#dbcdb8] bg-[#fffdf8] px-4 py-3">Studio remains where better questions create better future tracks.</li>
+              </ul>
             </article>
-            <div className="mt-4 space-y-3">
-                {surveys.length === 0 ? (
-                <article className="rounded-xl border border-[#dbcdb8] bg-[#f9f4ea] p-3 sm:p-4">
-                  <p className="text-sm font-semibold text-balance">No surveys yet</p>
-                  <p className={`font-body mt-1 text-sm text-[#5c5146]`}>
-                    Start with one decision question and publish your first survey.
-                  </p>
-                  <ol className={`font-body mt-2 space-y-1 text-sm text-[#5c5146]`}>
-                    <li>1. Write one focused prompt.</li>
-                    <li>2. Publish.</li>
-                    <li>3. Collect and review first responses.</li>
-                  </ol>
-                  <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-                    <a
-                      href="/admin/questionnaires/v1"
-                      className="inline-flex items-center justify-center rounded-lg bg-[#b85e2d] px-3 py-2 text-sm text-[#fff6ed] transition-colors hover:bg-[#a05227]"
-                    >
-                      Create first survey
-                    </a>
-                  </div>
-                </article>
-              ) : (
-                surveys.map((survey) => (
-                <article
-                  key={survey.id}
-                  className="rounded-xl border border-[#dbcdb8] bg-[#f9f4ea] p-3 sm:p-4 cursor-pointer hover:bg-[#f3e7d8]"
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => {
-                    if (survey.status === "draft") {
-                      router.push(`/admin/questionnaires/v1?surveyId=${encodeURIComponent(survey.id)}`)
-                      return
-                    }
-                    trackEvent("response_replayed", { survey_id: survey.id, source: "survey_stack_top_signal" })
-                    router.push(`/admin/responses?surveyId=${survey.id}&focus=top-signal`)
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault()
-                      if (survey.status === "draft") {
-                        router.push(`/admin/questionnaires/v1?surveyId=${encodeURIComponent(survey.id)}`)
-                        return
-                      }
-                      trackEvent("response_replayed", { survey_id: survey.id, source: "survey_stack_top_signal" })
-                      router.push(`/admin/responses?surveyId=${survey.id}&focus=top-signal`)
-                    }
-                  }}
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h3 className="text-base font-semibold text-balance sm:text-lg">{survey.title}</h3>
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs ${
-                        isShareableSurveyStatus(survey.status)
-                          ? "bg-[#e6f0df] text-[#2d5a17]"
-                          : survey.status === "closed"
-                            ? "bg-[#efe4d3] text-[#7a6146]"
-                            : "bg-[#f4ead9] text-[#8a5a33]"
-                      }`}
-                    >
-                      {survey.status}
-                    </span>
-                  </div>
-                  <div className={`font-body mt-2 grid gap-1.5 sm:grid-cols-3 sm:gap-2 text-xs sm:text-sm text-[#5c5146]`}>
-                    <p className="inline-flex items-center gap-1 sm:gap-2">
-                      <Target className="size-3.5 sm:size-4" aria-hidden="true" />
-                      {survey.questionCount} prompts
-                    </p>
-                    <p className="inline-flex items-center gap-1 sm:gap-2 tabular-nums">
-                      <Calendar className="size-3.5 sm:size-4" aria-hidden="true" />
-                      <span className="hidden sm:inline">updated </span>{new Date(survey.updatedAt).toLocaleDateString()}
-                    </p>
-                    <p className="tabular-nums">{responsesBySurvey[survey.id] ?? 0} responses</p>
-                  </div>
-                  <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-                    {isShareableSurveyStatus(survey.status) ? (
-                      <Button
-                        variant="outline"
-                        className="w-full border-[#dbcdb8] bg-[#fff6ed] sm:w-auto"
-                        onClick={async (event) => {
-                          event.stopPropagation()
-                          if (typeof window === "undefined") return
-                          const link = buildShareLink(survey.id, survey.updatedAt)
-                          try {
-                            await navigator.clipboard.writeText(link)
-                            setUiMessage(`Survey link copied for "${survey.title}".`)
-                            trackEvent("share_link_copied", { share_link: link, share_type: "survey_stack_survey" })
-                          } catch {
-                            setUiMessage("Could not copy survey link. Copy it from the browser address bar.")
-                          }
-                        }}
-                      >
-                        <Copy className="mr-2 size-4" aria-hidden="true" />
-                        Copy survey link
-                      </Button>
-                    ) : null}
-                    {isShareableSurveyStatus(survey.status) && user?.id ? (
-                      <Button
-                        variant="outline"
-                        className="w-full border-[#dbcdb8] bg-[#fff6ed] sm:w-auto"
-                        onClick={async (event) => {
-                          event.stopPropagation()
-                          if (typeof window === "undefined") return
-                          const creatorId = user.id
-                          const embedLink = `${window.location.origin}/embed/by-creator/${creatorId}/${survey.id}`
-                          const iframeSnippet = `<iframe src="${embedLink}" width="100%" height="760" style="border:0;border-radius:16px;" title="Audioform survey"></iframe>`
-                          try {
-                            await navigator.clipboard.writeText(iframeSnippet)
-                            setUiMessage(`Embed code copied for "${survey.title}".`)
-                            trackEvent("share_link_copied", {
-                              share_link: embedLink,
-                              share_type: "survey_stack_embed_iframe",
-                            })
-                          } catch {
-                            setUiMessage("Could not copy iframe code. Please try again.")
-                          }
-                        }}
-                      >
-                        <Code2 className="mr-2 size-4" aria-hidden="true" />
-                        Copy iframe code
-                      </Button>
-                    ) : null}
-                    {isShareableSurveyStatus(survey.status) ? (
-                      <Button
-                        variant="outline"
-                        className="w-full border-[#dbcdb8] bg-[#fff6ed] sm:w-auto"
-                        onClick={(event) => {
-                          event.stopPropagation()
-                          setShareDialogSurveyId(survey.id)
-                        }}
-                      >
-                        <QrCode className="mr-2 size-4" aria-hidden="true" />
-                        QR code
-                      </Button>
-                    ) : null}
-                    {survey.status === "draft" ? (
-                      <Button
-                        variant="outline"
-                        className="w-full border-[#dbcdb8] bg-[#fff6ed] sm:w-auto"
-                        onClick={async (event) => {
-                          event.stopPropagation()
-                          try {
-                            const draftLink = `${window.location.origin}/admin/questionnaires/v1?surveyId=${encodeURIComponent(survey.id)}`
-                            await navigator.clipboard.writeText(draftLink)
-                            setUiMessage(`Draft link copied for "${survey.title}".`)
-                          } catch {
-                            setUiMessage("Could not copy draft link. Please copy from the browser address bar.")
-                          }
-                        }}
-                      >
-                        Copy draft link
-                      </Button>
-                    ) : null}
-                    <Button
-                      variant="outline"
-                      className="h-8 w-full border-[#e3c3b5] bg-[#fff0e9] text-[#8a3d2b] hover:bg-[#f7e2d8] sm:h-9 sm:w-auto"
-                      disabled={deletingSurveyId === survey.id}
-                      onClick={() => setSurveyDeleteDialogId(survey.id)}
-                    >
-                      <Trash2 className="mr-1 size-3.5 sm:size-4" aria-hidden="true" />
-                      <span className="hidden sm:inline">
-                        {deletingSurveyId === survey.id ? "Deleting..." : "Delete"}
-                      </span>
-                    </Button>
-                  </div>
-                  <p className={`font-body mt-2 text-xs text-[#5c5146] hidden sm:block`}>
-                    {isShareableSurveyStatus(survey.status)
-                      ? "Copy the live link, iframe, or QR from this row when you are ready to distribute."
-                      : "Clip export/share lives in Moderation Queue after opening the top signal."}
-                  </p>
-                </article>
-                ))
-              )}
+
+            <article className="rounded-[1.75rem] border border-[#dbcdb8] bg-[#fff8f0] p-5">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-[var(--af-color-primary)]">New signal</h2>
+                <span className="text-xs text-[#7a6146]">{responses.length} tracks</span>
+              </div>
+              <div className="mt-4 space-y-3">
+                {featuredTracks.map((track) => (
+                  <button
+                    key={track.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedTrackId(track.id)
+                      void listeningSession.loadQueue(allTracks, {
+                        selectedTrackId: track.id,
+                        autoplay: true,
+                        previewMode: listeningSession.previewMode,
+                        source: "listen-home",
+                      })
+                    }}
+                    className="block w-full rounded-2xl border border-[#dbcdb8] bg-[#fffdf8] px-4 py-3 text-left hover:bg-[#f7efe4]"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-[var(--af-color-primary)]">{track.title}</p>
+                        <p className="mt-1 text-xs text-[#665746]">{track.listening.hotTake}</p>
+                      </div>
+                      <ArrowRight className="mt-0.5 size-4 text-[#8a431f]" />
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </article>
+          </section>
+        </div>
+
+        <section className="mt-8">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.18em] text-[#8a431f]">Releases</p>
+              <h2 className="mt-1 text-2xl font-semibold text-[var(--af-color-primary)]">Each survey now behaves like a release.</h2>
             </div>
-          </section>
-
-          <aside className="space-y-4 hidden lg:block">
-            <article className="af-accent-card af-fade-up af-delay-2 rounded-2xl border p-4">
-              <h2 className="text-lg font-semibold text-balance">Insight Extractor</h2>
-              <p className="font-body mt-1 text-xs text-[#5c5146]">
-                Track transcript throughput, failed runs, and the strongest repeated themes.
-              </p>
-              <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                <Metric label="Transcripts" value={`${extractorMetrics.withTranscript}`} />
-                <Metric label="Insights" value={`${extractorMetrics.withInsight}`} />
-                <Metric label="Pending" value={`${extractorMetrics.transcriptPending}`} />
-                <Metric label="Failed" value={`${extractorMetrics.transcriptFailed}`} />
-              </div>
-              <div className="mt-4">
-                <p className="text-sm font-semibold text-balance">Top themes</p>
-                <ul className="font-body mt-2 space-y-2 text-sm text-[#5c5146]">
-                  {themeCoverage.length ? (
-                    themeCoverage.map(({ theme, count, coverage }) => (
-                      <li key={theme} className="rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] px-3 py-3">
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="font-medium capitalize text-[var(--af-color-primary)]">{theme}</span>
-                          <span className="tabular-nums text-xs text-[#7a6146]">{count} mentions</span>
-                        </div>
-                        <div className="mt-2 h-2 rounded-full bg-[#e7dccb]">
-                          <div className="h-2 rounded-full bg-[#b85e2d]" style={{ width: `${Math.min(100, coverage)}%` }} />
-                        </div>
-                        <p className="mt-1 text-xs text-[#7a6146]">Appears in {coverage}% of extracted insights</p>
-                      </li>
-                    ))
-                  ) : extractorMetrics.transcriptPending > 0 ? (
-                    <li className="rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] p-3">
-                      Themes will appear as pending transcript runs finish.
-                    </li>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {releaseCards.map((release) => (
+              <article key={release.id} className="rounded-[1.75rem] border border-[#dbcdb8] bg-[#fff8f0] p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-lg font-semibold text-[var(--af-color-primary)]">{release.title}</h3>
+                    <p className="mt-1 text-sm text-[#5c5146]">{release.responseCount} tracks • {release.estimatedMinutes} min listen</p>
+                  </div>
+                  <span className="rounded-full bg-[#f3ecdf] px-2 py-1 text-xs text-[#7a6146]">{release.status}</span>
+                </div>
+                <p className="mt-4 text-sm text-[#665746]">{release.subtitle}</p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Button
+                    className="bg-[#b85e2d] text-[#fff6ed] hover:bg-[#a05227]"
+                    onClick={() => {
+                      const trackId = release.topTracks[0]?.id ?? null
+                      setSelectedTrackId(trackId)
+                      if (trackId && release.topTracks.length > 0) {
+                        void listeningSession.loadQueue(release.topTracks, {
+                          selectedTrackId: trackId,
+                          autoplay: true,
+                          previewMode: true,
+                          source: `release:${release.id}`,
+                        })
+                      }
+                    }}
+                  >
+                    <Headphones className="mr-2 size-4" />
+                    Play release
+                  </Button>
+                  <Button variant="outline" className="border-[#dbcdb8] bg-[#fffdf8]" onClick={() => router.push(`/admin/responses?surveyId=${encodeURIComponent(release.id)}`)}>
+                    Release detail
+                  </Button>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {release.publicListeningEnabled ? (
+                    <span className="rounded-full bg-[#e8f2e0] px-2 py-1 text-xs text-[#2d5a17]">Public listening on</span>
                   ) : (
-                    <li className="rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] p-3">
-                      Run extraction on a few responses to generate the first grouped themes.
-                    </li>
+                    <span className="rounded-full bg-[#f3ecdf] px-2 py-1 text-xs text-[#7a6146]">Private listening only</span>
                   )}
-                </ul>
-              </div>
-              {extractorMetrics.transcriptFailed > 0 ? (
-                <div className="mt-4 rounded-lg border border-[#e3c3b5] bg-[#fff0e9] px-3 py-2 text-xs text-[#8a3d2b]">
-                  {extractorMetrics.transcriptFailed} extraction run{extractorMetrics.transcriptFailed === 1 ? " needs" : "s need"} retry from the response inbox.
                 </div>
-              ) : null}
-            </article>
-
-            <article className="af-accent-card af-fade-up af-delay-2 rounded-2xl border p-4">
-              <h2 className="text-lg font-semibold text-balance">Today</h2>
-              <p className={`font-body mt-1 text-xs text-[#5c5146]`}>
-                Real-time activity feed from survey, response, and reminder events.
-              </p>
-              <ul className={`font-body mt-3 space-y-2 text-sm text-[#5c5146]`}>
-                {timeline.length ? (
-                  timeline.map((event) => (
-                    <li key={event.id} className="rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] p-3">
-                      {humanizeDashboardEventMessage(event, surveyTitleById)}
-                    </li>
-                  ))
-                ) : (
-                  <li className="rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] p-3">
-                    No activity yet. Publish a survey or collect a response to populate this feed.
-                  </li>
-                )}
-              </ul>
-            </article>
-          </aside>
-
-          <section className="order-3 space-y-4 lg:hidden">
-            <article className="af-accent-card af-fade-up af-delay-2 rounded-2xl border p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="block">
-                  <h2 className="text-lg font-semibold text-balance">Insight Extractor</h2>
-                  <p className="font-body mt-1 text-xs text-[#5c5146]">Theme groups and extractor health.</p>
-                </div>
-                <div className="rounded-full bg-[#f3ecdf] px-2 py-1 text-xs text-[#7a6146]">{extractorMetrics.withInsight} ready</div>
-              </div>
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <Metric label="Insights" value={`${extractorMetrics.withInsight}`} />
-                <Metric label="Pending" value={`${extractorMetrics.transcriptPending}`} />
-              </div>
-              <ul className="mt-3 space-y-2 text-sm text-[#5c5146]">
-                {themeCoverage.slice(0, 3).map(({ theme, count }) => (
-                  <li key={theme} className="flex items-center justify-between rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] px-3 py-2">
-                    <span className="capitalize text-[var(--af-color-primary)]">{theme}</span>
-                    <span className="text-xs tabular-nums">{count}</span>
-                  </li>
-                ))}
-                {!themeCoverage.length ? (
-                  <li className="rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] p-3 text-xs">
-                    Run extraction on a few responses to see grouped themes here.
-                  </li>
-                ) : null}
-              </ul>
-            </article>
-            <article className="af-accent-card af-fade-up af-delay-2 rounded-2xl border p-4">
-              <h2 className="text-lg font-semibold text-balance">Today</h2>
-              <p className="font-body mt-1 text-xs text-[#5c5146]">Recent survey and response activity.</p>
-              <ul className="mt-3 space-y-2 text-sm text-[#5c5146]">
-                {timeline.slice(0, 3).map((event) => (
-                  <li key={event.id} className="rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] p-3">
-                    {humanizeDashboardEventMessage(event, surveyTitleById)}
-                  </li>
-                ))}
-                {!timeline.length ? (
-                  <li className="rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] p-3 text-xs">
-                    No activity yet. Publish a survey or collect a response to populate this feed.
-                  </li>
-                ) : null}
-              </ul>
-            </article>
-          </section>
+              </article>
+            ))}
+          </div>
         </section>
       </div>
-
-      <AlertDialog open={!!surveyDeleteDialogId} onOpenChange={(open) => !open && setSurveyDeleteDialogId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete survey?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Delete this survey and its responses permanently? This cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={!!deletingSurveyId}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-[#8a3d2b] text-[#fff6ed] hover:bg-[#6f2f21]"
-              disabled={!surveyDeleteDialogId || !!deletingSurveyId}
-              onClick={() => {
-                if (!surveyDeleteDialogId) return
-                void handleDeleteSurvey(surveyDeleteDialogId)
-              }}
-            >
-              {deletingSurveyId ? "Deleting..." : "Delete permanently"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <Dialog open={!!shareDialogSurveyId} onOpenChange={(open) => !open && setShareDialogSurveyId(null)}>
-        <DialogContent className="border-[#dbcdb8] bg-[#f9f4ea] sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Survey QR handoff</DialogTitle>
-            <DialogDescription>
-              Scan the code or copy the direct link for quick sharing.
-            </DialogDescription>
-          </DialogHeader>
-          {shareDialogSurveyId ? (
-            <div className="space-y-4">
-              <div className="mx-auto w-fit rounded-[1.5rem] border border-[#dbcdb8] bg-[#fffdf8] p-4">
-                <img
-                  src={buildQrCodeUrl(shareDialogSurveyId)}
-                  alt="QR code for survey share link"
-                  width={240}
-                  height={240}
-                  className="size-[240px]"
-                />
-              </div>
-              <Button
-                variant="outline"
-                className="w-full border-[#dbcdb8] bg-[#fff7ee]"
-                onClick={async () => {
-                  const survey = surveys.find((item) => item.id === shareDialogSurveyId)
-                  const link = buildShareLink(shareDialogSurveyId, survey?.updatedAt)
-                  try {
-                    await navigator.clipboard.writeText(link)
-                    setUiMessage(`Survey link copied for "${survey?.title ?? "survey"}".`)
-                  } catch {
-                    setUiMessage("Could not copy survey link. Copy it from the QR dialog instead.")
-                  }
-                }}
-              >
-                <Copy className="mr-2 size-4" aria-hidden="true" />
-                Copy direct link
-              </Button>
-              <Button
-                variant="outline"
-                className="w-full border-[#dbcdb8] bg-[#fff7ee]"
-                onClick={async () => {
-                  const survey = surveys.find((item) => item.id === shareDialogSurveyId)
-                  const qrUrl = buildQrCodeUrl(shareDialogSurveyId)
-                  try {
-                    const response = await fetch(qrUrl)
-                    const blob = await response.blob()
-                    const objectUrl = window.URL.createObjectURL(blob)
-                    const anchor = document.createElement("a")
-                    anchor.href = objectUrl
-                    anchor.download = `${survey?.title?.trim().replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "").toLowerCase() || "audioform-survey"}-qr.png`
-                    document.body.appendChild(anchor)
-                    anchor.click()
-                    anchor.remove()
-                    window.URL.revokeObjectURL(objectUrl)
-                    setUiMessage(`QR code downloaded for "${survey?.title ?? "survey"}".`)
-                  } catch {
-                    setUiMessage("Could not download QR code. Please try again.")
-                  }
-                }}
-              >
-                <QrCode className="mr-2 size-4" aria-hidden="true" />
-                Download QR code
-              </Button>
-            </div>
-          ) : null}
-        </DialogContent>
-      </Dialog>
-
-      <AdminMobileNav />
     </main>
   )
 }
-
-function Metric({ label, value, helper }: { label: string; value: string; helper?: string }) {
-  return (
-    <div className="block rounded-lg border border-[#dbcdb8] bg-[#f9f4ea] p-3">
-      <p className="text-sm text-[#5c5146]">{label}</p>
-      <p className="mt-1 text-3xl font-semibold tabular-nums">{value}</p>
-      {helper ? <p className="mt-1 text-xs text-[#5c5146]">{helper}</p> : null}
-    </div>
-  )
-}
-

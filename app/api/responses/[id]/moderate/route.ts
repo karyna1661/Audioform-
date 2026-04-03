@@ -8,6 +8,8 @@ const moderateSchema = z.object({
   flagged: z.boolean().optional(),
   highSignal: z.boolean().optional(),
   bookmarked: z.boolean().optional(),
+  publicPlaylistEligible: z.boolean().optional(),
+  epInclusion: z.boolean().optional(),
 })
 
 export async function PATCH(
@@ -46,6 +48,8 @@ export async function PATCH(
     if (parsed.data.flagged !== undefined) updates.flagged = parsed.data.flagged
     if (parsed.data.highSignal !== undefined) updates.highSignal = parsed.data.highSignal
     if (parsed.data.bookmarked !== undefined) updates.bookmarked = parsed.data.bookmarked
+    if (parsed.data.publicPlaylistEligible !== undefined) updates.publicPlaylistEligible = parsed.data.publicPlaylistEligible
+    if (parsed.data.epInclusion !== undefined) updates.epInclusion = parsed.data.epInclusion
 
     const updated = await updateStoredResponseForSurveyIds(id, ownedSurveyIds, {
       ...updates,
@@ -62,6 +66,8 @@ export async function PATCH(
         flagged: updated.flagged,
         highSignal: updated.highSignal,
         bookmarked: updated.bookmarked,
+        publicPlaylistEligible: updated.publicPlaylistEligible,
+        epInclusion: updated.epInclusion,
         moderationUpdatedAt: updated.moderationUpdatedAt,
       },
     })

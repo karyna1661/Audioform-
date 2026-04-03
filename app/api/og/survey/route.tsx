@@ -44,7 +44,7 @@ export async function GET(request: Request) {
             }}
           >
             <div style={{ width: 16, height: 16, borderRadius: 999, background: "#b85e2d" }} />
-            Audioform survey
+            Scan. Speak. Listen.
           </div>
           <div style={{ fontSize: 56, fontWeight: 700, lineHeight: 1.05, maxWidth: 980 }}>{title}</div>
           <div
@@ -69,8 +69,8 @@ export async function GET(request: Request) {
 
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <div style={{ fontSize: 28, color: "#6e3316" }}>Answer by voice in under a minute</div>
-            <div style={{ fontSize: 22, color: "#7a6146" }}>Powered by Audioform</div>
+            <div style={{ fontSize: 28, color: "#6e3316" }}>Scan. Speak. Listen.</div>
+            <div style={{ fontSize: 22, color: "#7a6146" }}>Answer by voice and hear the shape of opinion.</div>
           </div>
           <div style={{ fontSize: 24, color: "#7a6146" }}>audioform-production.up.railway.app</div>
         </div>

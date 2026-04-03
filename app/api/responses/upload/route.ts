@@ -12,12 +12,14 @@ import {
   uploadAudioToStorage,
 } from "@/lib/server/response-store"
 import { applyRateLimit, getRequestClientIp } from "@/lib/server/rate-limit"
+import { buildPreviewClipRange, computeListeningRank, deriveHotTake, deriveMomentumTags } from "@/lib/listening-model"
 
 const uploadSchema = z.object({
   responseId: z.string().min(1),
   idempotencyKey: z.string().min(10),
   sessionId: z.string().min(1).optional(),
   durationSeconds: z.number().optional(),
+  publicOptIn: z.boolean().optional(),
 })
 
 const ALLOWED_AUDIO_MIME = new Set([
@@ -69,6 +71,7 @@ export async function POST(request: NextRequest) {
       idempotencyKey: form.get("idempotencyKey"),
       sessionId: form.get("sessionId"),
       durationSeconds: form.get("durationSeconds") ? Number(form.get("durationSeconds")) : undefined,
+      publicOptIn: form.get("publicOptIn") === "true",
     })
     if (!parsed.success || !audio) {
       logUpload("invalid_payload", { ip, hasAudio: Boolean(audio) })
@@ -153,6 +156,27 @@ export async function POST(request: NextRequest) {
       storageFileId,
       publicUrl: uploaded.publicUrl ?? null,
       durationSeconds: parsed.data.durationSeconds ?? null,
+      publicOptIn: Boolean(parsed.data.publicOptIn),
+      publicPlaylistEligible: Boolean(parsed.data.publicOptIn),
+      listeningRank: computeListeningRank({
+        durationSeconds: parsed.data.durationSeconds ?? null,
+        highSignal: existing.highSignal,
+        bookmarked: existing.bookmarked,
+        flagged: existing.flagged,
+      }),
+      previewStartSeconds: buildPreviewClipRange(parsed.data.durationSeconds ?? null)?.startSeconds ?? null,
+      previewEndSeconds: buildPreviewClipRange(parsed.data.durationSeconds ?? null)?.endSeconds ?? null,
+      hotTake: deriveHotTake({
+        durationSeconds: parsed.data.durationSeconds ?? null,
+        highSignal: existing.highSignal,
+        bookmarked: existing.bookmarked,
+      }),
+      momentumTags: deriveMomentumTags({
+        durationSeconds: parsed.data.durationSeconds ?? null,
+        highSignal: existing.highSignal,
+        bookmarked: existing.bookmarked,
+      }),
+      collectionMembership: existing.bookmarked ? ["saved"] : [],
     })
 
     if (!finalized) {

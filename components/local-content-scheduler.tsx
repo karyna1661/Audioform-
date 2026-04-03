@@ -13,6 +13,7 @@ type CompletionMap = Record<string, boolean>
 export function LocalContentScheduler() {
   const [completed, setCompleted] = useState<CompletionMap>({})
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const totalPosts = localContentSchedule.length
 
   useEffect(() => {
     try {
@@ -40,9 +41,9 @@ export function LocalContentScheduler() {
       <div className="af-panel mx-auto max-w-6xl rounded-[2rem] border border-[#dbcdb8] p-5 sm:p-8">
         <header className="border-b border-[#dbcdb8] pb-5">
           <p className="font-body text-sm text-[#5c5146] text-pretty">Local-only planning surface</p>
-          <h1 className="mt-1 text-4xl font-semibold text-balance">30-Day Pre-Beta Content Scheduler</h1>
+          <h1 className="mt-1 text-4xl font-semibold text-balance">Pre-Beta Content Scheduler</h1>
           <p className="font-body mt-3 max-w-3xl text-sm text-[#5c5146] text-pretty">
-            This page is for localhost only. It is seeded with 30 days of Audioform pre-beta content and a checklist so each post can be marked complete after you publish it.
+            This page is for localhost only. It is seeded with Audioform pre-beta content and a checklist so each post can be marked complete after you publish it.
           </p>
         </header>
 
@@ -63,7 +64,9 @@ export function LocalContentScheduler() {
           </div>
           <aside className="rounded-2xl border border-[#dbcdb8] bg-[#fff7ee] p-4">
             <p className="text-sm font-semibold">Tracker</p>
-            <p className="mt-2 text-3xl font-semibold tabular-nums text-[#6e3316]">{doneCount}/30</p>
+            <p className="mt-2 text-3xl font-semibold tabular-nums text-[#6e3316]">
+              {doneCount}/{totalPosts}
+            </p>
             <p className="font-body mt-1 text-sm text-[#5c5146]">{remainingCount} posts left before beta opening.</p>
             <Button
               variant="outline"

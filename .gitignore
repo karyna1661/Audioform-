@@ -27,6 +27,7 @@ tmp-e2e-*
 .tmp/
 uploads/
 data/
+/worktrees/
 
 # vercel
 .vercel

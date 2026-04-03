@@ -30,11 +30,13 @@ import { listInsightsByTranscriptIds } from "@/lib/server/insight-store"
 import { getRequestId, logServerEvent, logServerError } from "@/lib/server/observability"
 import { applyRateLimit, getRequestClientIp } from "@/lib/server/rate-limit"
 import { listTranscriptsByResponseIds } from "@/lib/server/transcript-store"
+import { buildPreviewClipRange, computeListeningRank, deriveHotTake, deriveMomentumTags } from "@/lib/listening-model"
 
 const uploadSchema = z.object({
   questionId: z.string().min(1),
   surveyId: z.string().min(1).default("audioform-survey"),
   durationSeconds: z.number().optional(),
+  publicOptIn: z.boolean().optional(),
 })
 
 const ALLOWED_AUDIO_MIME = new Set([
@@ -54,6 +56,8 @@ const moderationSchema = z.object({
   flagged: z.boolean().optional(),
   highSignal: z.boolean().optional(),
   bookmarked: z.boolean().optional(),
+  publicPlaylistEligible: z.boolean().optional(),
+  epInclusion: z.boolean().optional(),
 })
 
 function newIdempotencyKey(): string {
@@ -88,6 +92,7 @@ export async function POST(request: NextRequest) {
       questionId: formData.get("questionId"),
       surveyId: formData.get("surveyId"),
       durationSeconds: formData.get("durationSeconds") ? Number(formData.get("durationSeconds")) : undefined,
+      publicOptIn: formData.get("publicOptIn") === "true",
     })
 
     if (!audioFile || !parsed.success) {
@@ -168,6 +173,20 @@ export async function POST(request: NextRequest) {
         storageFileId,
         publicUrl: uploaded.publicUrl ?? null,
         durationSeconds: parsed.data.durationSeconds ?? null,
+        publicOptIn: Boolean(parsed.data.publicOptIn),
+        publicPlaylistEligible: Boolean(parsed.data.publicOptIn),
+        listeningRank: computeListeningRank({
+          durationSeconds: parsed.data.durationSeconds ?? null,
+        }),
+        previewStartSeconds: buildPreviewClipRange(parsed.data.durationSeconds ?? null)?.startSeconds ?? null,
+        previewEndSeconds: buildPreviewClipRange(parsed.data.durationSeconds ?? null)?.endSeconds ?? null,
+        hotTake: deriveHotTake({
+          durationSeconds: parsed.data.durationSeconds ?? null,
+        }),
+        momentumTags: deriveMomentumTags({
+          durationSeconds: parsed.data.durationSeconds ?? null,
+        }),
+        collectionMembership: [],
       })
 
       if (!stored) {
@@ -388,6 +407,49 @@ export async function GET(request: NextRequest) {
         flagged: item.flagged,
         highSignal: item.highSignal,
         bookmarked: item.bookmarked,
+        publicOptIn: item.publicOptIn,
+        publicPlaylistEligible: item.publicPlaylistEligible,
+        listening: {
+          rank: item.listeningRank ?? computeListeningRank({
+            durationSeconds: item.durationSeconds,
+            transcriptText: transcript?.transcriptText ?? null,
+            transcriptStatus: transcript?.status ?? null,
+            summary: insight?.summary ?? null,
+            primaryTheme: insight?.primaryTheme ?? null,
+            themes: insight?.themes ?? [],
+            signalScore: insight?.signalScore ?? null,
+            sentimentScore: insight?.sentimentScore ?? null,
+            highSignal: item.highSignal,
+            bookmarked: item.bookmarked,
+            flagged: item.flagged,
+          }),
+          previewClipRange:
+            item.previewStartSeconds != null && item.previewEndSeconds != null
+              ? { startSeconds: item.previewStartSeconds, endSeconds: item.previewEndSeconds }
+              : buildPreviewClipRange(item.durationSeconds),
+          hotTake:
+            item.hotTake ||
+            deriveHotTake({
+              durationSeconds: item.durationSeconds,
+              summary: insight?.summary ?? null,
+              primaryTheme: insight?.primaryTheme ?? null,
+              highSignal: item.highSignal,
+              bookmarked: item.bookmarked,
+            }),
+          momentumTags:
+            item.momentumTags.length > 0
+              ? item.momentumTags
+              : deriveMomentumTags({
+                  durationSeconds: item.durationSeconds,
+                  themes: insight?.themes ?? [],
+                  signalScore: insight?.signalScore ?? null,
+                  sentimentScore: insight?.sentimentScore ?? null,
+                  highSignal: item.highSignal,
+                  bookmarked: item.bookmarked,
+                }),
+          collectionMembership: item.collectionMembership,
+          epInclusion: item.epInclusion,
+        },
         moderationUpdatedAt: item.moderationUpdatedAt,
         timestamp: item.createdAt,
         transcript: transcript
@@ -440,8 +502,14 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Invalid moderation payload", details: parsed.error.flatten() }, { status: 400, headers: corsHeaders })
     }
 
-    const { id, flagged, highSignal, bookmarked } = parsed.data
-    if (flagged === undefined && highSignal === undefined && bookmarked === undefined) {
+    const { id, flagged, highSignal, bookmarked, publicPlaylistEligible, epInclusion } = parsed.data
+    if (
+      flagged === undefined &&
+      highSignal === undefined &&
+      bookmarked === undefined &&
+      publicPlaylistEligible === undefined &&
+      epInclusion === undefined
+    ) {
       return NextResponse.json({ error: "No moderation fields provided." }, { status: 400, headers: corsHeaders })
     }
 
@@ -455,6 +523,8 @@ export async function PATCH(request: NextRequest) {
       flagged,
       highSignal,
       bookmarked,
+      publicPlaylistEligible,
+      epInclusion,
     })
     if (!updated) {
       return NextResponse.json({ error: "Response not found." }, { status: 404, headers: corsHeaders })
@@ -473,6 +543,8 @@ export async function PATCH(request: NextRequest) {
         flagged: updated.flagged,
         highSignal: updated.highSignal,
         bookmarked: updated.bookmarked,
+        publicPlaylistEligible: updated.publicPlaylistEligible,
+        epInclusion: updated.epInclusion,
         moderationUpdatedAt: updated.moderationUpdatedAt,
         timestamp: updated.createdAt,
       },

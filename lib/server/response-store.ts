@@ -24,6 +24,15 @@ export type StoredResponse = {
   flagged: boolean
   highSignal: boolean
   bookmarked: boolean
+  publicOptIn: boolean
+  publicPlaylistEligible: boolean
+  listeningRank: number | null
+  previewStartSeconds: number | null
+  previewEndSeconds: number | null
+  hotTake: string | null
+  momentumTags: string[]
+  collectionMembership: string[]
+  epInclusion: boolean
   moderationUpdatedAt: string | null
   createdAt: string
 }
@@ -48,6 +57,15 @@ type ResponseRow = {
   flagged: boolean | null
   high_signal: boolean | null
   bookmarked: boolean | null
+  public_opt_in: boolean | null
+  public_playlist_eligible: boolean | null
+  listening_rank: number | null
+  preview_start_seconds: number | null
+  preview_end_seconds: number | null
+  hot_take: string | null
+  momentum_tags: string[] | null
+  collection_membership: string[] | null
+  ep_inclusion: boolean | null
   moderation_updated_at: string | null
   created_at: string
 }
@@ -146,6 +164,15 @@ function mapRow(row: ResponseRow): StoredResponse {
     flagged: Boolean(row.flagged),
     highSignal: Boolean(row.high_signal),
     bookmarked: Boolean(row.bookmarked),
+    publicOptIn: Boolean(row.public_opt_in),
+    publicPlaylistEligible: Boolean(row.public_playlist_eligible),
+    listeningRank: row.listening_rank,
+    previewStartSeconds: row.preview_start_seconds,
+    previewEndSeconds: row.preview_end_seconds,
+    hotTake: row.hot_take,
+    momentumTags: row.momentum_tags ?? [],
+    collectionMembership: row.collection_membership ?? [],
+    epInclusion: Boolean(row.ep_inclusion),
     moderationUpdatedAt: row.moderation_updated_at,
     createdAt: row.created_at,
   }
@@ -184,6 +211,15 @@ export async function initPendingResponse(input: {
         flagged: false,
         high_signal: false,
         bookmarked: false,
+        public_opt_in: false,
+        public_playlist_eligible: false,
+        listening_rank: null,
+        preview_start_seconds: null,
+        preview_end_seconds: null,
+        hot_take: null,
+        momentum_tags: [],
+        collection_membership: [],
+        ep_inclusion: false,
         moderation_updated_at: null,
         created_at: createdAt,
       },
@@ -196,7 +232,7 @@ export async function initPendingResponse(input: {
 
 export async function getStoredResponseById(id: string): Promise<StoredResponse | null> {
   const rows = await supabaseRequest<ResponseRow[]>(
-    `/rest/v1/response_records?id=eq.${encodeURIComponent(id)}&select=id,survey_id,question_id,user_id,session_id,status,idempotency_key,upload_attempts,file_name,mime_type,size,storage_path,storage_file_id,public_url,duration_seconds,duration_bucket,flagged,high_signal,bookmarked,moderation_updated_at,created_at&limit=1`,
+    `/rest/v1/response_records?id=eq.${encodeURIComponent(id)}&select=id,survey_id,question_id,user_id,session_id,status,idempotency_key,upload_attempts,file_name,mime_type,size,storage_path,storage_file_id,public_url,duration_seconds,duration_bucket,flagged,high_signal,bookmarked,public_opt_in,public_playlist_eligible,listening_rank,preview_start_seconds,preview_end_seconds,hot_take,momentum_tags,collection_membership,ep_inclusion,moderation_updated_at,created_at&limit=1`,
   )
   if (!rows.length) return null
   return mapRow(rows[0])
@@ -234,6 +270,15 @@ export async function finalizeUploadedResponse(input: {
   storageFileId?: string | null
   publicUrl?: string | null
   durationSeconds?: number | null
+  publicOptIn?: boolean
+  publicPlaylistEligible?: boolean
+  listeningRank?: number | null
+  previewStartSeconds?: number | null
+  previewEndSeconds?: number | null
+  hotTake?: string | null
+  momentumTags?: string[]
+  collectionMembership?: string[]
+  epInclusion?: boolean
 }): Promise<StoredResponse | null> {
   const durationBucket =
     typeof input.durationSeconds === "number" ? classifyResponseDuration(input.durationSeconds) : null
@@ -253,6 +298,15 @@ export async function finalizeUploadedResponse(input: {
         public_url: input.publicUrl ?? null,
         duration_seconds: input.durationSeconds ?? null,
         duration_bucket: durationBucket,
+        public_opt_in: input.publicOptIn ?? false,
+        public_playlist_eligible: input.publicPlaylistEligible ?? false,
+        listening_rank: input.listeningRank ?? null,
+        preview_start_seconds: input.previewStartSeconds ?? null,
+        preview_end_seconds: input.previewEndSeconds ?? null,
+        hot_take: input.hotTake ?? null,
+        momentum_tags: input.momentumTags ?? [],
+        collection_membership: input.collectionMembership ?? [],
+        ep_inclusion: input.epInclusion ?? false,
       }),
     },
   )
@@ -337,9 +391,11 @@ export async function listStoredResponses(filters?: {
 }): Promise<StoredResponse[]> {
   const params: string[] = [
     "select=id,survey_id,question_id,user_id,session_id,status,idempotency_key,upload_attempts,file_name,mime_type,size,storage_path,storage_file_id,public_url,duration_seconds,duration_bucket,flagged,high_signal,bookmarked,moderation_updated_at,created_at",
-    "order=created_at.desc",
-    "status=eq.uploaded",
   ]
+  params[0] =
+    "select=id,survey_id,question_id,user_id,session_id,status,idempotency_key,upload_attempts,file_name,mime_type,size,storage_path,storage_file_id,public_url,duration_seconds,duration_bucket,flagged,high_signal,bookmarked,public_opt_in,public_playlist_eligible,listening_rank,preview_start_seconds,preview_end_seconds,hot_take,momentum_tags,collection_membership,ep_inclusion,moderation_updated_at,created_at"
+  params.push("order=created_at.desc")
+  params.push("status=eq.uploaded")
   if (filters?.surveyId) params.push(`survey_id=eq.${encodeURIComponent(filters.surveyId)}`)
   if (filters?.surveyIds?.length) params.push(`survey_id=in.(${filters.surveyIds.map((id) => encodeURIComponent(id)).join(",")})`)
   if (filters?.questionId) params.push(`question_id=eq.${encodeURIComponent(filters.questionId)}`)
@@ -393,7 +449,7 @@ export async function getStoredResponseByIdForSurveyIds(
   const rows = await supabaseRequest<ResponseRow[]>(
     `/rest/v1/response_records?id=eq.${encodeURIComponent(id)}&survey_id=in.(${surveyIds
       .map((surveyId) => encodeURIComponent(surveyId))
-      .join(",")})&select=id,survey_id,question_id,user_id,session_id,status,idempotency_key,upload_attempts,file_name,mime_type,size,storage_path,storage_file_id,public_url,duration_seconds,duration_bucket,flagged,high_signal,bookmarked,moderation_updated_at,created_at&limit=1`,
+      .join(",")})&select=id,survey_id,question_id,user_id,session_id,status,idempotency_key,upload_attempts,file_name,mime_type,size,storage_path,storage_file_id,public_url,duration_seconds,duration_bucket,flagged,high_signal,bookmarked,public_opt_in,public_playlist_eligible,listening_rank,preview_start_seconds,preview_end_seconds,hot_take,momentum_tags,collection_membership,ep_inclusion,moderation_updated_at,created_at&limit=1`,
   )
   if (!rows.length) return null
   return mapRow(rows[0])
@@ -401,7 +457,7 @@ export async function getStoredResponseByIdForSurveyIds(
 
 export async function updateStoredResponse(
   id: string,
-  patch: Partial<Pick<StoredResponse, "flagged" | "highSignal" | "bookmarked">>,
+  patch: Partial<Pick<StoredResponse, "flagged" | "highSignal" | "bookmarked" | "publicPlaylistEligible" | "epInclusion">>,
 ): Promise<StoredResponse | null> {
   const body: Record<string, unknown> = {
     moderation_updated_at: new Date().toISOString(),
@@ -409,6 +465,8 @@ export async function updateStoredResponse(
   if (patch.flagged !== undefined) body.flagged = patch.flagged
   if (patch.highSignal !== undefined) body.high_signal = patch.highSignal
   if (patch.bookmarked !== undefined) body.bookmarked = patch.bookmarked
+  if (patch.publicPlaylistEligible !== undefined) body.public_playlist_eligible = patch.publicPlaylistEligible
+  if (patch.epInclusion !== undefined) body.ep_inclusion = patch.epInclusion
 
   const rows = await supabaseRequest<ResponseRow[]>(
     `/rest/v1/response_records?id=eq.${encodeURIComponent(id)}`,
@@ -425,7 +483,7 @@ export async function updateStoredResponse(
 export async function updateStoredResponseForSurveyIds(
   id: string,
   surveyIds: string[],
-  patch: Partial<Pick<StoredResponse, "flagged" | "highSignal" | "bookmarked">>,
+  patch: Partial<Pick<StoredResponse, "flagged" | "highSignal" | "bookmarked" | "publicPlaylistEligible" | "epInclusion">>,
 ): Promise<StoredResponse | null> {
   if (!surveyIds.length) return null
 
@@ -435,6 +493,8 @@ export async function updateStoredResponseForSurveyIds(
   if (patch.flagged !== undefined) body.flagged = patch.flagged
   if (patch.highSignal !== undefined) body.high_signal = patch.highSignal
   if (patch.bookmarked !== undefined) body.bookmarked = patch.bookmarked
+  if (patch.publicPlaylistEligible !== undefined) body.public_playlist_eligible = patch.publicPlaylistEligible
+  if (patch.epInclusion !== undefined) body.ep_inclusion = patch.epInclusion
 
   const rows = await supabaseRequest<ResponseRow[]>(
     `/rest/v1/response_records?id=eq.${encodeURIComponent(id)}&survey_id=in.(${surveyIds

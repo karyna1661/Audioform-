@@ -19,7 +19,9 @@ create table if not exists public.surveys (
   created_by text not null references public.users(id),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  published_at timestamptz
+  published_at timestamptz,
+  public_listening_enabled boolean not null default false,
+  closed_at timestamptz
 );
 
 create index if not exists surveys_status_idx on public.surveys (status);
@@ -61,6 +63,15 @@ create table if not exists public.response_records (
   flagged boolean not null default false,
   high_signal boolean not null default false,
   bookmarked boolean not null default false,
+  public_opt_in boolean not null default false,
+  public_playlist_eligible boolean not null default false,
+  listening_rank integer,
+  preview_start_seconds integer,
+  preview_end_seconds integer,
+  hot_take text,
+  momentum_tags text[] not null default '{}',
+  collection_membership text[] not null default '{}',
+  ep_inclusion boolean not null default false,
   moderation_updated_at timestamptz,
   created_at timestamptz not null default now()
 );

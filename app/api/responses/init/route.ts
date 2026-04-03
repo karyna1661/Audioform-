@@ -12,6 +12,7 @@ const initSchema = z.object({
   surveyId: z.string().min(1),
   questionId: z.string().min(1),
   idempotencyKey: z.string().min(10).optional(),
+  publicOptIn: z.boolean().optional(),
 })
 
 function newIdempotencyKey(): string {

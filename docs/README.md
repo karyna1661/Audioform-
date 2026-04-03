@@ -1,4 +1,4 @@
-# Documentation Index
+    # Documentation Index
 
 This repo keeps the public GitHub surface intentionally small. Most operator notes, incident writeups, and historical rollout docs now live under structured docs folders.
 
@@ -11,6 +11,7 @@ This repo keeps the public GitHub surface intentionally small. Most operator not
 
 ## Product Docs
 
+- `docs/product/STUDIO_LISTEN_ARCHITECTURE.md`
 - `docs/product/QUESTION_INTELLIGENCE_SYSTEM.md`
 - `docs/product/USER_FLOW_WALKTHROUGH.md`
 - `docs/product/SURVEY_QUALITY_ENHANCEMENT_SUMMARY.md`
@@ -27,4 +28,3 @@ This repo keeps the public GitHub surface intentionally small. Most operator not
 
 - `docs/archive/README.md`
 - `docs/archive/` contains incident notes, old launch status docs, fix summaries, migration notes, and deployment history that are still useful internally but should not dominate the repo root.
-

@@ -21,7 +21,8 @@ const surveySchema = z.object({
   templatePack: z.string().optional(),
   questions: z.array(z.string().min(1)).max(20).optional(),
   questionCount: z.number().int().min(0),
-  status: z.enum(["draft", "published"]),
+  status: z.enum(["draft", "published", "live", "closed"]),
+  publicListeningEnabled: z.boolean().optional(),
 })
 
 function logSurvey(event: string, payload: Record<string, unknown>) {

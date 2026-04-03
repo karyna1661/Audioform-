@@ -8,8 +8,11 @@ import { Button } from "@/components/ui/button"
 import { ArrowLeft, CheckCircle2, ChevronRight, Copy, GripVertical, Heart, LayoutTemplate, Library, Lightbulb, Plus, Rocket, Search, Sparkles, Star, Target, Trash2, Undo2 } from "lucide-react"
 import { trackEvent } from "@/lib/analytics"
 import { recordSurveyPublished } from "@/lib/behavior-metrics"
+import { buildSurveyShareUrl } from "@/lib/share-links"
 import { AdminMobileNav } from "@/components/admin-mobile-nav"
 import { SurveyLoadingSkeleton } from "@/components/survey-loading-skeleton"
+import { useIsMobile } from "@/components/ui/use-mobile"
+import { PocketActionStack, PocketSection, PocketShell } from "@/components/mobile/pocket-shell"
 
 
 const EMPTY_QUESTIONS: string[] = []
@@ -213,6 +216,7 @@ function evaluateQuestionQuality(question: string): {
 
 export default function QuestionnairesV1Page() {
   const { status, user } = useRequireAdmin()
+  const isMobile = useIsMobile()
   const searchParams = useSearchParams()
   const requestedSurveyId = searchParams.get("surveyId")
   const [questions, setQuestions] = useState(EMPTY_QUESTIONS)
@@ -226,6 +230,7 @@ export default function QuestionnairesV1Page() {
   const [isSavingDraft, setIsSavingDraft] = useState(false)
   const [isPublishing, setIsPublishing] = useState(false)
   const [publishedSurveyId, setPublishedSurveyId] = useState<string | null>(null)
+  const [publicListeningEnabled, setPublicListeningEnabled] = useState(false)
   const [draftLoading, setDraftLoading] = useState(false)
   const [showTemplates, setShowTemplates] = useState(true) // Toggle for mobile: templates vs categories
   const [mobileStep, setMobileStep] = useState(0)
@@ -303,6 +308,7 @@ export default function QuestionnairesV1Page() {
       questions: normalizedQuestions,
       questionCount: normalizedQuestions.length,
       status: nextStatus,
+      publicListeningEnabled,
     }
 
     const response = await fetch("/api/surveys", {
@@ -406,6 +412,7 @@ export default function QuestionnairesV1Page() {
 
         setDraftSurveyId(survey.id)
         setTitle(survey.title || DEFAULT_SURVEY_TITLE)
+        setPublicListeningEnabled(Boolean((survey as { publicListeningEnabled?: boolean }).publicListeningEnabled))
         if (Array.isArray(survey.questions)) {
           setQuestions(survey.questions)
           setSelectedIndex(0)
@@ -476,9 +483,9 @@ export default function QuestionnairesV1Page() {
   const mobileGridSectionClass = (step: number) => (mobileStep === step ? "grid" : "hidden lg:grid")
   const surveyLink =
     publishedSurveyId
-      ? `${typeof window !== "undefined" ? window.location.origin : ""}/share/survey/${encodeURIComponent(
-          publishedSurveyId,
-        )}?v=${Date.now()}`
+      ? buildSurveyShareUrl(typeof window !== "undefined" ? window.location.origin : "", publishedSurveyId, {
+          version: Date.now(),
+        })
       : ""
   const embedLink =
     publishedSurveyId && creatorId
@@ -493,6 +500,398 @@ export default function QuestionnairesV1Page() {
   const workingRuleCopy = "Keep this to 2-3 prompts, ask for one concrete moment, and avoid anything that can be answered with yes or no."
   const qualityCoachCopy = "Target 80%+ before publish. Ask for one concrete moment, not a rating or yes/no answer."
   const releaseDeskCopy = "Publish when the title is clear, the sequence is short, and each prompt asks for one concrete moment."
+
+  const handlePublishSurvey = async () => {
+    if (!readyChecks.hasTitle || !readyChecks.hasPrompt) {
+      setDraftMessage("Add a title and at least one prompt before publishing.")
+      return
+    }
+
+    const allQuestionScores = questions.map((q) => evaluateQuestionQuality(q).score)
+    const lowQualityQuestions = allQuestionScores.filter((score) => score < minimumQualityThreshold)
+
+    if (lowQualityQuestions.length > 0) {
+      setDraftMessage(
+        `Improve prompt quality first. ${lowQualityQuestions.length} prompt(s) below ${minimumQualityThreshold}% threshold. Use the quality coach to reach 80%+.`,
+      )
+      return
+    }
+
+    setIsPublishing(true)
+    try {
+      const surveyId = await saveSurvey("published")
+      recordSurveyPublished({ surveyId, title })
+      trackEvent("survey_published", {
+        survey_id: surveyId,
+        question_count: questions.length,
+      })
+      setPublishedSurveyId(surveyId)
+      setDraftMessage("Survey published and visible in Survey Stack.")
+    } catch (error) {
+      setDraftMessage(error instanceof Error ? error.message : "Failed to publish survey.")
+    } finally {
+      setIsPublishing(false)
+    }
+  }
+
+  if (isMobile) {
+    return (
+      <>
+        <PocketShell
+          eyebrow="Pocket Studio"
+          title="Build a survey that earns a real story."
+          description="On mobile, keep the loop tight: define the decision, choose a strong angle, refine only the prompts that matter, then publish."
+        >
+          {draftMessage ? (
+            <p className="font-body mb-4 rounded-2xl border border-[#cfbea4] bg-[#fff8f0] px-4 py-3 text-sm text-[#665746]">
+              {draftMessage}
+            </p>
+          ) : null}
+
+          <PocketSection title="Builder brief" description="Name the survey after the decision it should help you make.">
+            <div className="space-y-2">
+              <label className="text-sm font-semibold" htmlFor="survey-title-mobile">
+                Survey title
+              </label>
+              <input
+                id="survey-title-mobile"
+                className="w-full rounded-2xl border border-[#cfbea4] bg-[#fffdf8] px-4 py-3 text-base"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="e.g. Why are users dropping after onboarding?"
+              />
+              <p className="font-body text-sm leading-6 text-[#665746]">
+                Strong titles read like working briefs, not generic feedback forms.
+              </p>
+            </div>
+          </PocketSection>
+
+          <PocketSection title="Prompt source" description="Start with a template or add individual prompts from the question bank." className="mt-4">
+            <div className="mb-4 flex rounded-xl border border-[#cfbea4] bg-[#fffdf8] p-1">
+              <button
+                type="button"
+                onClick={() => setShowTemplates(true)}
+                className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition-all ${
+                  showTemplates ? "bg-[#b85e2d] text-[#fff6ed]" : "text-[#665746] hover:bg-[#f8efdf]"
+                }`}
+              >
+                <LayoutTemplate className="size-4" aria-hidden="true" />
+                Templates
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowTemplates(false)}
+                className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition-all ${
+                  !showTemplates ? "bg-[#b85e2d] text-[#fff6ed]" : "text-[#665746] hover:bg-[#f8efdf]"
+                }`}
+              >
+                <Library className="size-4" aria-hidden="true" />
+                Categories
+              </button>
+            </div>
+
+            {showTemplates ? (
+              <div className="space-y-2">
+                {surveyTemplates.map((template) => (
+                  <button
+                    key={template.id}
+                    type="button"
+                    onClick={() => {
+                      commitQuestionChange(template.questions, 0)
+                      setDraftMessage(`Applied ${template.label} template. These prompts are optimized for voice responses.`)
+                      trackEvent("prompt_template_applied", {
+                        template_id: template.id,
+                        template_label: template.label,
+                        question_count: template.questions.length,
+                      })
+                    }}
+                    className="w-full rounded-[1.2rem] border border-[#cfbea4] bg-[#fffdf8] px-4 py-4 text-left"
+                  >
+                    <p className="text-sm font-semibold text-[#6e3316]">{template.label}</p>
+                    <p className="font-body mt-1 text-sm leading-6 text-[#665746]">{template.description}</p>
+                    <p className="font-body mt-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8c7f70]">
+                      {template.questions.length} prompt{template.questions.length !== 1 ? "s" : ""}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {questionCategories.map((category) => {
+                  const Icon = category.icon
+                  return (
+                    <details key={category.id} className="group rounded-[1.2rem] border border-[#cfbea4] bg-[#fffdf8] p-4">
+                      <summary className="flex cursor-pointer list-none items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex size-9 items-center justify-center rounded-full border border-[#d8c7b3] bg-[#f8efdf] text-[#b85e2d]">
+                            <Icon className="size-4" />
+                          </span>
+                          <div className="text-left">
+                            <p className="text-sm font-semibold text-[#6e3316]">{category.label}</p>
+                            <p className="font-body text-xs leading-5 text-[#665746]">{category.description}</p>
+                          </div>
+                        </div>
+                        <ChevronRight className="size-4 transition-transform group-open:rotate-90" />
+                      </summary>
+                      <div className="mt-3 space-y-2">
+                        {category.questions.map((question, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => {
+                              const next = [...questions, question]
+                              commitQuestionChange(next, questions.length)
+                              trackEvent("decision_intent_prompt_viewed", {
+                                category_id: category.id,
+                                category_label: category.label,
+                              })
+                            }}
+                            className="w-full rounded-xl border border-[#cfbea4] bg-[#f8efdf] px-3 py-3 text-left text-sm leading-6 text-[#665746] hover:border-[#b85e2d] hover:bg-[#fff7ee]"
+                          >
+                            {question}
+                          </button>
+                        ))}
+                      </div>
+                    </details>
+                  )
+                })}
+              </div>
+            )}
+          </PocketSection>
+
+          <PocketSection title="Prompt sequence" description="Keep the interview short and deliberate. Tap a prompt to edit it." className="mt-4">
+            <div className="space-y-2">
+              {questions.length === 0 ? (
+                <div className="rounded-[1.2rem] border border-dashed border-[#cfbea4] bg-[#fff8f0] px-4 py-6">
+                  <p className="text-sm font-semibold text-[#6e3316]">No prompts yet.</p>
+                  <p className="font-body mt-2 text-sm leading-6 text-[#665746]">
+                    Start from a template or add prompts from the question bank. Mobile works best with 1-3 thoughtful prompts.
+                  </p>
+                </div>
+              ) : null}
+
+              {questions.map((q, i) => {
+                const questionQuality = evaluateQuestionQuality(q)
+                const isLowQuality = questionQuality.score < minimumQualityThreshold
+                return (
+                  <button
+                    key={`${q}-${i}`}
+                    type="button"
+                    onClick={() => setSelectedIndex(i)}
+                    className={`w-full rounded-[1.2rem] border px-4 py-4 text-left ${
+                      i === selectedIndex
+                        ? "border-[#b85e2d] bg-[#fff7ee]"
+                        : isLowQuality
+                          ? "border-[#d8b2a7] bg-[#fcf2ef]"
+                          : "border-[#cfbea4] bg-[#f8efdf]"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#7a6146]">Prompt {i + 1}</p>
+                      <span className={`text-xs font-semibold ${isLowQuality ? "text-[#8a3d2b]" : "text-[#2d5a17]"}`}>
+                        {questionQuality.score}%
+                      </span>
+                    </div>
+                    <p className="font-body mt-2 text-sm leading-6 text-[#665746]">{q}</p>
+                  </button>
+                )
+              })}
+            </div>
+
+            <div className="mt-3 grid gap-2">
+              <Button
+                variant="outline"
+                className="w-full border-dashed border-[#c5b296] bg-[#f8efdf] text-[#665746]"
+                onClick={() => {
+                  const nextQuestions = [...questions, "New prompt"]
+                  commitQuestionChange(nextQuestions, questions.length)
+                }}
+              >
+                <Plus className="mr-2 size-4" aria-hidden="true" />
+                Add prompt
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full border-[#cfbea4] bg-[#fff7ee]"
+                onClick={undoQuestionChange}
+                disabled={questionHistory.length === 0}
+              >
+                <Undo2 className="mr-2 size-4" aria-hidden="true" />
+                Undo change
+              </Button>
+            </div>
+          </PocketSection>
+
+          <PocketSection title="Refine selected prompt" description="Use the quality coach to push the current prompt into story territory." className="mt-4 bg-[#fff6ed]">
+            <textarea
+              id="question-editor-mobile"
+              className="font-body min-h-36 w-full rounded-[1.2rem] border border-[#cfbea4] bg-[#fffdf8] px-4 py-4 text-sm leading-6 text-pretty"
+              value={selected}
+              placeholder="Choose a template or add a prompt from the question bank to begin editing."
+              disabled={questions.length === 0}
+              onChange={(e) => {
+                const next = [...questions]
+                next[selectedIndex] = e.target.value
+                commitQuestionChange(next, selectedIndex)
+              }}
+            />
+
+            <div className="mt-3 rounded-xl border border-[#cfbea4] bg-[#fff7ee] px-4 py-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs uppercase tracking-[0.18em] text-[#7a6146]">Quality score</p>
+                <p className="text-lg font-semibold text-[#6e3316]">{selectedQuestionQuality.score}%</p>
+              </div>
+            </div>
+
+            <ul className="mt-3 space-y-1.5">
+              {selectedQuestionQuality.checks.map((item) => (
+                <li key={item.label} className="flex items-center gap-2 text-xs">
+                  <CheckCircle2 className={`size-3.5 ${item.ok ? "text-[#2d5a17]" : "text-[#8c7f70]"}`} aria-hidden="true" />
+                  <span className={item.ok ? "text-[#2d5a17]" : "text-[#665746]"}>{item.label}</span>
+                </li>
+              ))}
+            </ul>
+
+            <PocketActionStack className="mt-3">
+              <Button
+                variant="outline"
+                className="w-full border-[#cfbea4] bg-[#fff7ee] text-xs"
+                disabled={questions.length === 0}
+                onClick={() => {
+                  if (!selected.trim()) return
+                  const next = [...questions]
+                  next[selectedIndex] = /last|week|day|recent|moment/i.test(selected)
+                    ? selected
+                    : `In the last week, ${selected.charAt(0).toLowerCase()}${selected.slice(1)}`
+                  commitQuestionChange(next, selectedIndex)
+                }}
+              >
+                Add timeframe
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full border-[#cfbea4] bg-[#fff7ee] text-xs"
+                disabled={questions.length === 0}
+                onClick={() => {
+                  if (!selected.trim()) return
+                  const next = [...questions]
+                  next[selectedIndex] = selected.replace(/^(is|are|do|did|can|will|would|should|could)\b/i, "What")
+                  commitQuestionChange(next, selectedIndex)
+                }}
+              >
+                Convert to open question
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full border-[#cfbea4] bg-[#fff7ee] text-xs"
+                disabled={questions.length === 0}
+                onClick={() => {
+                  if (!selected.trim()) return
+                  const next = [...questions]
+                  next[selectedIndex] = /example|specific|moment/i.test(selected)
+                    ? selected
+                    : `${selected.replace(/\?*$/, "?")} Share one concrete moment.`
+                  commitQuestionChange(next, selectedIndex)
+                }}
+              >
+                Add depth cue
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full border-[#cfbea4] bg-[#fff7ee] text-[#8a3d2b]"
+                disabled={questions.length === 0}
+                onClick={() => {
+                  if (questions.length === 0) return
+                  const nextQuestions = questions.filter((_, index) => index !== selectedIndex)
+                  commitQuestionChange(nextQuestions, Math.max(0, selectedIndex - 1))
+                  setDraftMessage("Prompt removed from the sequence.")
+                }}
+              >
+                <Trash2 className="mr-2 size-4" aria-hidden="true" />
+                Delete prompt
+              </Button>
+            </PocketActionStack>
+          </PocketSection>
+
+          <PocketSection title="Responder preview" description="Read this out loud. If it sounds vague, refine it before you publish." className="mt-4">
+            <div className="rounded-[1.2rem] border border-[#cfbea4] bg-[#fffdf8] p-4">
+              <p className="font-body text-xs uppercase tracking-[0.18em] text-[#7a6146]">What the respondent hears</p>
+              <p className="mt-2 text-lg font-semibold text-[var(--af-color-primary)] text-balance">
+                {selected || "Select a prompt to preview the respondent experience."}
+              </p>
+            </div>
+            <div className="mt-3 grid grid-cols-1 gap-2">
+              <div className="rounded-xl border border-[#cfbea4] bg-[#fff7ee] px-3 py-2 text-sm text-[#665746]">1 concrete example</div>
+              <div className="rounded-xl border border-[#cfbea4] bg-[#fff7ee] px-3 py-2 text-sm text-[#665746]">1 friction moment</div>
+              <div className="rounded-xl border border-[#cfbea4] bg-[#fff7ee] px-3 py-2 text-sm text-[#665746]">1 clear suggestion</div>
+            </div>
+          </PocketSection>
+
+          <PocketSection title="Release desk" description={releaseDeskCopy} className="mt-4 bg-[#fff6ed]">
+            <ul className="space-y-2">
+              {readinessItems.map((item) => (
+                <li key={item.label} className="flex items-center gap-2 text-sm">
+                  <CheckCircle2 className={`size-4 ${item.ok ? "text-[#2d5a17]" : "text-[#8c7f70]"}`} aria-hidden="true" />
+                  <span className={item.ok ? "text-[#2d5a17]" : "text-[#665746]"}>{item.label}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="font-body mt-4 text-sm leading-6 text-[#665746]">
+              Current draft: {questions.length} {questions.length === 1 ? "prompt" : "prompts"} at {averageQuestionQuality}% average quality.
+            </p>
+
+            <PocketActionStack className="mt-4">
+              <Button
+                className="w-full bg-[#b85e2d] text-[#fff6ed] hover:bg-[#a05227]"
+                onClick={() => void handlePublishSurvey()}
+                disabled={isPublishing}
+              >
+                <Rocket className="mr-2 size-4" aria-hidden="true" />
+                {isPublishing ? "Publishing..." : "Publish survey"}
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full border-[#cfbea4] bg-[#fff7ee]"
+                onClick={() => void saveDraft()}
+                disabled={isSavingDraft}
+              >
+                {isSavingDraft ? "Saving..." : "Save draft"}
+              </Button>
+              <Button variant="outline" className="w-full border-[#cfbea4] bg-[#fff7ee]" onClick={startNewDraft}>
+                New draft
+              </Button>
+              {draftSurveyId ? (
+                <Button
+                  variant="outline"
+                  className="w-full border-[#cfbea4] bg-[#fff7ee]"
+                  onClick={async () => {
+                    try {
+                      const draftLink = `${window.location.origin}/admin/questionnaires/v1?surveyId=${encodeURIComponent(draftSurveyId)}`
+                      await navigator.clipboard.writeText(draftLink)
+                      setDraftMessage("Draft link copied.")
+                    } catch {
+                      setDraftMessage("Could not copy draft link. Copy it from the browser address bar.")
+                    }
+                  }}
+                >
+                  <Copy className="mr-2 size-4" aria-hidden="true" />
+                  Copy draft link
+                </Button>
+              ) : null}
+              {publishedSurveyId ? (
+                <Link href="/admin/share">
+                  <Button variant="outline" className="w-full border-[#cfbea4] bg-[#fff7ee]">
+                    Go to share hub
+                  </Button>
+                </Link>
+              ) : null}
+            </PocketActionStack>
+          </PocketSection>
+        </PocketShell>
+        <AdminMobileNav />
+      </>
+    )
+  }
 
   return (
     <main className={`af-shell min-h-dvh p-3 pb-28 sm:p-6 sm:pb-6`}>
@@ -616,7 +1015,7 @@ export default function QuestionnairesV1Page() {
                   <div className="mb-5 grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_280px] lg:items-start">
                     <div>
                       <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#7a6146]">Prompt source</p>
-                      <h2 className="mt-2 text-2xl font-semibold text-[#261c14]">Start with a research angle, then shape the sequence.</h2>
+                      <h2 className="mt-2 text-2xl font-semibold text-[var(--af-color-primary)]">Start with a research angle, then shape the sequence.</h2>
                       <p className="font-body mt-2 max-w-2xl text-sm leading-6 text-[#665746]">
                         Templates give you a strong opening move. Categories help you add the missing tension, context, or desire without bloating the survey.
                       </p>
@@ -785,7 +1184,7 @@ export default function QuestionnairesV1Page() {
                   <div className="flex flex-wrap items-end justify-between gap-3">
                     <div>
                       <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#7a6146]">Signal path</p>
-                      <h3 className="mt-1 text-2xl font-semibold text-[#261c14]">Order the prompts like an interview.</h3>
+                      <h3 className="mt-1 text-2xl font-semibold text-[var(--af-color-primary)]">Order the prompts like an interview.</h3>
                       <p className="font-body mt-2 text-sm leading-6 text-[#665746]">Drag to reorder. Start broad, move to the hardest friction moment, then close on what would change the decision.</p>
                     </div>
                     <Button variant="outline" className="border-[#cfbea4] bg-[#fff7ee]" onClick={undoQuestionChange} disabled={questionHistory.length === 0}>
@@ -891,7 +1290,7 @@ export default function QuestionnairesV1Page() {
                          <label className="block text-sm font-semibold uppercase tracking-[0.18em] text-[#7a6146]" htmlFor="question-editor">
                            Prompt editor
                          </label>
-                          <h3 className="mt-2 text-2xl font-semibold text-[#261c14]">Refine the selected prompt until it earns a story.</h3>
+                          <h3 className="mt-2 text-2xl font-semibold text-[var(--af-color-primary)]">Refine the selected prompt until it earns a story.</h3>
                        </div>
                        <Button
                          type="button"
@@ -1061,6 +1460,21 @@ export default function QuestionnairesV1Page() {
                     Current draft: {questions.length} {questions.length === 1 ? "prompt" : "prompts"} at {averageQuestionQuality}% average quality.
                   </p>
                 </div>
+                <div className="mt-4 rounded-2xl border border-[#cfbea4] bg-[#fffdf8] p-4">
+                  <p className="text-sm font-semibold">Public listening</p>
+                  <p className="mt-1 text-sm text-[#665746]">
+                    Unlock an anonymous playlist after respondents submit while the survey is live.
+                  </p>
+                  <label className="mt-3 flex items-start gap-3 text-sm text-[#5c5146]">
+                    <input
+                      type="checkbox"
+                      className="mt-1 size-4 accent-[#b85e2d]"
+                      checked={publicListeningEnabled}
+                      onChange={(event) => setPublicListeningEnabled(event.target.checked)}
+                    />
+                    <span>Enable public listening for this release.</span>
+                  </label>
+                </div>
                 <div className="mt-4 flex items-center justify-between gap-3">
                   <Button variant="outline" className="border-[#cfbea4] bg-[#fff7ee]" onClick={() => setMobileStep(3)}>
                     Back
@@ -1180,6 +1594,22 @@ export default function QuestionnairesV1Page() {
                 <Rocket className="mr-2 size-4" aria-hidden="true" />
                 {isPublishing ? "Publishing..." : "Publish survey"}
               </Button>
+            </div>
+
+            <div className="mt-4 rounded-2xl border border-[#cfbea4] bg-[#fff7ee] p-3">
+              <p className="text-sm font-semibold">Public listening</p>
+              <p className="font-body mt-1 text-xs text-[#665746]">
+                Let respondents unlock an anonymous preview-first playlist after they submit while this survey is open.
+              </p>
+              <label className="mt-3 flex items-start gap-3 text-sm text-[#5c5146]">
+                <input
+                  type="checkbox"
+                  className="mt-1 size-4 accent-[#b85e2d]"
+                  checked={publicListeningEnabled}
+                  onChange={(event) => setPublicListeningEnabled(event.target.checked)}
+                />
+                <span>Enable public listening for this release.</span>
+              </label>
             </div>
 
             {draftSurveyId ? (

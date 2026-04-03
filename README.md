@@ -1,14 +1,19 @@
 # Audioform
 
-Audioform is a voice-feedback platform for founders and product teams who want richer feedback than text forms can capture. Teams publish short voice surveys, collect spoken responses, and review higher-signal feedback with replayable context.
+Audioform is a voice-feedback product built around two linked creator surfaces:
 
-## Features
+- `Studio` for shaping prompts and publishing releases
+- `Listen` for hearing ranked takes, reviewing transcripts, and pulling signal forward
 
-- Publish short voice surveys with builder-focused prompt guidance
-- Collect spoken responses across desktop and mobile
-- Review responses with playback, flagging, and high-signal triage
-- Share surveys with social preview pages or embed them externally
-- Track response activity across admin workflows
+Respondents answer by voice, creators review the strongest takes first, and public listening can unlock a responder-side player when a release allows it.
+
+## Core Product
+
+- Build and publish releases in `Studio`
+- Listen through ranked takes in `Listen`
+- Review transcript, AI summary, and moderation actions in the `Take Deck`
+- Share releases through source-aware QR and social flows
+- Unlock responder listening rooms when public listening is enabled
 
 ## Quick Start
 
@@ -47,14 +52,22 @@ Deployment and database setup live outside the root README to keep the public re
 - `docs/internal/DEPLOYMENT_P0_BETA.md` - Railway deployment runbook
 - `docs/internal/DATABASE_SETUP_SUPABASE.md` - Supabase schema and migration setup
 
+## Product Surfaces
+
+- `app/admin/dashboard/v4/page.tsx` - creator Listen home
+- `app/admin/questionnaires/v1/page.tsx` - creator Studio
+- `app/admin/responses/page.tsx` - release listening, take review, and moderation
+- `app/questionnaire/v1/questionnaire-client.tsx` - respondent voice flow
+- `app/questionnaire/thank-you/page.tsx` - responder completion and player unlock
+- `app/share/survey/[surveyId]/page.tsx` - public release landing for shared links
+
 ## Architecture
 
-- `app/admin/questionnaires/v1/page.tsx` - survey builder
-- `app/questionnaire/v1/page.tsx` - respondent survey entry
-- `app/questionnaire/v1/questionnaire-client.tsx` - respondent upload flow
-- `app/admin/responses/page.tsx` - response inbox
-- `app/share/survey/[surveyId]/page.tsx` - share landing page
+- `components/listen/` - shared listening session, release player, and persistent dock
+- `components/release-take-deck.tsx` - transcript and AI-summary review surface
+- `lib/listening-model.ts` - release ranking, preview clip, hot take, and momentum logic
 - `app/api/responses/init` and `app/api/responses/upload` - 2-phase upload pipeline
+- `scripts/process-job-queue.mjs` - async transcription and insight extraction worker
 
 ## Scripts
 
@@ -66,6 +79,7 @@ Deployment and database setup live outside the root README to keep the public re
 ## Documentation
 
 - `docs/README.md` - documentation map
+- `docs/product/STUDIO_LISTEN_ARCHITECTURE.md` - current product architecture and route model
 - `docs/product/QUESTION_INTELLIGENCE_SYSTEM.md` - builder prompt system
 - `docs/product/USER_FLOW_WALKTHROUGH.md` - builder and respondent journeys
 - `future-work/` - roadmap, GTM, and scalability planning

@@ -25,6 +25,8 @@ export async function GET(
         intent: survey.intent,
         templatePack: survey.templatePack,
         questionCount: survey.questionCount,
+        publicListeningEnabled: survey.publicListeningEnabled,
+        status: survey.status,
         questions,
       },
     })

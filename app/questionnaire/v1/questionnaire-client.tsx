@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { AlertCircle } from "lucide-react"
+import { AlertCircle, AudioWaveform, Headphones, Mic, Sparkles } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AudioRecorder } from "@/components/audio-recorder"
 import { Button } from "@/components/ui/button"
@@ -13,6 +13,8 @@ import { getActiveSurveyId, recordFirstResponseForActiveSurvey } from "@/lib/beh
 import { useAuth } from "@/lib/auth-context"
 import { classifyResponseDuration } from "@/lib/response-duration"
 import { SurveyLoadingSkeleton } from "@/components/survey-loading-skeleton"
+import { PocketActionStack, PocketSection, PocketShell } from "@/components/mobile/pocket-shell"
+import { normalizeArrivalSource } from "@/lib/share-links"
 
 type PublicSurvey = {
   id: string
@@ -20,6 +22,8 @@ type PublicSurvey = {
   decisionFocus: string | null
   intent: string | null
   questionCount: number
+  publicListeningEnabled?: boolean
+  status?: string
   questions?: string[]
 }
 
@@ -86,6 +90,8 @@ export default function QuestionnaireClientPage() {
   const [surveyError, setSurveyError] = useState<string | null>(null)
   const [questionList, setQuestionList] = useState<Array<{ id: string; text: string }>>([])
   const [shortResponseHint, setShortResponseHint] = useState<string | null>(null)
+  const [publicListeningEnabled, setPublicListeningEnabled] = useState(false)
+  const [allowPublicOptIn, setAllowPublicOptIn] = useState(false)
   const isMountedRef = useRef(true)
   const uploadSessionsRef = useRef<Record<string, UploadSession>>({})
 
@@ -110,6 +116,9 @@ export default function QuestionnaireClientPage() {
   }, [])
 
   const resolvedSurveyId = searchParams.get("surveyId") || getActiveSurveyId() || null
+  const arrivalSource = normalizeArrivalSource(searchParams.get("src"))
+  const isQrEntry = arrivalSource === "qr"
+  const isSocialEntry = arrivalSource === "social"
   const current = questionList[index]
 
   useEffect(() => {
@@ -148,6 +157,8 @@ export default function QuestionnaireClientPage() {
 
         const prompts = buildPromptsFromSurvey(json.survey)
         if (isMounted) {
+          setPublicListeningEnabled(Boolean(json.survey.publicListeningEnabled) && json.survey.status !== "closed")
+          setAllowPublicOptIn(Boolean(json.survey.publicListeningEnabled) && json.survey.status !== "closed")
           if (!prompts.length) {
             setQuestionList([])
             setSurveyError("This published survey has no saved prompts yet.")
@@ -199,6 +210,7 @@ export default function QuestionnaireClientPage() {
       if (typeof durationSeconds === "number") {
         formData.append("durationSeconds", String(durationSeconds))
       }
+      formData.append("publicOptIn", allowPublicOptIn ? "true" : "false")
 
       const uploadController = new AbortController()
       const uploadTimeout = window.setTimeout(() => uploadController.abort(), 45000)
@@ -281,6 +293,7 @@ export default function QuestionnaireClientPage() {
 
     setRecorderSubmitState("success")
     setAnswers((prev) => ({ ...prev, [questionId]: blob }))
+    const completedResponseId = uploadSessionsRef.current[questionId]?.responseId ?? null
     delete uploadSessionsRef.current[questionId]
 
     if (currentIndex < questionList.length - 1) {
@@ -298,9 +311,11 @@ export default function QuestionnaireClientPage() {
       recordFirstResponseForActiveSurvey()
     }
     setIsSubmittingAnswer(false)
-    const thankYouHref = resolvedSurveyId
-      ? `/questionnaire/thank-you?surveyId=${encodeURIComponent(resolvedSurveyId)}`
-      : "/questionnaire/thank-you"
+    const thankYouParams = new URLSearchParams()
+    if (resolvedSurveyId) thankYouParams.set("surveyId", resolvedSurveyId)
+    if (completedResponseId) thankYouParams.set("responseId", completedResponseId)
+    if (arrivalSource !== "direct") thankYouParams.set("src", arrivalSource)
+    const thankYouHref = `/questionnaire/thank-you${thankYouParams.toString() ? `?${thankYouParams.toString()}` : ""}`
     router.push(thankYouHref)
   }
 
@@ -323,6 +338,29 @@ export default function QuestionnaireClientPage() {
   }
 
   if (permissionGranted === false) {
+    if (isMobile) {
+      return (
+        <PocketShell
+          eyebrow="Audioform survey"
+          title="Microphone access needed"
+          description="Enable microphone permission in your browser settings, then come back here to record your answer."
+          footer={
+            <Button className="w-full bg-[#b85e2d] text-[#fff6ed] hover:bg-[#a05227]" onClick={() => window.location.reload()}>
+              Retry microphone access
+            </Button>
+          }
+        >
+          <Alert className="border-[#e3c3b5] bg-[#fff0e9] text-[#8a3d2b]">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Microphone unavailable</AlertTitle>
+            <AlertDescription className="font-body text-pretty">
+              Audioform needs microphone access before this survey can continue.
+            </AlertDescription>
+          </Alert>
+        </PocketShell>
+      )
+    }
+
     return (
       <main className="min-h-dvh overflow-x-hidden bg-[#f3ecdf] p-4 sm:p-6">
         <div className="mx-auto w-full max-w-2xl overflow-hidden rounded-[1.5rem] border border-[#dbcdb8] bg-[#f9f4ea] p-6">
@@ -341,19 +379,186 @@ export default function QuestionnaireClientPage() {
     )
   }
 
+  if (isMobile) {
+    const answeredCount = Object.keys(answers).length
+    const progressPercent = Math.round((answeredCount / questionList.length) * 100)
+
+    return (
+      <PocketShell
+        eyebrow={`Question ${Math.min(index + 1, questionList.length)} of ${questionList.length}`}
+        title={current.text}
+        description={
+          isQrEntry
+            ? "Scan in, speak clearly, then unlock the listening room after you submit if this release has public listening on."
+            : isSocialEntry
+              ? "Hear the prompt, add your voice, then join the listening room after you submit if this release is open."
+              : "Answer clearly by voice, then unlock the listening room after you submit if this release has public listening on."
+        }
+        footer={
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-3 text-xs text-[#5c5146]">
+              <span>{answeredCount} answered so far</span>
+              <span className="tabular-nums">{progressPercent}% complete</span>
+            </div>
+            <div className="h-2 rounded-full bg-[#e8dcc9]">
+              <div className="h-2 rounded-full bg-[#b85e2d]" style={{ width: `${progressPercent}%` }} />
+            </div>
+            <Button
+              variant="outline"
+              className="w-full border-[#dbcdb8] bg-[#f3ecdf]"
+              disabled={index === 0 || isSubmittingAnswer}
+              onClick={() => setIndex((value) => Math.max(0, value - 1))}
+            >
+              Previous prompt
+            </Button>
+          </div>
+        }
+      >
+        {authStatus === "authenticated" && user?.role === "admin" ? (
+          <div className="mb-4">
+            <Link href="/admin/dashboard/v4" className="font-body text-sm text-[#8a431f] underline">
+              Back to Listen
+            </Link>
+          </div>
+        ) : null}
+
+        <PocketSection
+          title={isQrEntry ? "Scan. Speak. Listen." : isSocialEntry ? "Hear. Speak. Join." : "Speak and contribute."}
+          description={
+            publicListeningEnabled
+              ? isSocialEntry
+                ? "This release opens into a responder listening room after submission."
+                : "This release includes a responder listening room after submission."
+              : isSocialEntry
+                ? "This release is collecting private voice takes for the creator."
+                : "This release is set up for a clean scan-and-speak flow."
+          }
+          className="bg-[#fff6ed]"
+        >
+          <div className="grid gap-2">
+            <div className="rounded-2xl border border-[#dbcdb8] bg-[#fffdf8] px-4 py-3">
+              <div className="flex items-center gap-2 text-[#8a431f]">
+                <Mic className="size-4" />
+                <p className="text-xs font-semibold uppercase tracking-[0.16em]">Speak clearly</p>
+              </div>
+              <p className="mt-2 text-sm leading-6 text-[#5c5146]">One concrete moment in 20-45 seconds is ideal.</p>
+            </div>
+            {publicListeningEnabled ? (
+              <div className="rounded-2xl border border-[#dbcdb8] bg-[#fffdf8] px-4 py-3">
+                <div className="flex items-center gap-2 text-[#8a431f]">
+                  <Headphones className="size-4" />
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em]">Player unlock</p>
+                </div>
+              <p className="mt-2 text-sm leading-6 text-[#5c5146]">After you submit, you can listen to the strongest takes from other responders in preview mode.</p>
+            </div>
+            ) : null}
+          </div>
+        </PocketSection>
+
+        <PocketSection title="Your voice take" description="Record once, preview it, then send when it sounds right.">
+          <AudioRecorder
+            key={current.id}
+            onSubmit={(blob) => void submitAndAdvance(blob, current.id, index)}
+            questionId={current.id}
+            isMobile={isMobile}
+            isUploading={isSubmittingAnswer || pendingUploads > 0}
+            submitState={recorderSubmitState}
+            onRecordingStart={() => trackEvent("response_recording_started", { question_id: current.id })}
+            onRecordingSubmit={({ questionId, durationSeconds }) => {
+              setLastDurationSeconds(durationSeconds)
+              setRecordingDurations((prev) => ({ ...prev, [questionId]: durationSeconds }))
+              setShortResponseHint(
+                durationSeconds < 10
+                  ? "This take is on the short side. If you can, add one concrete moment or example before sending."
+                  : null,
+              )
+            }}
+          />
+        </PocketSection>
+
+        <PocketActionStack className="mt-4">
+          {publicListeningEnabled ? (
+            <PocketSection
+              title="Join the responder listening room"
+              description="If you opt in, your take can appear anonymously after submission while this release is open."
+              className="bg-[#fff6ed]"
+            >
+              <label className="flex items-start gap-3 rounded-2xl border border-[#dbcdb8] bg-[#fffdf8] px-3 py-3 text-sm text-[#5c5146]">
+                <input
+                  type="checkbox"
+                  className="mt-1 size-4 accent-[#b85e2d]"
+                  checked={allowPublicOptIn}
+                  onChange={(event) => setAllowPublicOptIn(event.target.checked)}
+                />
+                <span>Allow my response to be included in the anonymous listening room after I submit.</span>
+              </label>
+            </PocketSection>
+          ) : null}
+
+          {shortResponseHint ? (
+            <Alert className="border-[#dbcdb8] bg-[#fff6ed] text-[#5c5146]">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Want a stronger answer?</AlertTitle>
+              <AlertDescription className="font-body text-pretty">{shortResponseHint}</AlertDescription>
+            </Alert>
+          ) : null}
+
+          {uploadError ? (
+            <Alert className="border-[#e3c3b5] bg-[#fff0e9] text-[#8a3d2b]">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Upload paused</AlertTitle>
+              <AlertDescription className="font-body text-pretty">
+                {uploadError}
+                {lastDurationSeconds ? ` Your ${lastDurationSeconds}s take is still here so you can retry without re-recording.` : ""}
+              </AlertDescription>
+            </Alert>
+          ) : null}
+
+          <PocketSection
+            title="Why voice works here"
+            description="The creator will hear your tone, conviction, and hesitation, not just a short text reply."
+            className="bg-[#fff6ed]"
+          >
+            <ul className="font-body space-y-2 text-sm leading-6 text-[#5c5146]">
+              <li>Keep it to one concrete moment.</li>
+              <li>Say what felt confusing, useful, or missing.</li>
+              <li>If you can, end with one clear suggestion.</li>
+            </ul>
+          </PocketSection>
+        </PocketActionStack>
+      </PocketShell>
+    )
+  }
+
   return (
     <main className="min-h-dvh overflow-x-hidden bg-[#f3ecdf] px-3 py-4 sm:p-6">
       <section className="mx-auto w-full max-w-3xl overflow-hidden rounded-[1.35rem] border border-[#dbcdb8] bg-[#f9f4ea] p-4 sm:rounded-[2rem] sm:p-6">
         {authStatus === "authenticated" && user?.role === "admin" ? (
           <div className="mb-4">
             <Link href="/admin/dashboard/v4" className="font-body text-sm text-[#8a431f] underline">
-              Back to dashboard
+              Back to Listen
             </Link>
           </div>
         ) : null}
-        <p className="font-body text-[13px] leading-6 text-[#5c5146] text-pretty sm:text-sm">
-          Give one clear 30-second response so the builder can decide what to improve next.
-        </p>
+        <div className="rounded-[1.5rem] border border-[#dbcdb8] bg-[#fff6ed] p-4">
+          <div className="flex flex-wrap items-start gap-3">
+            <div className="inline-flex size-10 items-center justify-center rounded-full border border-[#dbcdb8] bg-[#fffdf8]">
+              <AudioWaveform className="size-4 text-[#8a431f]" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8a431f]">
+                {isQrEntry ? "Scan. Speak. Listen." : isSocialEntry ? "Hear. Speak. Join." : "Voice response"}
+              </p>
+              <p className="font-body mt-2 text-[13px] leading-6 text-[#5c5146] text-pretty sm:text-sm">
+                {isQrEntry
+                  ? "Give one clear voice response so the creator can hear the real shape of your opinion. If public listening is enabled, you can unlock the player after you submit."
+                  : isSocialEntry
+                    ? "You came in through a shared release link. Add one clear voice take so the creator can hear your perspective, then join the player if public listening is open."
+                    : "Give one clear voice response so the creator can hear the real shape of your opinion. If public listening is enabled, you can unlock the player after you submit."}
+              </p>
+            </div>
+          </div>
+        </div>
         <div className="mt-3 flex items-center justify-between gap-3">
           <p className="min-w-0 font-body text-[13px] leading-5 text-[#5c5146] sm:text-sm">
             Question {Math.min(index + 1, questionList.length)} of {questionList.length}
@@ -401,6 +606,24 @@ export default function QuestionnaireClientPage() {
           </Alert>
         ) : null}
 
+        {publicListeningEnabled ? (
+          <div className="mt-4 rounded-2xl border border-[#dbcdb8] bg-[#fff6ed] p-4">
+            <div className="mb-3 flex items-center gap-2 text-[#8a431f]">
+              <Headphones className="size-4" />
+              <p className="text-xs font-semibold uppercase tracking-[0.16em]">Responder listening room</p>
+            </div>
+            <label className="flex items-start gap-3 text-sm text-[#5c5146]">
+              <input
+                type="checkbox"
+                className="mt-1 size-4 accent-[#b85e2d]"
+                checked={allowPublicOptIn}
+                onChange={(event) => setAllowPublicOptIn(event.target.checked)}
+              />
+              <span>Allow my response to be included anonymously in this release's public listening room after submit.</span>
+            </label>
+          </div>
+        ) : null}
+
         {uploadError ? (
           <Alert className="mt-4 border-[#e3c3b5] bg-[#fff0e9] text-[#8a3d2b]">
             <AlertCircle className="h-4 w-4" />
@@ -424,6 +647,22 @@ export default function QuestionnaireClientPage() {
           <p className="min-w-0 text-right font-body text-[11px] leading-5 text-[#5c5146] sm:text-xs">
             {Object.keys(answers).length} answered so far
           </p>
+        </div>
+        <div className="mt-4 grid gap-2 sm:grid-cols-3">
+          <div className="rounded-2xl border border-[#dbcdb8] bg-[#fffdf8] px-4 py-3">
+            <p className="text-[11px] uppercase tracking-[0.14em] text-[#8a431f]">Step 1</p>
+            <p className="mt-2 text-sm font-medium text-[var(--af-color-primary)]">Record</p>
+          </div>
+          <div className="rounded-2xl border border-[#dbcdb8] bg-[#fffdf8] px-4 py-3">
+            <p className="text-[11px] uppercase tracking-[0.14em] text-[#8a431f]">Step 2</p>
+            <p className="mt-2 text-sm font-medium text-[var(--af-color-primary)]">Submit</p>
+          </div>
+          <div className="rounded-2xl border border-[#dbcdb8] bg-[#fffdf8] px-4 py-3">
+            <p className="text-[11px] uppercase tracking-[0.14em] text-[#8a431f]">Step 3</p>
+            <p className="mt-2 text-sm font-medium text-[var(--af-color-primary)]">
+              {publicListeningEnabled ? "Listen" : "Done"}
+            </p>
+          </div>
         </div>
       </section>
     </main>

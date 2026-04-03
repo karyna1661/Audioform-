@@ -5,11 +5,13 @@ type SurveyRow = {
   intent: string | null
   template_pack: string | null
   question_count: number | null
-  status: "draft" | "published"
+  status: "draft" | "published" | "live" | "closed"
   created_by: string
   created_at: string
   updated_at: string
   published_at: string | null
+  public_listening_enabled: boolean | null
+  closed_at: string | null
 }
 
 type DashboardEventRow = {
@@ -28,11 +30,13 @@ export type StoredSurvey = {
   intent: string | null
   templatePack: string | null
   questionCount: number
-  status: "draft" | "published"
+  status: "draft" | "published" | "live" | "closed"
   createdBy: string
   createdAt: string
   updatedAt: string
   publishedAt: string | null
+  publicListeningEnabled: boolean
+  closedAt: string | null
 }
 
 export type DashboardEvent = {
@@ -50,7 +54,10 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
   try {
     const payload = parts[1].replace(/-/g, "+").replace(/_/g, "/")
     const padded = payload + "=".repeat((4 - (payload.length % 4)) % 4)
-    const parsed = JSON.parse(Buffer.from(padded, "base64").toString("utf8")) as Record<string, unknown>
+    const decoded = typeof Buffer !== "undefined" 
+      ? Buffer.from(padded, "base64").toString("utf8")
+      : atob(padded)
+    const parsed = JSON.parse(decoded) as Record<string, unknown>
     return parsed
   } catch {
     return null
@@ -113,6 +120,8 @@ function mapSurvey(row: SurveyRow): StoredSurvey {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     publishedAt: row.published_at,
+    publicListeningEnabled: Boolean(row.public_listening_enabled),
+    closedAt: row.closed_at,
   }
 }
 
@@ -129,10 +138,11 @@ function mapEvent(row: DashboardEventRow): DashboardEvent {
 
 export async function listSurveys(input?: {
   id?: string
-  status?: "draft" | "published"
+  status?: "draft" | "published" | "live" | "closed"
   createdBy?: string
 }): Promise<StoredSurvey[]> {
   const params: string[] = ["select=id,title,decision_focus,intent,template_pack,question_count,status,created_by,created_at,updated_at,published_at", "order=updated_at.desc"]
+  params[0] = "select=id,title,decision_focus,intent,template_pack,question_count,status,created_by,created_at,updated_at,published_at,public_listening_enabled,closed_at"
   if (input?.id) params.push(`id=eq.${encodeURIComponent(input.id)}`)
   if (input?.status) params.push(`status=eq.${input.status}`)
   if (input?.createdBy) params.push(`created_by=eq.${encodeURIComponent(input.createdBy)}`)
@@ -141,16 +151,22 @@ export async function listSurveys(input?: {
 }
 
 export async function getPublishedSurveyById(id: string): Promise<StoredSurvey | null> {
-  const rows = await listSurveys({ id, status: "published" })
-  return rows[0] ?? null
+  const rows = await listSurveys({ id })
+  const survey = rows[0] ?? null
+  if (!survey) return null
+  if (survey.status !== "published" && survey.status !== "live") return null
+  return survey
 }
 
 export async function getPublishedSurveyByCreatorAndId(
   creatorId: string,
   id: string,
 ): Promise<StoredSurvey | null> {
-  const rows = await listSurveys({ id, createdBy: creatorId, status: "published" })
-  return rows[0] ?? null
+  const rows = await listSurveys({ id, createdBy: creatorId })
+  const survey = rows[0] ?? null
+  if (!survey) return null
+  if (survey.status !== "published" && survey.status !== "live") return null
+  return survey
 }
 
 export async function getSurveyById(id: string): Promise<StoredSurvey | null> {
@@ -171,8 +187,9 @@ function buildSurveyPayload(
     intent?: string
     templatePack?: string
     questionCount: number
-    status: "draft" | "published"
+    status: "draft" | "published" | "live" | "closed"
     createdBy: string
+    publicListeningEnabled?: boolean
   },
   publishedAt: string | null,
 ) {
@@ -187,6 +204,8 @@ function buildSurveyPayload(
     created_by: input.createdBy,
     updated_at: new Date().toISOString(),
     published_at: publishedAt,
+    public_listening_enabled: Boolean(input.publicListeningEnabled),
+    closed_at: input.status === "closed" ? new Date().toISOString() : null,
   }
 }
 
@@ -197,12 +216,13 @@ export async function saveSurveyForCreator(input: {
   intent?: string
   templatePack?: string
   questionCount: number
-  status: "draft" | "published"
+  status: "draft" | "published" | "live" | "closed"
   createdBy: string
+  publicListeningEnabled?: boolean
 }): Promise<StoredSurvey> {
   const existing = await getSurveyById(input.id)
   const publishedAt =
-    input.status === "published" ? existing?.publishedAt || new Date().toISOString() : null
+    input.status === "published" || input.status === "live" ? existing?.publishedAt || new Date().toISOString() : null
 
   if (!existing) {
     const payload = buildSurveyPayload(input, publishedAt)

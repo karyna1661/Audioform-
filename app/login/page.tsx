@@ -11,10 +11,13 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { useIsMobile } from "@/components/ui/use-mobile"
+import { PocketSection, PocketShell } from "@/components/mobile/pocket-shell"
 
 export default function LoginPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const isMobile = useIsMobile()
   const requestedCallbackUrl = searchParams.get("callbackUrl")
   const callbackUrl = sanitizeCallbackUrl(requestedCallbackUrl)
   const { signIn, signOut, status, user } = useAuth()
@@ -63,6 +66,94 @@ export default function LoginPage() {
     }
   }
 
+  if (isMobile) {
+    return (
+      <PocketShell
+        eyebrow="Audioform access"
+        title="Return to Listen and Studio."
+        description="Sign in to hear ranked takes, reopen your active release, and shape the next prompt flow."
+      >
+        <PocketSection title="Welcome back" description="Enter your details to reopen your creator workspace.">
+          {error && (
+            <Alert variant="destructive" className="mb-4" aria-live="assertive" id={errorId}>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="name@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                aria-invalid={!!error}
+                aria-describedby={errorId}
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Password</Label>
+                <Link href="/forgot-password" className="font-body text-sm text-[#8a431f] hover:underline">
+                  Forgot password?
+                </Link>
+              </div>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  aria-invalid={!!error}
+                  aria-describedby={errorId}
+                  required
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-[#5c5146] hover:bg-[#f3ecdf]"
+                >
+                  {showPassword ? <EyeOff className="size-4" aria-hidden="true" /> : <Eye className="size-4" aria-hidden="true" />}
+                </button>
+              </div>
+            </div>
+
+            <Button type="submit" className="w-full bg-[#b85e2d] text-[#fff6ed] hover:bg-[#a05227]" disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" /> Opening creator workspace
+                </>
+              ) : (
+                "Enter workspace"
+              )}
+            </Button>
+          </form>
+        </PocketSection>
+
+        <PocketSection title="Need access?" description="Create an account to open Studio, publish a release, and hear strongest takes in Listen." className="mt-4 bg-[#fff6ed]">
+          <Link href="/signup">
+            <Button variant="outline" className="w-full border-[#dbcdb8] bg-[#f3ecdf]">
+              Create an account
+            </Button>
+          </Link>
+        </PocketSection>
+
+        <p className="font-body mt-5 text-center text-sm text-[#5c5146]">
+          <Link href="/" className="font-semibold text-[#8a431f] hover:underline">
+            Return home
+          </Link>
+        </p>
+      </PocketShell>
+    )
+  }
+
   return (
     <main className="af-shell min-h-dvh p-4 sm:p-6">
       <section className="af-panel af-fade-up mx-auto grid max-w-6xl overflow-hidden rounded-[2rem] border lg:grid-cols-[1.15fr_1fr]">
@@ -74,20 +165,20 @@ export default function LoginPage() {
             Home
           </Link>
           <p className="font-body mt-4 text-sm text-[#5c5146] text-pretty">AudioForm Access</p>
-          <h1 className="mt-2 text-4xl font-semibold text-balance">Sign in to your signal inbox</h1>
+          <h1 className="mt-2 text-4xl font-semibold text-balance">Sign in to Listen and Studio</h1>
           <p className="font-body mt-4 text-base text-[#5c5146] text-pretty">
-            Review responses, find signal, and decide your next build step.
+            Return to your creator workspace, hear ranked takes, and tighten the next release when you know what to change.
           </p>
 
           <div className="mt-6 space-y-3">
-            <FeatureRow icon={<Headphones className="size-4 text-[#8a431f]" aria-hidden="true" />} text="Hear what users felt, not just what they typed." />
-            <FeatureRow icon={<ShieldCheck className="size-4 text-[#8a431f]" aria-hidden="true" />} text="Creator and respondent flows stay separated." />
+            <FeatureRow icon={<Headphones className="size-4 text-[#8a431f]" aria-hidden="true" />} text="Hear ranked takes first instead of digging through a response table." />
+            <FeatureRow icon={<ShieldCheck className="size-4 text-[#8a431f]" aria-hidden="true" />} text="Move cleanly between Listen for playback and Studio for prompt shaping." />
           </div>
 
           <div className="mt-8 rounded-xl border border-[#dbcdb8] bg-[#f9f4ea] p-4">
             <p className="text-sm font-semibold">Need access?</p>
             <p className="font-body mt-1 text-sm text-[#5c5146] text-pretty">
-              Create an account to start running voice surveys and reviewing high-signal responses.
+              Create an account to open Studio, publish a release, and hear strongest takes in Listen.
             </p>
           </div>
         </aside>
@@ -95,7 +186,7 @@ export default function LoginPage() {
         <section className="p-6 sm:p-8">
           <div className="block max-w-md pt-10 sm:pt-12 lg:pt-20">
             <h2 className="text-3xl font-semibold text-balance">Welcome back</h2>
-            <p className="font-body mt-2 text-[#5c5146] text-pretty">Enter your details to reopen your signal loop.</p>
+            <p className="font-body mt-2 text-[#5c5146] text-pretty">Enter your details to return to Listen, reopen a release, or jump back into Studio.</p>
 
             {error && (
               <Alert variant="destructive" className="mt-4" aria-live="assertive" id={errorId}>
@@ -150,7 +241,7 @@ export default function LoginPage() {
               <Button type="submit" className="w-full bg-[#b85e2d] text-[#fff6ed] hover:bg-[#a05227]" disabled={isLoading}>
                 {isLoading ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" /> Opening workspace
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" /> Opening creator workspace
                   </>
                 ) : (
                   "Enter workspace"
@@ -159,11 +250,11 @@ export default function LoginPage() {
             </form>
 
             <article className="mt-5 rounded-xl border border-[#dbcdb8] bg-[#f9f4ea] p-3">
-              <p className="text-sm font-semibold text-balance">Resume your loop</p>
+              <p className="text-sm font-semibold text-balance">Resume your creator loop</p>
               <ol className="font-body mt-2 space-y-1 text-sm text-[#5c5146] text-pretty">
-                <li>1. Open your active survey draft.</li>
-                <li>2. Publish or share the link.</li>
-                <li>3. Replay strongest responses in Signal Inbox.</li>
+                <li>1. Return to Listen and open your active release.</li>
+                <li>2. Replay the strongest takes first.</li>
+                <li>3. Move into Studio when you know what to tighten next.</li>
               </ol>
             </article>
 

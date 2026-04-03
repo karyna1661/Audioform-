@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import QuestionnaireClientPage from "./questionnaire-client"
 import { getLatestPublishedSurveyQuestions, getPublishedSurveyById } from "@/lib/server/survey-store"
-import { isUuidLike } from "@/lib/share-links"
+import { isUuidLike, normalizeArrivalSource } from "@/lib/share-links"
 
 type PageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>
@@ -16,7 +16,13 @@ function getParam(value: string | string[] | undefined): string | null {
 export async function generateMetadata({ searchParams }: PageProps): Promise<Metadata> {
   const params = await searchParams
   const surveyId = getParam(params.surveyId)
-  const brandedDescription = "Powered by Audioform. Answer by voice in under a minute."
+  const arrivalSource = normalizeArrivalSource(getParam(params.src))
+  const brandedDescription =
+    arrivalSource === "social"
+      ? "Hear. Speak. Join. Answer by voice and join the conversation."
+      : arrivalSource === "qr"
+        ? "Scan. Speak. Listen. Answer by voice and hear the shape of opinion."
+        : "Answer by voice and hear the shape of opinion."
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://audioform-production.up.railway.app"
 
   if (!surveyId || !isUuidLike(surveyId)) {
@@ -35,7 +41,11 @@ export async function generateMetadata({ searchParams }: PageProps): Promise<Met
 
   const survey = await getPublishedSurveyById(surveyId)
   const title = survey?.title?.trim() || "Audioform voice survey"
-  const url = `${appUrl}/questionnaire/v1?surveyId=${encodeURIComponent(surveyId)}`
+  const query = new URLSearchParams({
+    surveyId,
+    ...(arrivalSource !== "direct" ? { src: arrivalSource } : {}),
+  })
+  const url = `${appUrl}/questionnaire/v1?${query.toString()}`
   const imageUrl = `${appUrl}/api/og/survey?surveyId=${encodeURIComponent(surveyId)}&ext=.png`
 
   return {
