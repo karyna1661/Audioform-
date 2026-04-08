@@ -382,6 +382,14 @@ export default function QuestionnaireClientPage() {
   if (isMobile) {
     const answeredCount = Object.keys(answers).length
     const progressPercent = Math.round((answeredCount / questionList.length) * 100)
+    const introTitle = isQrEntry ? "Scan. Speak. Listen." : isSocialEntry ? "Hear. Speak. Join." : "Speak and contribute."
+    const introBody = publicListeningEnabled
+      ? isSocialEntry
+        ? "This release opens into a responder listening room after submission."
+        : "This release includes a responder listening room after submission."
+      : isSocialEntry
+        ? "This release is collecting private voice takes for the creator."
+        : "This release is set up for a clean scan-and-speak flow."
 
     return (
       <PocketShell
@@ -414,6 +422,29 @@ export default function QuestionnaireClientPage() {
           </div>
         }
       >
+        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#dbcdb8] bg-[#fffdf8] px-3 py-1.5 text-[11px] font-medium text-[#5c5146]">
+          {isQrEntry ? <Headphones className="size-3.5 text-[#2d5a17]" /> : isSocialEntry ? <Sparkles className="size-3.5 text-[#8a431f]" /> : <Mic className="size-3.5 text-[#8a431f]" />}
+          {isQrEntry ? "Entering the room" : isSocialEntry ? "Joining the conversation" : "Voice response"}
+        </div>
+
+        <div className="mb-4 grid grid-cols-3 gap-2">
+          <div className="rounded-[1.15rem] border border-[#dbcdb8] bg-[#fff8f0] px-3 py-3">
+            <p className="text-[10px] uppercase tracking-[0.18em] text-[#7a6146]">Prompt</p>
+            <p className="mt-1 text-base font-semibold text-[var(--af-color-primary)]">{index + 1}</p>
+            <p className="mt-1 text-[11px] leading-4 text-[#665746]">currently live</p>
+          </div>
+          <div className="rounded-[1.15rem] border border-[#dbcdb8] bg-[#fff8f0] px-3 py-3">
+            <p className="text-[10px] uppercase tracking-[0.18em] text-[#7a6146]">Answered</p>
+            <p className="mt-1 text-base font-semibold text-[var(--af-color-primary)]">{answeredCount}</p>
+            <p className="mt-1 text-[11px] leading-4 text-[#665746]">takes submitted</p>
+          </div>
+          <div className="rounded-[1.15rem] border border-[#dbcdb8] bg-[#fff8f0] px-3 py-3">
+            <p className="text-[10px] uppercase tracking-[0.18em] text-[#7a6146]">Mode</p>
+            <p className="mt-1 text-base font-semibold text-[var(--af-color-primary)]">{publicListeningEnabled ? "Open" : "Private"}</p>
+            <p className="mt-1 text-[11px] leading-4 text-[#665746]">after submit</p>
+          </div>
+        </div>
+
         {authStatus === "authenticated" && user?.role === "admin" ? (
           <div className="mb-4">
             <Link href="/admin/dashboard/v4" className="font-body text-sm text-[#8a431f] underline">
@@ -422,36 +453,27 @@ export default function QuestionnaireClientPage() {
           </div>
         ) : null}
 
-        <PocketSection
-          title={isQrEntry ? "Scan. Speak. Listen." : isSocialEntry ? "Hear. Speak. Join." : "Speak and contribute."}
-          description={
-            publicListeningEnabled
-              ? isSocialEntry
-                ? "This release opens into a responder listening room after submission."
-                : "This release includes a responder listening room after submission."
-              : isSocialEntry
-                ? "This release is collecting private voice takes for the creator."
-                : "This release is set up for a clean scan-and-speak flow."
-          }
-          className="bg-[#fff6ed]"
-        >
-          <div className="grid gap-2">
-            <div className="rounded-2xl border border-[#dbcdb8] bg-[#fffdf8] px-4 py-3">
-              <div className="flex items-center gap-2 text-[#8a431f]">
-                <Mic className="size-4" />
-                <p className="text-xs font-semibold uppercase tracking-[0.16em]">Speak clearly</p>
-              </div>
-              <p className="mt-2 text-sm leading-6 text-[#5c5146]">One concrete moment in 20-45 seconds is ideal.</p>
-            </div>
-            {publicListeningEnabled ? (
-              <div className="rounded-2xl border border-[#dbcdb8] bg-[#fffdf8] px-4 py-3">
-                <div className="flex items-center gap-2 text-[#8a431f]">
-                  <Headphones className="size-4" />
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em]">Player unlock</p>
+        <PocketSection title={introTitle} description={introBody} className="bg-[#fff6ed]">
+          <div className="space-y-2">
+            <div className="rounded-[1rem] border border-[#dbcdb8] bg-[#fffdf8] px-4 py-4">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7a6146]">How it works</p>
+              <div className="mt-3 space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="inline-flex size-9 items-center justify-center rounded-full bg-[#f2ddcd] text-[#8a431f]"><Mic className="size-4" /></div>
+                  <p className="text-[12px] leading-5 text-[#5c5146]">Share your voice with one concrete moment.</p>
                 </div>
-              <p className="mt-2 text-sm leading-6 text-[#5c5146]">After you submit, you can listen to the strongest takes from other responders in preview mode.</p>
+                <div className="flex items-center gap-3">
+                  <div className="inline-flex size-9 items-center justify-center rounded-full bg-[#f3ecdf] text-[#7a6146]"><AudioWaveform className="size-4" /></div>
+                  <p className="text-[12px] leading-5 text-[#5c5146]">Your take lands in the creator's listening workspace.</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className={`inline-flex size-9 items-center justify-center rounded-full ${publicListeningEnabled ? "bg-[#e8f2e0] text-[#2d5a17]" : "bg-[#f3ecdf] text-[#7a6146]"}`}><Headphones className="size-4" /></div>
+                  <p className="text-[12px] leading-5 text-[#5c5146]">
+                    {publicListeningEnabled ? "Unlock the listening room after you submit if this release stays open." : "This release stays private and goes straight to creator review."}
+                  </p>
+                </div>
+              </div>
             </div>
-            ) : null}
           </div>
         </PocketSection>
 
@@ -475,6 +497,19 @@ export default function QuestionnaireClientPage() {
             }}
           />
         </PocketSection>
+
+        <div className="af-mobile-rail mt-4">
+          {[
+            "The creator will hear conviction, hesitation, and specificity, not just the words.",
+            publicListeningEnabled
+              ? "If you opt in, the public listening room unlocks after submission while the release is still open."
+              : "This release stays private after submission and goes straight into creator review.",
+          ].map((line) => (
+            <div key={line} className="af-mobile-rail-card rounded-[1.1rem] border border-[#dbcdb8] bg-[#fffdf8] p-3.5 text-sm leading-6 text-[#5c5146]">
+              {line}
+            </div>
+          ))}
+        </div>
 
         <PocketActionStack className="mt-4">
           {publicListeningEnabled ? (

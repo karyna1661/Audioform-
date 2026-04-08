@@ -68,8 +68,8 @@ export async function GET(request: Request) {
   const transcript = await getTranscriptByResponseId(responseId)
   const insight = transcript ? await getInsightByTranscriptId(transcript.id) : null
 
-  const summary = insight?.summary || "Processing insight..."
-  const quote = insight?.quotes?.[0] || ""
+  const summary = insight?.narrativeSummary || "Processing insight..."
+  const quote = insight?.powerQuote || ""
   const theme = insight?.primaryTheme || ""
   const duration = formatDuration(durationSeconds)
 

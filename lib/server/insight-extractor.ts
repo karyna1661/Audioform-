@@ -1,16 +1,22 @@
+import { aggregateAndStoreReleaseInsight } from "@/lib/server/release-insight-engine"
 import { upsertInsightResult } from "@/lib/server/insight-store"
+import type { ResponseQuoteCandidate, ResponseSignalSummary } from "@/lib/server/insight-types"
+import { getStoredResponseById } from "@/lib/server/response-store"
 import type { StoredTranscript } from "@/lib/server/transcript-store"
 
 type Sentiment = "positive" | "negative" | "neutral"
 
 type BuiltInsight = {
-  summary: string
+  narrativeSummary: string
+  signalSummary: ResponseSignalSummary
+  powerQuote: string | null
+  verbatimQuotes: string[]
+  quoteCandidates: ResponseQuoteCandidate[]
   primaryTheme: string | null
   themes: string[]
   sentiment: Sentiment
   sentimentScore: number
   signalScore: number
-  quotes: string[]
   provider: string
   extractorVersion: string
 }
@@ -41,14 +47,14 @@ function clipVerbatimQuote(sentence: string, maxLength = 140): string {
 }
 
 function pickSentiment(text: string): { sentiment: Sentiment; score: number } {
-  const positiveWords = ["love", "great", "clear", "easy", "smooth", "helpful", "excited", "good"]
-  const negativeWords = ["confusing", "unclear", "frustrating", "hard", "slow", "stuck", "difficult", "awkward"]
+  const positiveWords = ["love", "great", "clear", "easy", "smooth", "helpful", "excited", "good", "confident"]
+  const negativeWords = ["confusing", "unclear", "frustrating", "hard", "slow", "stuck", "difficult", "awkward", "lost"]
   const lower = text.toLowerCase()
   const positiveHits = positiveWords.filter((word) => lower.includes(word)).length
   const negativeHits = negativeWords.filter((word) => lower.includes(word)).length
 
-  if (negativeHits > positiveHits) return { sentiment: "negative", score: Math.min(0.92, 0.56 + negativeHits * 0.08) }
-  if (positiveHits > negativeHits) return { sentiment: "positive", score: Math.min(0.92, 0.56 + positiveHits * 0.08) }
+  if (negativeHits > positiveHits) return { sentiment: "negative", score: Math.min(0.92, 0.52 + negativeHits * 0.09) }
+  if (positiveHits > negativeHits) return { sentiment: "positive", score: Math.min(0.92, 0.52 + positiveHits * 0.09) }
   return { sentiment: "neutral", score: 0.5 }
 }
 
@@ -59,7 +65,7 @@ function extractThemes(text: string): string[] {
     ["pricing", ["pricing", "price", "cost", "expensive", "cheap"]],
     ["navigation", ["find", "where", "navigate", "menu", "landing page"]],
     ["clarity", ["clear", "unclear", "confusing", "understand", "explain"]],
-    ["speed", ["slow", "fast", "loading", "upload"]],
+    ["speed", ["slow", "fast", "loading", "upload", "wait"]],
     ["workflow", ["workflow", "integration", "slack", "notion", "export"]],
     ["trust", ["trust", "accurate", "wrong", "insight", "summary"]],
     ["mobile", ["phone", "mobile", "screen", "preview"]],
@@ -71,86 +77,140 @@ function extractThemes(text: string): string[] {
     .slice(0, 4)
 }
 
-function sentenceScore(sentence: string, themes: string[]): number {
+function scoreQuoteCandidate(sentence: string, themes: string[]): ResponseQuoteCandidate {
   const lower = sentence.toLowerCase()
-  let score = 0
+  const conviction =
+    0.35 +
+    (/(love|hate|frustrating|stuck|impossible|awkward|clear|confusing|almost gave up|wish)/.test(lower) ? 0.35 : 0) +
+    (/(never|always|no idea|had to|kept|still)/.test(lower) ? 0.2 : 0)
+  const specificity =
+    0.3 +
+    (themes.some((theme) => lower.includes(theme)) ? 0.25 : 0) +
+    (/(because|when|after|before|instead|moment)/.test(lower) ? 0.25 : 0)
+  const shareability =
+    0.25 +
+    (sentence.length >= 28 && sentence.length <= 120 ? 0.35 : 0) +
+    (!/^\b(i think|maybe|sort of|kind of)\b/i.test(sentence) ? 0.2 : 0)
 
-  if (sentence.length >= 35 && sentence.length <= 170) score += 3
-  if (themes.some((theme) => lower.includes(theme))) score += 2
-  if (/(because|but|so|when|after|instead|wish|would|almost)/.test(lower)) score += 2
-  if (/(love|great|easy|excited|confusing|unclear|frustrating|hard|slow|awkward)/.test(lower)) score += 2
-  if (/[.!?]$/.test(sentence)) score += 1
-
-  return score
+  const score = Math.min(1, Number(((conviction + specificity + shareability) / 3).toFixed(2)))
+  return {
+    quote: clipVerbatimQuote(sentence, 120),
+    conviction: Number(Math.min(1, conviction).toFixed(2)),
+    specificity: Number(Math.min(1, specificity).toFixed(2)),
+    shareability: Number(Math.min(1, shareability).toFixed(2)),
+    score,
+  }
 }
 
-function extractQuotes(text: string, themes: string[]): string[] {
-  const sentences = splitIntoSentences(text)
-  if (!sentences.length) return []
-
-  const ranked = [...sentences].sort((a, b) => sentenceScore(b, themes) - sentenceScore(a, themes))
-  const best = ranked[0]
-  if (!best) return []
-  return [clipVerbatimQuote(best)]
+function pickQuoteCandidates(text: string, themes: string[]): ResponseQuoteCandidate[] {
+  return splitIntoSentences(text)
+    .filter((sentence) => sentence.length >= 18)
+    .map((sentence) => scoreQuoteCandidate(sentence, themes))
+    .filter((candidate) => candidate.score >= 0.45)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3)
 }
 
-function calculateSignalScore(text: string, themes: string[]): number {
-  const lengthBoost = Math.min(40, Math.round(text.length / 12))
-  const themeBoost = themes.length * 14
-  return Math.max(25, Math.min(100, 25 + lengthBoost + themeBoost))
+function calculateSignalScore(text: string, themes: string[], signalSummary: ResponseSignalSummary): number {
+  const lengthBoost = Math.min(35, Math.round(text.length / 14))
+  const themeBoost = themes.length * 10
+  const signalBoost = signalSummary.complaint ? 12 : 0
+  const opportunityBoost = signalSummary.opportunity ? 10 : 0
+  return Math.max(28, Math.min(100, 28 + lengthBoost + themeBoost + signalBoost + opportunityBoost))
 }
 
-function buildSummary(text: string, themes: string[], sentiment: Sentiment): string {
-  const compact = normalizeWhitespace(text)
-  if (!compact) return "The response is still being processed into a usable summary."
+function buildHeuristicNarrativeSummary(text: string, themes: string[], signalSummary: ResponseSignalSummary, sentiment: Sentiment): string {
+  const themeLabel = themes.length >= 2 ? `${themes[0]} and ${themes[1]}` : themes[0] ?? null
+  const complaint = signalSummary.complaint?.trim()
+  const opportunity = signalSummary.opportunity?.trim()
+  const frictionMoment = signalSummary.frictionMoment?.trim()
 
-  const themeLabel =
-    themes.length >= 2
-      ? `${themes[0]} and ${themes[1]}`
-      : themes[0] ?? null
-
-  if (themeLabel && sentiment === "negative") {
-    return truncate(`The responder describes friction around ${themeLabel} and points to a moment that still feels harder than it should.`, 180)
+  if (complaint && opportunity) {
+    return truncate(`The responder points to ${complaint.toLowerCase()} as the main friction and implies ${opportunity.toLowerCase()} would make the experience land better.`, 220)
+  }
+  if (themeLabel && frictionMoment && sentiment === "negative") {
+    return truncate(`The responder describes friction around ${themeLabel} and anchors it in ${frictionMoment.toLowerCase()}.`, 220)
   }
   if (themeLabel && sentiment === "positive") {
-    return truncate(`The responder highlights positive momentum around ${themeLabel} and suggests this part of the experience is starting to land well.`, 180)
+    return truncate(`The responder hears momentum around ${themeLabel} and suggests this part of the experience is starting to feel stronger.`, 220)
   }
   if (themeLabel) {
-    return truncate(`The responder focuses on ${themeLabel} and gives concrete detail about how that part of the experience is landing.`, 180)
+    return truncate(`The responder focuses on ${themeLabel} and gives concrete detail about how that part of the experience is landing.`, 220)
   }
 
-  const sentences = splitIntoSentences(compact)
-  const lead = sentences[0] ?? compact
-  return truncate(`The responder centers on one concrete moment: ${lead.toLowerCase()}`, 180)
+  const lead = splitIntoSentences(text)[0] ?? text
+  return truncate(`The responder centers on one concrete moment: ${lead.toLowerCase()}`, 220)
+}
+
+function buildHeuristicSignalSummary(text: string, themes: string[], sentiment: Sentiment): ResponseSignalSummary {
+  const lower = text.toLowerCase()
+  const themeLabel = themes[0] ?? "the experience"
+
+  const emotion = sentiment === "negative" ? "frustrated" : sentiment === "positive" ? "encouraged" : "thoughtful"
+
+  if (/(confusing|unclear|lost|no idea|didn't know)/.test(lower)) {
+    return {
+      complaint: `${themeLabel} feels confusing`,
+      opportunity: `clearer guidance around ${themeLabel}`,
+      emotion,
+      frictionMoment: "the first-run flow",
+      confidence: 0.66,
+    }
+  }
+  if (/(slow|wait|loading|took too long)/.test(lower)) {
+    return {
+      complaint: `${themeLabel} feels slow`,
+      opportunity: `faster feedback around ${themeLabel}`,
+      emotion,
+      frictionMoment: "the waiting time",
+      confidence: 0.64,
+    }
+  }
+  if (/(hard|awkward|too many|extra steps)/.test(lower)) {
+    return {
+      complaint: `${themeLabel} takes too much effort`,
+      opportunity: `reduce the number of steps around ${themeLabel}`,
+      emotion,
+      frictionMoment: "the core task flow",
+      confidence: 0.62,
+    }
+  }
+
+  return {
+    complaint: themeLabel ? `${themeLabel} still needs sharper clarity` : null,
+    opportunity: themeLabel ? `make ${themeLabel} easier to understand` : null,
+    emotion,
+    frictionMoment: null,
+    confidence: 0.48,
+  }
 }
 
 function normalizeForInclusion(value: string): string {
   return value
     .toLowerCase()
-    .replace(/[“”]/g, "\"")
-    .replace(/[‘’]/g, "'")
+    .replace(/[â€œâ€]/g, "\"")
+    .replace(/[â€˜â€™]/g, "'")
     .replace(/\s+/g, " ")
     .trim()
 }
 
-function coerceQuotesFromTranscript(text: string, candidates: string[] | undefined, themes: string[]): string[] {
+function coerceVerbatimCandidates(text: string, candidates: string[] | undefined, themes: string[]): ResponseQuoteCandidate[] {
   const transcriptSentences = splitIntoSentences(text)
-  if (!transcriptSentences.length) return []
+  const matches: string[] = []
 
   for (const candidate of candidates ?? []) {
     const probe = normalizeForInclusion(candidate)
     if (!probe) continue
     const exact = transcriptSentences.find((sentence) => normalizeForInclusion(sentence).includes(probe))
-    if (exact) return [clipVerbatimQuote(exact)]
+    if (exact && !matches.includes(exact)) {
+      matches.push(exact)
+    }
   }
 
-  return extractQuotes(text, themes)
+  return matches.length ? matches.map((sentence) => scoreQuoteCandidate(sentence, themes)) : pickQuoteCandidates(text, themes)
 }
 
-async function generateAiInsight(text: string): Promise<BuiltInsight | null> {
-  if (!process.env.OPENAI_API_KEY) return null
-
-  const fallback = buildHeuristicInsight(text)
+async function callOpenAiJson<T>(system: string, user: string): Promise<T> {
   const model = process.env.OPENAI_INSIGHT_MODEL || process.env.OPENAI_TEXT_MODEL || "gpt-4o-mini"
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -163,18 +223,8 @@ async function generateAiInsight(text: string): Promise<BuiltInsight | null> {
       response_format: { type: "json_object" },
       temperature: 0.2,
       messages: [
-        {
-          role: "system",
-          content:
-            "You are an expert product analyst. Return strict JSON with keys: summary, primaryTheme, themes, sentiment, quotes. " +
-            "summary must be a concise paraphrase of what the responder means, not a transcript copy, and no more than 180 characters. " +
-            "primaryTheme must be 1-3 words. themes must contain up to 4 lower-case themes. " +
-            "sentiment must be positive, negative, or neutral. quotes must be 1-2 exact verbatim excerpts from the transcript.",
-        },
-        {
-          role: "user",
-          content: `Transcript:\n${text}`,
-        },
+        { role: "system", content: system },
+        { role: "user", content: user },
       ],
     }),
     cache: "no-store",
@@ -192,33 +242,85 @@ async function generateAiInsight(text: string): Promise<BuiltInsight | null> {
       }
     }>
   }
-  const rawContent = data.choices?.[0]?.message?.content ?? ""
-  const parsed = JSON.parse(rawContent) as {
-    summary?: string
-    primaryTheme?: string
-    themes?: string[]
-    sentiment?: Sentiment
-    quotes?: string[]
-  }
+  return JSON.parse(data.choices?.[0]?.message?.content ?? "{}") as T
+}
 
-  const themes = Array.isArray(parsed.themes)
-    ? parsed.themes.map((theme) => normalizeWhitespace(String(theme)).toLowerCase()).filter(Boolean).slice(0, 4)
+async function generateAiNarrativeInsight(text: string): Promise<{
+  narrativeSummary?: string
+  primaryTheme?: string
+  themes?: string[]
+}> {
+  return callOpenAiJson(
+    "You are a world-class product analyst. Return strict JSON with keys narrativeSummary, primaryTheme, themes. " +
+      "narrativeSummary must be a concise 1-2 sentence synthesis of what the responder means and must not restate the transcript verbatim. " +
+      "primaryTheme must be 1-3 words. themes must contain up to 4 lower-case themes.",
+    `Transcript:\n${text}`,
+  )
+}
+
+async function generateAiSignalInsight(text: string): Promise<{
+  signalSummary?: ResponseSignalSummary
+  sentiment?: Sentiment
+}> {
+  return callOpenAiJson(
+    "You are extracting structured intelligence from user feedback. Return strict JSON with keys signalSummary and sentiment. " +
+      "signalSummary must contain complaint, opportunity, emotion, frictionMoment, confidence. " +
+      "complaint groups the main friction. opportunity infers the strongest solution direction. emotion is the dominant emotional tone. " +
+      "sentiment must be positive, negative, or neutral.",
+    `Transcript:\n${text}`,
+  )
+}
+
+async function generateAiQuoteCandidates(text: string): Promise<{
+  verbatimQuotes?: string[]
+}> {
+  return callOpenAiJson(
+    "Extract the most impactful verbatim quotes from this transcript. Return strict JSON with key verbatimQuotes. " +
+      "Rules: keep each quote under 20 words, keep wording verbatim, prefer strong opinion, emotion, or sharp insight, avoid vague lines.",
+    `Transcript:\n${text}`,
+  )
+}
+
+async function generateAiInsight(text: string): Promise<BuiltInsight | null> {
+  if (!process.env.OPENAI_API_KEY) return null
+
+  const fallback = buildHeuristicInsight(text)
+  const [narrative, signal, quotes]: [
+    Awaited<ReturnType<typeof generateAiNarrativeInsight>>,
+    Awaited<ReturnType<typeof generateAiSignalInsight>>,
+    Awaited<ReturnType<typeof generateAiQuoteCandidates>>,
+  ] = await Promise.all([
+    generateAiNarrativeInsight(text).catch(() => ({})),
+    generateAiSignalInsight(text).catch(() => ({})),
+    generateAiQuoteCandidates(text).catch(() => ({})),
+  ])
+
+  const themes = Array.isArray(narrative.themes)
+    ? narrative.themes.map((theme) => normalizeWhitespace(String(theme)).toLowerCase()).filter(Boolean).slice(0, 4)
     : fallback.themes
+
+  const signalSummary = signal.signalSummary ?? fallback.signalSummary
+  const quoteCandidates = coerceVerbatimCandidates(text, quotes.verbatimQuotes, themes)
+  const powerQuote = quoteCandidates[0]?.quote ?? null
   const sentiment =
-    parsed.sentiment === "positive" || parsed.sentiment === "negative" || parsed.sentiment === "neutral"
-      ? parsed.sentiment
+    signal.sentiment === "positive" || signal.sentiment === "negative" || signal.sentiment === "neutral"
+      ? signal.sentiment
       : fallback.sentiment
 
   return {
-    summary: truncate(normalizeWhitespace(parsed.summary ?? "") || fallback.summary, 180),
-    primaryTheme: normalizeWhitespace(parsed.primaryTheme ?? "") || themes[0] || fallback.primaryTheme,
+    narrativeSummary:
+      truncate(normalizeWhitespace(narrative.narrativeSummary ?? "") || fallback.narrativeSummary, 220),
+    signalSummary,
+    powerQuote,
+    verbatimQuotes: quoteCandidates.map((candidate) => candidate.quote),
+    quoteCandidates,
+    primaryTheme: normalizeWhitespace(narrative.primaryTheme ?? "") || themes[0] || fallback.primaryTheme,
     themes,
     sentiment,
     sentimentScore: fallback.sentimentScore,
-    signalScore: fallback.signalScore,
-    quotes: coerceQuotesFromTranscript(text, parsed.quotes, themes),
-    provider: "openai-structured",
-    extractorVersion: "v2",
+    signalScore: calculateSignalScore(text, themes, signalSummary),
+    provider: "openai-response-structured",
+    extractorVersion: "v3",
   }
 }
 
@@ -226,17 +328,22 @@ function buildHeuristicInsight(text: string): BuiltInsight {
   const compact = normalizeWhitespace(text)
   const themes = extractThemes(compact)
   const sentiment = pickSentiment(compact)
+  const signalSummary = buildHeuristicSignalSummary(compact, themes, sentiment.sentiment)
+  const quoteCandidates = pickQuoteCandidates(compact, themes)
 
   return {
-    summary: buildSummary(compact, themes, sentiment.sentiment),
+    narrativeSummary: buildHeuristicNarrativeSummary(compact, themes, signalSummary, sentiment.sentiment),
+    signalSummary,
+    powerQuote: quoteCandidates[0]?.quote ?? null,
+    verbatimQuotes: quoteCandidates.map((candidate) => candidate.quote),
+    quoteCandidates,
     primaryTheme: themes[0] ?? null,
     themes,
     sentiment: sentiment.sentiment,
     sentimentScore: sentiment.score,
-    signalScore: calculateSignalScore(compact, themes),
-    quotes: extractQuotes(compact, themes),
-    provider: "audioform-heuristic",
-    extractorVersion: "v2",
+    signalScore: calculateSignalScore(compact, themes, signalSummary),
+    provider: "audioform-response-heuristic",
+    extractorVersion: "v3",
   }
 }
 
@@ -244,17 +351,29 @@ export async function extractAndStoreInsight(transcript: StoredTranscript) {
   const text = transcript.transcriptText?.trim() || ""
   const insight = text ? (await generateAiInsight(text).catch(() => null)) ?? buildHeuristicInsight(text) : buildHeuristicInsight(text)
 
-  return upsertInsightResult({
+  const stored = await upsertInsightResult({
     transcriptId: transcript.id,
     responseId: transcript.responseId,
-    summary: insight.summary,
+    narrativeSummary: insight.narrativeSummary,
+    signalSummary: insight.signalSummary,
+    powerQuote: insight.powerQuote,
+    verbatimQuotes: insight.verbatimQuotes,
+    quoteCandidates: insight.quoteCandidates,
     primaryTheme: insight.primaryTheme,
     themes: insight.themes,
     sentiment: insight.sentiment,
     sentimentScore: insight.sentimentScore,
     signalScore: insight.signalScore,
-    quotes: insight.quotes,
     provider: insight.provider,
     extractorVersion: insight.extractorVersion,
   })
+
+  if (transcript.responseId) {
+    const response = await getStoredResponseById(transcript.responseId).catch(() => null)
+    if (response?.surveyId) {
+      await aggregateAndStoreReleaseInsight(response.surveyId).catch(() => null)
+    }
+  }
+
+  return stored
 }

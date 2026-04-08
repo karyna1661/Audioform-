@@ -4,6 +4,7 @@ import { useMemo, useState } from "react"
 import { AudioWaveform, Bookmark, ChevronDown, ChevronUp, Flag, Pause, Play, Sparkles, Star } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { useIsMobile } from "@/components/ui/use-mobile"
 import { cn } from "@/lib/utils"
 import { getMomentumLabel, type ListeningMomentumTag } from "@/lib/listening-model"
 import { useListeningSession } from "@/components/listen/listening-session-provider"
@@ -37,13 +38,28 @@ type ResponseWithMetadata = {
   } | null
   insight?: {
     id: string
-    summary: string | null
+    narrativeSummary: string | null
+    signalSummary: {
+      complaint?: string | null
+      opportunity?: string | null
+      emotion?: string | null
+      frictionMoment?: string | null
+      confidence?: number | null
+    } | null
+    powerQuote: string | null
+    verbatimQuotes: string[]
+    quoteCandidates: Array<{
+      quote: string
+      score: number
+      conviction: number
+      specificity: number
+      shareability: number
+    }>
     primaryTheme: string | null
     themes: string[]
     sentiment: string | null
     sentimentScore: number | null
     signalScore: number | null
-    quotes: string[]
     provider: string | null
     extractorVersion: string | null
   } | null
@@ -99,9 +115,9 @@ function transcriptPreview(response: ResponseWithMetadata): string {
 }
 
 function summaryPreview(response: ResponseWithMetadata): string {
-  if (response.insight?.summary) return response.insight.summary
-  if (response.transcript?.status === "failed") return "Generate a fresh AI summary after the transcript is repaired."
-  return "Generate an AI summary when you want a faster review pass on this take."
+  if (response.insight?.narrativeSummary) return response.insight.narrativeSummary
+  if (response.transcript?.status === "failed") return "Generate a fresh narrative summary after the transcript is repaired."
+  return "Generate a narrative summary when you want a faster review pass on this take."
 }
 
 function hotTakePreview(response: ResponseWithMetadata): string | null {
@@ -133,6 +149,12 @@ function buildTrack(response: ResponseWithMetadata): ListeningTrack {
   }
 }
 
+function quoteScoreLabel(response: ResponseWithMetadata): string | null {
+  const score = response.insight?.quoteCandidates?.[0]?.score
+  if (typeof score !== "number") return null
+  return `${Math.round(score * 100)} quote score`
+}
+
 export function ReleaseTakeDeck({
   responses,
   extractingInsightId = null,
@@ -145,6 +167,7 @@ export function ReleaseTakeDeck({
   onExtractInsight,
 }: ReleaseTakeDeckProps) {
   const session = useListeningSession()
+  const isMobile = useIsMobile()
   const [expandedId, setExpandedId] = useState<string | null>(responses[0]?.id ?? null)
 
   const stats = useMemo(
@@ -187,23 +210,23 @@ export function ReleaseTakeDeck({
         <AudioWaveform className="mx-auto h-10 w-10 text-[#8a431f]/60" />
         <h2 className="mt-4 text-lg font-semibold text-[var(--af-color-primary)]">No takes in this release yet</h2>
         <p className="mt-2 text-sm text-[#5c5146]">
-          As soon as new voices land, the strongest takes will appear here for transcript and AI-summary review.
+          As soon as new voices land, the strongest takes will appear here for transcript and narrative-summary review.
         </p>
       </section>
     )
   }
 
   return (
-    <section className="mt-6 rounded-2xl border border-[#dbcdb8] bg-[#fffdf8] p-4 sm:p-5">
+    <section className={cn("mt-6 rounded-2xl border border-[#dbcdb8] bg-[#fffdf8] p-4 sm:p-5", isMobile && "rounded-none border-0 bg-transparent p-0")}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-xs uppercase tracking-[0.18em] text-[#8a431f]">Take deck</p>
-          <h2 className="mt-1 text-2xl font-semibold text-[var(--af-color-primary)]">Review transcript and AI summary without leaving the player.</h2>
-          <p className="mt-2 max-w-3xl text-sm text-[#5c5146]">
-            Each card keeps audio, transcript, summary, and creator actions together so the release still feels like listening first.
+          <h2 className={cn("mt-1 text-2xl font-semibold text-[var(--af-color-primary)]", isMobile && "text-[1.35rem] leading-[1.05] tracking-[-0.03em]")}>Review transcript and narrative summary without leaving the player.</h2>
+          <p className={cn("mt-2 max-w-3xl text-sm text-[#5c5146]", isMobile && "text-[12px] leading-5")}>
+            Each card keeps audio, transcript, narrative summary, and creator actions together so the release still feels like listening first.
           </p>
         </div>
-        <div className="grid min-w-[220px] grid-cols-2 gap-2 text-center sm:grid-cols-4">
+        <div className={cn("grid min-w-[220px] grid-cols-2 gap-2 text-center sm:grid-cols-4", isMobile && "w-full min-w-0")}>
           <div className="rounded-2xl border border-[#dbcdb8] bg-[#fff8f0] px-3 py-3">
             <p className="text-lg font-semibold text-[var(--af-color-primary)]">{stats.total}</p>
             <p className="text-[11px] uppercase tracking-[0.12em] text-[#7a6146]">Takes</p>
@@ -232,7 +255,8 @@ export function ReleaseTakeDeck({
           const hotTake = hotTakePreview(response)
           const theme = response.insight?.primaryTheme ?? null
           const hasInsight = Boolean(response.insight)
-          const primaryQuote = response.insight?.quotes?.[0] ?? null
+          const primaryQuote = response.insight?.powerQuote ?? null
+          const quoteScore = quoteScoreLabel(response)
           const isActive = session.activeSource === sessionSource && session.currentTrack?.id === response.id
           const isPlaying = isActive && session.playingId === response.id
 
@@ -242,6 +266,7 @@ export function ReleaseTakeDeck({
               className={cn(
                 "rounded-[1.6rem] border p-4 transition-colors sm:p-5",
                 expanded ? "border-[#cfa16d] bg-[#fff9f2]" : "border-[#dbcdb8] bg-white",
+                isMobile && "rounded-[1rem] p-3.5",
                 response.highSignal && "shadow-[0_0_0_1px_rgba(37,97,58,0.08)]",
                 response.flagged && "border-[#e7b6ab]",
               )}
@@ -283,6 +308,11 @@ export function ReleaseTakeDeck({
                     {hotTake ? (
                       <p className="min-w-0 text-sm font-medium text-[#8a431f]">{truncate(hotTake, 140)}</p>
                     ) : null}
+                    {response.insight?.signalSummary?.complaint ? (
+                      <p className="text-xs uppercase tracking-[0.12em] text-[#7a6146]">
+                        Signal: {response.insight.signalSummary.complaint}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
                 <Button
@@ -296,19 +326,23 @@ export function ReleaseTakeDeck({
               </div>
 
               {!expanded ? (
-                <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
-                  <div className="rounded-2xl border border-[#dbcdb8] bg-[#fffdf8] p-4">
+                <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
+                  <div className={cn("rounded-2xl border border-[#dbcdb8] bg-[#fff8f0] p-4", isMobile && "rounded-[1rem] border-[#dbcdb8]/35 p-3")}>
                     <div className="flex items-center justify-between gap-3">
-                      <p className="text-sm font-medium text-[var(--af-color-primary)]">{transcriptLabel(response)}</p>
-                      <span className="text-xs uppercase tracking-[0.14em] text-[#7a6146]">Preview</span>
+                      <p className="text-sm font-medium text-[var(--af-color-primary)]">Power quote</p>
+                      {quoteScore ? (
+                        <span className="text-xs uppercase tracking-[0.14em] text-[#7a6146]">{quoteScore}</span>
+                      ) : null}
                     </div>
-                    <p className="mt-3 text-sm leading-6 text-[#5c5146]">{truncate(transcript, 180)}</p>
+                    <p className="mt-3 text-sm leading-6 text-[#665746] italic">
+                      {primaryQuote ? `"${truncate(primaryQuote, 170)}"` : "A pull quote will appear here once the insight engine finds a sharp verbatim line worth carrying."}
+                    </p>
                   </div>
-                  <div className="rounded-2xl border border-[#dbcdb8] bg-[#fffaf3] p-4">
+                  <div className={cn("rounded-2xl border border-[#dbcdb8] bg-[#fffaf3] p-4", isMobile && "rounded-[1rem] border-[#dbcdb8]/35 p-3")}>
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <Sparkles className="size-4 text-[#8a431f]" />
-                        <p className="text-sm font-medium text-[var(--af-color-primary)]">AI summary</p>
+                        <p className="text-sm font-medium text-[var(--af-color-primary)]">Narrative summary</p>
                       </div>
                       <span className="text-xs uppercase tracking-[0.14em] text-[#7a6146]">
                         {hasInsight ? "Ready" : "Needs summary"}
@@ -316,31 +350,85 @@ export function ReleaseTakeDeck({
                     </div>
                     <p className="mt-3 text-sm leading-6 text-[#5c5146]">{truncate(summary, 180)}</p>
                   </div>
+                  {response.insight?.signalSummary ? (
+                    <div className={cn("rounded-2xl border border-[#dbcdb8] bg-[#fffdf8] p-4", isMobile && "rounded-[1rem] border-[#dbcdb8]/35 p-3")}>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-sm font-medium text-[var(--af-color-primary)]">Signal</p>
+                        <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-[0.12em] text-[#7a6146]">
+                          {response.insight.signalSummary.emotion ? <span>{response.insight.signalSummary.emotion}</span> : null}
+                          {response.insight.signalSummary.confidence != null ? <span>{Math.round(response.insight.signalSummary.confidence * 100)}% confidence</span> : null}
+                        </div>
+                      </div>
+                      <div className="mt-3 space-y-2 text-sm text-[#665746]">
+                        {response.insight.signalSummary.complaint ? (
+                          <p><span className="font-medium text-[var(--af-color-primary)]">Complaint:</span> {response.insight.signalSummary.complaint}</p>
+                        ) : null}
+                        {response.insight.signalSummary.opportunity ? (
+                          <p><span className="font-medium text-[var(--af-color-primary)]">Opportunity:</span> {response.insight.signalSummary.opportunity}</p>
+                        ) : null}
+                        {response.insight.signalSummary.frictionMoment ? (
+                          <p><span className="font-medium text-[var(--af-color-primary)]">Friction moment:</span> {response.insight.signalSummary.frictionMoment}</p>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               ) : (
                 <div className="mt-4 grid gap-3 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-                  <section className="rounded-2xl border border-[#dbcdb8] bg-[#fffdf8] p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2">
-                        <AudioWaveform className="size-4 text-[#8a431f]" />
-                        <p className="text-sm font-medium text-[var(--af-color-primary)]">Hear the take</p>
-                      </div>
+                  <section className={cn("rounded-2xl border border-[#dbcdb8] bg-[#fffdf8] p-4", isMobile && "rounded-[1rem] border-[#dbcdb8]/35 p-3")}>
+                    <div className="min-w-0">
+                      <p className="text-xs uppercase tracking-[0.18em] text-[#8a431f]">Hear the take</p>
+                      <h4 className={cn("mt-2 text-lg font-semibold text-[var(--af-color-primary)]", isMobile && "mt-1 text-[1rem] leading-[1.05] tracking-[-0.025em]")}>
+                        {response.questionText || `Question ${response.questionId.toUpperCase()}`}
+                      </h4>
+                      <p className={cn("mt-1 text-sm text-[#665746]", isMobile && "text-[12px] leading-4.5")}>
+                        {hotTake || "Ranked voice take ready for review."}
+                      </p>
                     </div>
 
-                    <div className="mt-3 rounded-2xl border border-[#e4d3bd] bg-[#fff8f0] p-4">
-                      <div className="h-1.5 overflow-hidden rounded-full bg-[#eadcca]">
-                        <div
-                          className="h-full rounded-full bg-[#b85e2d] transition-[width] duration-150 ease-linear"
-                          style={{ width: `${isActive ? session.progressPercent : 0}%` }}
-                        />
+                    <div className={cn("mt-3 rounded-[1.5rem] border border-[#dbcdb8] bg-[#fffdf8] p-4", isMobile && "rounded-none border-0 bg-transparent p-0 shadow-none")}>
+                      <div className={cn("flex items-center justify-between gap-3", isMobile && "items-start")}>
+                        <div className="min-w-0">
+                          <p className={cn("text-sm font-semibold text-[var(--af-color-primary)]", isMobile && "text-[13px]")}>
+                            {response.surveyTitle}
+                          </p>
+                          <p className={cn("mt-1 text-sm text-[#665746]", isMobile && "text-[12px] leading-4.5")}>
+                            {response.insight?.primaryTheme || "Auto-ranked voice take"}
+                          </p>
+                        </div>
+                        <div className={cn("text-right text-xs text-[#7a6146]", isMobile && "shrink-0 rounded-2xl bg-[#f7eee2] px-2 py-1.5 text-[10px]")}>
+                          <div>{formatDuration(response.durationSeconds)}</div>
+                          <div>Rank {rank ?? "-"}</div>
+                        </div>
                       </div>
-                      <div className="mt-2 flex items-center justify-between text-xs text-[#7a6146]">
-                        <span>{formatPlaybackTime(isActive ? session.displayElapsedSeconds : 0)}</span>
-                        <span>{formatPlaybackTime(response.durationSeconds)}</span>
+
+                      {response.listening?.momentumTags?.length ? (
+                        <div className={cn("mt-3 flex flex-wrap items-center gap-2", isMobile && "mt-2 gap-1.5")}>
+                          {response.listening.momentumTags.slice(0, 3).map((tag) => (
+                            <Badge key={tag} variant="outline" className={cn("border-[#cfbea4] bg-[#fff6ed] text-[#8a431f]", isMobile && "rounded-full border-[#cfbea4]/55 px-2 py-0.5 text-[9px] uppercase tracking-[0.1em]")}>
+                              <Sparkles className="mr-1 size-2.5" />
+                              {getMomentumLabel(tag as ListeningMomentumTag)}
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : null}
+
+                      <div className="mt-4">
+                        <div className="h-1.5 overflow-hidden rounded-full bg-[#eadcca]">
+                          <div
+                            className="h-full rounded-full bg-[#b85e2d] transition-[width] duration-150 ease-linear"
+                            style={{ width: `${isActive ? session.progressPercent : 0}%` }}
+                          />
+                        </div>
+                        <div className="mt-2 flex items-center justify-between text-xs text-[#7a6146]">
+                          <span>{formatPlaybackTime(isActive ? session.displayElapsedSeconds : 0)}</span>
+                          <span>{formatPlaybackTime(response.durationSeconds)}</span>
+                        </div>
                       </div>
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
+
+                      <div className={cn("mt-4 flex items-center gap-3", isMobile && "grid grid-cols-2 gap-2")}>
                         <Button
-                          className="bg-[#b85e2d] text-[#fff6ed] hover:bg-[#a05227]"
+                          className={cn("bg-[#b85e2d] text-[#fff6ed] hover:bg-[#a05227]", isMobile && "min-h-9 w-full rounded-full px-3 text-[12px]")}
                           onClick={() => void playTake(response.id)}
                         >
                           {isPlaying ? <Pause className="mr-2 size-4" /> : <Play className="mr-2 size-4" />}
@@ -348,7 +436,7 @@ export function ReleaseTakeDeck({
                         </Button>
                         <Button
                           variant="outline"
-                          className="border-[#dbcdb8] bg-[#fffdf8]"
+                          className={cn("border-[#dbcdb8] bg-[#fffdf8]", isMobile && "min-h-9 w-full rounded-full border-[#dbcdb8]/55 bg-[#fff7ef] px-3 text-[12px]")}
                           onClick={() => session.setPreviewMode(!session.previewMode)}
                         >
                           {session.previewMode ? "Preview clip" : "Full take"}
@@ -357,7 +445,7 @@ export function ReleaseTakeDeck({
                     </div>
 
                     {primaryQuote ? (
-                      <div className="mt-3 rounded-2xl border border-[#e4d3bd] bg-[#fff8f0] px-4 py-3">
+                      <div className={cn("mt-3 rounded-2xl border border-[#e4d3bd] bg-[#fff8f0] px-4 py-3", isMobile && "rounded-[1rem] border-[#e4d3bd]/45 px-3 py-3")}>
                         <p className="text-[11px] uppercase tracking-[0.16em] text-[#8a431f]">Pull quote</p>
                         <blockquote className="mt-2 text-sm italic leading-6 text-[#665746]">
                           "{truncate(primaryQuote, 280)}"
@@ -402,7 +490,7 @@ export function ReleaseTakeDeck({
                   </section>
 
                   <section className="grid gap-3">
-                    <div className="rounded-2xl border border-[#dbcdb8] bg-[#fffdf8] p-4">
+                    <div className={cn("rounded-2xl border border-[#dbcdb8] bg-[#fffdf8] p-4", isMobile && "rounded-[1rem] border-[#dbcdb8]/35 p-3")}>
                       <div className="flex items-center justify-between gap-3">
                         <p className="text-sm font-medium text-[var(--af-color-primary)]">{transcriptLabel(response)}</p>
                         <span className="text-xs uppercase tracking-[0.14em] text-[#7a6146]">Read</span>
@@ -410,11 +498,11 @@ export function ReleaseTakeDeck({
                       <p className="mt-3 text-sm leading-6 text-[#5c5146]">{transcript}</p>
                     </div>
 
-                    <div className="rounded-2xl border border-[#dbcdb8] bg-[#fffaf3] p-4">
+                    <div className={cn("rounded-2xl border border-[#dbcdb8] bg-[#fffaf3] p-4", isMobile && "rounded-[1rem] border-[#dbcdb8]/35 p-3")}>
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div className="flex flex-wrap items-center gap-2">
                           <Sparkles className="size-4 text-[#8a431f]" />
-                          <p className="text-sm font-medium text-[var(--af-color-primary)]">AI summary</p>
+                          <p className="text-sm font-medium text-[var(--af-color-primary)]">Narrative summary</p>
                           {response.insight?.signalScore != null ? (
                             <span className="text-xs font-medium text-[#7a6146]">{response.insight.signalScore}/100</span>
                           ) : null}
@@ -429,10 +517,37 @@ export function ReleaseTakeDeck({
                           disabled={!onExtractInsight || extractingInsightId === response.id}
                           onClick={() => onExtractInsight?.(response.id)}
                         >
-                          {extractingInsightId === response.id ? "Generating..." : "Generate AI summary"}
+                          {extractingInsightId === response.id ? "Generating..." : "Generate narrative summary"}
                         </Button>
                       ) : null}
                     </div>
+                    {response.insight?.signalSummary ? (
+                      <div className={cn("rounded-2xl border border-[#dbcdb8] bg-[#fffdf8] p-4", isMobile && "rounded-[1rem] border-[#dbcdb8]/35 p-3")}>
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-sm font-medium text-[var(--af-color-primary)]">Signal</p>
+                          <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-[#7a6146]">
+                            {response.insight.signalSummary.emotion ? <span className="capitalize">{response.insight.signalSummary.emotion}</span> : null}
+                            {response.insight.signalSummary.confidence != null ? (
+                              <span>{Math.round(response.insight.signalSummary.confidence * 100)}%</span>
+                            ) : null}
+                          </div>
+                        </div>
+                        <div className="mt-3 space-y-2 text-sm text-[#665746]">
+                          {response.insight.signalSummary.complaint ? (
+                            <p><span className="font-medium text-[var(--af-color-primary)]">Complaint:</span> {response.insight.signalSummary.complaint}</p>
+                          ) : null}
+                          {response.insight.signalSummary.opportunity ? (
+                            <p><span className="font-medium text-[var(--af-color-primary)]">Opportunity:</span> {response.insight.signalSummary.opportunity}</p>
+                          ) : null}
+                          {response.insight.signalSummary.emotion ? (
+                            <p><span className="font-medium text-[var(--af-color-primary)]">Emotion:</span> {response.insight.signalSummary.emotion}</p>
+                          ) : null}
+                          {response.insight.signalSummary.frictionMoment ? (
+                            <p><span className="font-medium text-[var(--af-color-primary)]">Friction moment:</span> {response.insight.signalSummary.frictionMoment}</p>
+                          ) : null}
+                        </div>
+                      </div>
+                    ) : null}
                   </section>
                 </div>
               )}

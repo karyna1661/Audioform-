@@ -13,9 +13,10 @@ import {
 import { SurveyLoadingSkeleton } from "@/components/survey-loading-skeleton"
 import { Button } from "@/components/ui/button"
 import { AdminMobileNav } from "@/components/admin-mobile-nav"
-import { PocketActionStack, PocketSection, PocketShell } from "@/components/mobile/pocket-shell"
+import { MobilePage, MobileSection, PocketActionStack } from "@/components/mobile/pocket-shell"
 import { useIsMobile } from "@/components/ui/use-mobile"
-import { Copy, ExternalLink, MessageCircle, Play, QrCode, Send, Twitter } from "lucide-react"
+import { Copy, ExternalLink, Link2, MessageCircle, Play, QrCode, Send, Twitter } from "lucide-react"
+import { ShareQuoteCard } from "@/components/mobile/audioform-mobile-cards"
 
 type SurveyItem = {
   id: string
@@ -33,6 +34,13 @@ type PublicSurveyDetail = {
   publicListeningEnabled: boolean
   status: string
   questions: string[]
+}
+
+type ReleaseInsight = {
+  narrativeSummary: string | null
+  shareArtifacts: {
+    topQuotes: string[]
+  } | null
 }
 
 function isShareableSurveyStatus(status: SurveyItem["status"]) {
@@ -55,7 +63,9 @@ export default function AdminSharePage() {
   const [message, setMessage] = useState<string | null>(null)
   const [selectedSurveyId, setSelectedSurveyId] = useState<string | null>(null)
   const [selectedSurveyDetail, setSelectedSurveyDetail] = useState<PublicSurveyDetail | null>(null)
+  const [releaseInsight, setReleaseInsight] = useState<ReleaseInsight | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
+  const [copiedQuote, setCopiedQuote] = useState<string | null>(null)
 
   useEffect(() => {
     if (status !== "authenticated") return
@@ -87,6 +97,7 @@ export default function AdminSharePage() {
   useEffect(() => {
     if (!selectedSurveyId) {
       setSelectedSurveyDetail(null)
+      setReleaseInsight(null)
       return
     }
 
@@ -94,15 +105,21 @@ export default function AdminSharePage() {
     setDetailLoading(true)
     const run = async () => {
       try {
-        const response = await fetch(`/api/surveys/public/${encodeURIComponent(selectedSurveyId)}`, {
-          cache: "no-store",
-        })
-        if (!response.ok) throw new Error("Failed to load release details.")
-        const json = (await response.json()) as { survey?: PublicSurveyDetail }
-        if (!cancelled) setSelectedSurveyDetail(json.survey ?? null)
+        const [surveyResponse, responseInsightResponse] = await Promise.all([
+          fetch(`/api/surveys/public/${encodeURIComponent(selectedSurveyId)}`, { cache: "no-store" }),
+          fetch(`/api/responses?surveyId=${encodeURIComponent(selectedSurveyId)}&limit=500`, { credentials: "include", cache: "no-store" }),
+        ])
+        if (!surveyResponse.ok) throw new Error("Failed to load release details.")
+        const surveyJson = (await surveyResponse.json()) as { survey?: PublicSurveyDetail }
+        const responseJson = responseInsightResponse.ok ? (await responseInsightResponse.json()) as { releaseInsight?: ReleaseInsight } : { releaseInsight: null }
+        if (!cancelled) {
+          setSelectedSurveyDetail(surveyJson.survey ?? null)
+          setReleaseInsight(responseJson.releaseInsight ?? null)
+        }
       } catch {
         if (!cancelled) {
           setSelectedSurveyDetail(null)
+          setReleaseInsight(null)
           setMessage("Could not load the preview prompt for this release.")
         }
       } finally {
@@ -161,6 +178,7 @@ export default function AdminSharePage() {
   const distributionLabel = selectedSurveyDetail?.publicListeningEnabled
     ? "Social cards invite people to hear the conversation, add their voice, and join the listening room."
     : "Social cards invite people to hear the prompt and add their voice in one clean link-first flow."
+  const topQuotes = releaseInsight?.shareArtifacts?.topQuotes ?? []
 
   const downloadQrCode = async () => {
     if (!selectedSurvey || !links.qrUrl) return
@@ -225,119 +243,99 @@ export default function AdminSharePage() {
   if (isMobile) {
     return (
       <>
-        <PocketShell
-          eyebrow="Distribution"
-          title="Share hub"
-          description="Social preview goes to the release card. QR sends people straight into the live survey."
-        >
+        <MobilePage title="Share">
           {message ? (
-            <p className="font-body mb-4 rounded-2xl border border-[#cfbea4] bg-[#fff8f0] px-4 py-3 text-sm text-[#665746]">
+            <p className="font-body rounded-[0.9rem] bg-[#fff7ee] px-3 py-2.5 text-[12px] leading-5 text-[#665746]">
               {message}
             </p>
           ) : null}
 
-          <PocketSection
-            title="Live release"
-            description={selectedSurvey ? "Choose the release you want to send into the world." : "Publish from Studio first to use the share hub."}
-          >
+          <MobileSection title="Live release" description={selectedSurvey ? "Choose the release you want to send into the world." : "Publish from Studio first to use the share hub."}>
             {surveySelector}
-          </PocketSection>
+          </MobileSection>
 
           {selectedSurvey ? (
             <>
-              <PocketSection
-                title="Social preview"
-                description={detailLoading ? "Loading first prompt preview..." : distributionLabel}
-                className="mt-4 bg-[#fff6ed]"
-              >
-                <div className="rounded-[1.4rem] border border-[#dbcdb8] bg-[linear-gradient(180deg,#fffdf8_0%,#fff7ee_100%)] p-4">
-                  <img
-                    src={links.ogImageUrl}
-                    alt={`OG preview for ${selectedSurvey.title}`}
-                    className="w-full rounded-[1.1rem] border border-[#dbcdb8]"
-                  />
-                  <p className="mt-4 text-xs font-semibold uppercase tracking-[0.16em] text-[#8a431f]">First prompt preview</p>
-                  <p className="mt-2 text-base font-semibold leading-7 text-[var(--af-color-primary)]">{firstQuestion}</p>
+              <MobileSection title={selectedSurvey.title} description={`${selectedSurvey.questionCount} prompts · ${selectedSurveyDetail?.publicListeningEnabled ? "public listening on" : "voice answer flow"}`}>
+                <div className="rounded-[1rem] bg-[#fffdf8] p-3 shadow-[0_4px_12px_rgba(86,57,25,0.03)]">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8a431f]">First prompt preview</p>
+                  <p className="mt-2 text-[14px] font-semibold leading-6 text-[var(--af-color-primary)]">{firstQuestion}</p>
+                  <p className="mt-2 text-[12px] leading-5 text-[#665746]">{detailLoading ? "Loading preview..." : distributionLabel}</p>
                 </div>
-                <div className="mt-4 rounded-[1.2rem] border border-[#dbcdb8] bg-[#fffdf8] p-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8a431f]">Distribution script</p>
-                  <p className="mt-2 text-sm leading-6 text-[#5c5146]">
-                    Hear. Speak. Join. Start with the first prompt, answer by voice, then follow the conversation when public listening is on.
-                  </p>
+                <div className="mt-2.5 flex items-center justify-between rounded-[1rem] bg-[#f8efdf] p-3 shadow-[0_4px_12px_rgba(86,57,25,0.03)]">
+                  <div className="flex items-center gap-2">
+                    <Link2 className="size-4 text-[#8a431f]" />
+                    <span className="text-[12px] text-[#5c5146] line-clamp-1">audioform.app/r/{selectedSurvey.id.slice(-6)}</span>
+                  </div>
+                  <button type="button" className="inline-flex h-8 w-8 items-center justify-center rounded-[0.65rem] bg-[#f3ecdf] text-[#8c7f70]" onClick={() => void copyToClipboard(links.previewUrl, `Preview link copied for "${selectedSurvey.title}".`, "Could not copy preview link. Please try again.") }>
+                    <Copy className="size-3.5" />
+                  </button>
                 </div>
-                <PocketActionStack>
-                  <Button
-                    className="w-full bg-[#b85e2d] text-[#fff6ed] hover:bg-[#a05227]"
-                    onClick={() => void copyToClipboard(links.previewUrl, `Preview link copied for "${selectedSurvey.title}".`, "Could not copy preview link. Please try again.")}
-                  >
-                    <Copy className="mr-2 size-4" />
-                    Copy social preview link
-                  </Button>
-                  <Button asChild variant="outline" className="w-full border-[#dbcdb8] bg-[#fffdf8]">
-                    <a href={links.whatsappUrl} target="_blank" rel="noreferrer">
-                      <MessageCircle className="mr-2 size-4" />
-                      Share to WhatsApp
-                    </a>
-                  </Button>
-                  <Button asChild variant="outline" className="w-full border-[#dbcdb8] bg-[#fffdf8]">
-                    <a href={links.xUrl} target="_blank" rel="noreferrer">
-                      <Twitter className="mr-2 size-4" />
-                      Share to X
-                    </a>
-                  </Button>
-                  <Button asChild variant="outline" className="w-full border-[#dbcdb8] bg-[#fffdf8]">
-                    <a href={links.telegramUrl} target="_blank" rel="noreferrer">
-                      <Send className="mr-2 size-4" />
-                      Share to Telegram
-                    </a>
-                  </Button>
-                </PocketActionStack>
-              </PocketSection>
+              </MobileSection>
 
-              <PocketSection
-                title="QR handoff"
-                description="Scan goes directly into the live survey, not the preview page."
-                className="mt-4"
-              >
-                <div className="mx-auto w-fit rounded-[1.5rem] border border-[#dbcdb8] bg-[linear-gradient(180deg,#fff8f0_0%,#fffdf8_100%)] p-4">
-                  <img src={links.qrUrl} alt="QR code for live survey" width={220} height={220} className="size-[220px]" />
+              <MobileSection title="QR handoff" description="Scan goes directly into the live survey, not the preview page.">
+                <div className="mx-auto w-fit rounded-[1rem] bg-[linear-gradient(180deg,#fff8f0_0%,#fffdf8_100%)] p-3 shadow-[0_4px_12px_rgba(86,57,25,0.03)]">
+                  <img src={links.qrUrl} alt="QR code for live survey" width={180} height={180} className="size-[180px]" />
                 </div>
-                <div className="mt-4 rounded-[1.2rem] border border-[#dbcdb8] bg-[#fff6ed] p-3">
+                <div className="mt-2.5 rounded-[1rem] bg-[#fff6ed] p-3 shadow-[0_4px_12px_rgba(86,57,25,0.03)]">
                   <div className="flex items-center gap-2 text-[#8a431f]">
                     <Play className="size-4" />
                     <p className="text-[11px] font-semibold uppercase tracking-[0.16em]">Scan path</p>
                   </div>
-                  <p className="mt-2 text-sm leading-6 text-[#5c5146]">
+                  <p className="mt-2 text-[12px] leading-5 text-[#5c5146]">
                     QR is for rooms, events, and in-person demos. It should always open the live survey first so people can start speaking immediately.
                   </p>
                 </div>
                 <PocketActionStack>
-                  <Button
-                    className="w-full bg-[#b85e2d] text-[#fff6ed] hover:bg-[#a05227]"
-                    onClick={downloadQrCode}
-                  >
+                  <Button className="min-h-9 w-full bg-[#b85e2d] px-3 text-[12px] text-[#fff6ed] hover:bg-[#a05227]" onClick={downloadQrCode}>
                     <QrCode className="mr-2 size-4" />
                     Download survey QR
                   </Button>
-                  <Button
-                    variant="outline"
-                    className="w-full border-[#dbcdb8] bg-[#fffdf8]"
-                    onClick={() => void copyToClipboard(links.surveyUrl, `Live survey link copied for "${selectedSurvey.title}".`, "Could not copy live survey link. Please try again.")}
-                  >
+                  <Button variant="outline" className="min-h-9 w-full border-[#dbcdb8]/55 bg-[#fffdf8] px-3 text-[12px]" onClick={() => void copyToClipboard(links.surveyUrl, `Live survey link copied for "${selectedSurvey.title}".`, "Could not copy live survey link. Please try again.") }>
                     <Copy className="mr-2 size-4" />
                     Copy live survey link
                   </Button>
-                  <Button asChild variant="outline" className="w-full border-[#dbcdb8] bg-[#fffdf8]">
+                  <Button asChild variant="outline" className="min-h-9 w-full border-[#dbcdb8]/55 bg-[#fffdf8] px-3 text-[12px]">
                     <a href={links.surveyUrl} target="_blank" rel="noreferrer">
                       <ExternalLink className="mr-2 size-4" />
-                      Open live survey
-                    </a>
-                  </Button>
-                </PocketActionStack>
-              </PocketSection>
+                    Open live survey
+                  </a>
+                </Button>
+              </PocketActionStack>
+              </MobileSection>
+
+              <MobileSection title="Top quotes" description="Verbatim moments worth sharing responsibly.">
+                {topQuotes.length ? (
+                  <div className="space-y-2">
+                    {topQuotes.map((quote) => (
+                      <ShareQuoteCard
+                        key={quote}
+                        quote={quote}
+                        copied={copiedQuote === quote}
+                        onCopy={async () => {
+                          await copyToClipboard(quote, "Quote copied.", "Could not copy quote.")
+                          setCopiedQuote(quote)
+                          window.setTimeout(() => setCopiedQuote((current) => (current === quote ? null : current)), 1600)
+                        }}
+                        onShare={() => void copyToClipboard(`${quote}\n\n${selectedSurvey.title}\n${links.previewUrl}`, "Quote share text copied.", "Could not prepare quote share text.")}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-[1rem] bg-[#fffdf8] p-3 text-[12px] leading-5 text-[#665746] shadow-[0_4px_12px_rgba(86,57,25,0.03)]">
+                    Release-level share quotes will appear here once enough enriched takes land in the insight engine.
+                  </div>
+                )}
+                {releaseInsight?.narrativeSummary ? (
+                  <div className="mt-2.5 rounded-[1rem] bg-[#f2ddcd] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.28)]">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8a431f]">Release summary</p>
+                    <p className="mt-2 text-[12px] leading-5 text-[#5c5146]">{releaseInsight.narrativeSummary}</p>
+                  </div>
+                ) : null}
+              </MobileSection>
             </>
           ) : null}
-        </PocketShell>
+        </MobilePage>
         <AdminMobileNav />
       </>
     )

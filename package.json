@@ -19,6 +19,7 @@
     "gtm:free": "npm run -s gtm:reddit && npm run -s gtm:hn && npm run -s gtm:brief",
     "gtm:all": "npm run -s gtm:pipeline && npm run -s gtm:reddit && npm run -s gtm:hn && npm run -s gtm:brief",
     "worker:queue": "node scripts/process-job-queue.mjs",
+    "backfill:insights": "node scripts/backfill-insight-engine.mjs",
     "video:preview": "remotion studio remotion/index.ts",
     "video:render:demo": "remotion render remotion/index.ts AudioformBuildDemo out/audioform-build-demo.mp4 --codec=h264 --crf=18",
     "video:render:versioned": "node tasks/video-render-versioned.mjs"

@@ -50,13 +50,21 @@ type ResponseWithMetadata = {
   } | null
   insight?: {
     id: string
-    summary: string | null
+    narrativeSummary: string | null
+    signalSummary: {
+      complaint?: string | null
+      opportunity?: string | null
+      emotion?: string | null
+      frictionMoment?: string | null
+      confidence?: number | null
+    } | null
+    powerQuote: string | null
+    verbatimQuotes: string[]
     primaryTheme: string | null
     themes: string[]
     sentiment: string | null
     sentimentScore: number | null
     signalScore: number | null
-    quotes: string[]
     provider: string | null
     extractorVersion: string | null
   } | null
@@ -350,7 +358,7 @@ export function ResponseInbox({
           ) : (
             filteredResponses.map((response) => {
               const isExpanded = Boolean(expandedInsightIds[response.id])
-              const fullSummary = response.insight?.summary ?? null
+              const fullSummary = response.insight?.narrativeSummary ?? null
               const truncatedSummary = fullSummary && fullSummary.length > 160 && !isExpanded
                 ? `${fullSummary.slice(0, 157)}...`
                 : fullSummary
@@ -462,8 +470,8 @@ export function ResponseInbox({
                           ) : null}
                         </>
                       ) : null}
-                      {response.insight.quotes?.[0] ? (
-                        <p className="mt-2 text-xs italic text-[#665746]">"{response.insight.quotes[0]}"</p>
+                      {response.insight.powerQuote ? (
+                        <p className="mt-2 text-xs italic text-[#665746]">"{response.insight.powerQuote}"</p>
                       ) : null}
                       <Button
                         variant="outline"
@@ -489,8 +497,8 @@ export function ResponseInbox({
                         {extractingInsightId === response.id
                           ? "Extracting..."
                           : response.transcript?.status === "failed"
-                            ? "Retry AI summary"
-                            : "Generate AI summary"}
+                            ? "Retry narrative summary"
+                            : "Generate narrative summary"}
                       </Button>
                     </div>
                   )}
@@ -627,7 +635,7 @@ export function ResponseInbox({
           filteredResponses.map((response) => (
             (() => {
               const isExpanded = Boolean(expandedInsightIds[response.id])
-              const fullSummary = response.insight?.summary ?? null
+              const fullSummary = response.insight?.narrativeSummary ?? null
               const truncatedSummary = fullSummary && fullSummary.length > 160 && !isExpanded
                 ? `${fullSummary.slice(0, 157)}...`
                 : fullSummary
@@ -757,8 +765,8 @@ export function ResponseInbox({
                                ) : null}
                              </>
                            ) : null}
-                          {response.insight.quotes?.[0] ? (
-                            <p className="mt-1.5 sm:mt-2 text-xs italic text-[#665746] line-clamp-2">"{response.insight.quotes[0]}"</p>
+                          {response.insight.powerQuote ? (
+                            <p className="mt-1.5 sm:mt-2 text-xs italic text-[#665746] line-clamp-2">"{response.insight.powerQuote}"</p>
                           ) : null}
                         </div>
                       ) : null}
@@ -775,8 +783,8 @@ export function ResponseInbox({
                            {extractingInsightId === response.id
                              ? "Extracting..."
                              : response.transcript?.status === "failed"
-                               ? "Retry AI summary"
-                               : "Generate AI summary"}
+                               ? "Retry narrative summary"
+                               : "Generate narrative summary"}
                          </Button>
                        </div>
                      ) : null}

@@ -121,7 +121,10 @@ export default function Home() {
     <main className="af-shell af-noise-wrap min-h-dvh text-[#1f1b17]">
       <div className="mx-auto max-w-6xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-8">
         <header className="af-fade-up flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#dbcdb8] bg-[#f7efe2] px-4 py-3 sm:rounded-full sm:px-5">
-          <p className="text-sm font-medium uppercase text-balance">AudioForm</p>
+          <div>
+            <p className="text-sm font-medium uppercase text-balance">AudioForm</p>
+            <p className="mt-1 text-[11px] uppercase tracking-[0.18em] text-[#8a5a33] sm:hidden">Premium voice signal</p>
+          </div>
           <div className="flex w-full items-center gap-2 sm:w-auto">
             <Link
               href="/login"
@@ -141,6 +144,13 @@ export default function Home() {
         </header>
 
         <section className="af-panel af-sprinkle af-fade-up af-delay-1 mt-8 rounded-[1.75rem] border p-4 sm:mt-10 sm:rounded-[2.5rem] sm:p-12">
+          <div className="af-chip mb-4 flex items-center justify-between gap-3 rounded-[1.1rem] border px-3 py-3 sm:hidden">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#8a5a33]">Signal flow</p>
+              <p className="mt-1 text-sm font-medium text-[#5c5146]">Studio to Listen to shareable artifacts.</p>
+            </div>
+            <span className="rounded-full bg-[#fff7ee] px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-[#8a5a33]">Mobile tuned</span>
+          </div>
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start lg:gap-2">
             <div className="lg:pr-8 xl:pr-10">
               <div className="inline-flex items-center gap-2 rounded-full border border-[#dbcdb8] bg-[#fff7ee] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8a5a33]">
@@ -181,6 +191,18 @@ export default function Home() {
                 Studio helps you shape better prompts. Listen helps you hear ranked takes fast, so voice feedback becomes a
                 human signal stream instead of another tool you have to decode.
               </p>
+              <div className="mt-5 grid grid-cols-3 gap-2 sm:hidden">
+                {[
+                  { value: "Ranked", label: "playback first" },
+                  { value: "Clustered", label: "themes ready" },
+                  { value: "Shareable", label: "signal artifacts" },
+                ].map((item) => (
+                  <div key={item.label} className="rounded-[1.15rem] border border-[#dbcdb8] bg-[#fff8f0] px-3 py-3 text-left">
+                    <p className="text-sm font-semibold text-[var(--af-color-primary)]">{item.value}</p>
+                    <p className="mt-1 text-[11px] leading-4 text-[#6a5a49]">{item.label}</p>
+                  </div>
+                ))}
+              </div>
               <div className="mt-6 flex flex-col gap-3 sm:mt-8 sm:flex-row sm:flex-wrap">
                 <Link
                   href={signalLoopHref}
@@ -227,27 +249,53 @@ export default function Home() {
                       priority
                     />
                   </div>
+                  <div className="mt-3 rounded-[1.15rem] border border-[#eadbc7] bg-[#fff8f0] px-3 py-3 sm:hidden">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#8f6438]">Inside the product</p>
+                    <p className="mt-1 text-sm leading-5 text-[#665746]">Hear strongest takes first, then open the deck only when a response deserves deeper interpretation.</p>
+                  </div>
                 </div>
               </div>
             </motion.aside>
           </div>
 
-          <div className="mt-5 grid gap-2 sm:mt-7 sm:grid-cols-2">
+          <div className="mt-5 hidden gap-2 sm:mt-7 sm:grid sm:grid-cols-2">
             {[
               "Define the decision you need to make this week.",
               "Use Studio to shape the prompt, then use Listen to replay the strongest takes first.",
             ].map((line) => (
               <div
                 key={line}
-              className="af-chip af-fade-up af-delay-2 font-body flex min-h-20 items-center justify-center rounded-xl border px-3 py-3 text-center text-sm font-medium leading-snug text-[#5c5146]"
+                className="af-chip af-fade-up af-delay-2 font-body flex min-h-20 items-center justify-center rounded-xl border px-3 py-3 text-center text-sm font-medium leading-snug text-[#5c5146]"
               >
                 {line}
               </div>
             ))}
           </div>
+
+          <div className="af-mobile-rail mt-5 sm:hidden">
+            {[
+              {
+                title: "Start with one real decision",
+                text: "Frame the release around the product call, message tension, or research question you actually need to resolve.",
+              },
+              {
+                title: "Listen before you over-read",
+                text: "Preview-ranked takes keep the first minute alive so mobile listening feels immediate, not like desk work on a small screen.",
+              },
+              {
+                title: "Carry forward only trustworthy signal",
+                text: "Quotes stay verbatim. Summaries stay synthetic. Clusters stay grouped so the mobile view remains honest and legible.",
+              },
+            ].map((item) => (
+              <div key={item.title} className="af-mobile-rail-card rounded-[1.2rem] border border-[#dbcdb8] bg-[#fff8f0] p-4">
+                <p className="text-sm font-semibold text-[var(--af-color-primary)]">{item.title}</p>
+                <p className="mt-2 text-sm leading-6 text-[#5c5146]">{item.text}</p>
+              </div>
+            ))}
+          </div>
         </section>
 
-        <section className="mt-8 grid gap-4 md:grid-cols-3">
+        <section className="mt-8 hidden gap-4 md:grid md:grid-cols-3">
           {[
             {
               icon: <Mic className="size-5" aria-hidden="true" />,
@@ -269,6 +317,32 @@ export default function Home() {
               <div className="inline-flex rounded-full border border-[#dbcdb8] p-2 text-[#b85e2d]">{item.icon}</div>
               <h2 className="mt-4 text-xl font-medium text-balance">{item.title}</h2>
               <p className="mt-2 text-pretty text-sm leading-relaxed text-[#5c5146]">{item.text}</p>
+            </article>
+          ))}
+        </section>
+
+        <section className="af-mobile-scroller mt-8 md:hidden">
+          {[
+            {
+              icon: <Mic className="size-5" aria-hidden="true" />,
+              title: "Studio",
+              text: "Compose prompts that uncover friction, opportunity, and minority viewpoints before the first take lands.",
+            },
+            {
+              icon: <AudioWaveform className="size-5" aria-hidden="true" />,
+              title: "Listen",
+              text: "Replay ranked takes with enough atmosphere and structure that the mobile experience still feels calm and decisive.",
+            },
+            {
+              icon: <Sparkles className="size-5" aria-hidden="true" />,
+              title: "Insight",
+              text: "Move from verbatim quote to release-level synthesis without confusing AI interpretation for what people actually said.",
+            },
+          ].map((item) => (
+            <article key={item.title} className="af-accent-card af-glow-hover rounded-[1.6rem] border p-5">
+              <div className="inline-flex rounded-full border border-[#dbcdb8] p-2 text-[#b85e2d]">{item.icon}</div>
+              <h2 className="mt-4 text-[1.15rem] font-semibold text-balance text-[var(--af-color-primary)]">{item.title}</h2>
+              <p className="mt-2 text-sm leading-6 text-[#5c5146]">{item.text}</p>
             </article>
           ))}
         </section>

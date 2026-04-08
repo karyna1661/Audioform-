@@ -18,6 +18,35 @@ export default function AdminSettingsPage() {
           title="Settings"
           description="Use this mobile control room to steer the live feedback loop while fuller workspace settings continue to grow."
         >
+          <div className="mb-4 grid grid-cols-3 gap-2">
+            <div className="rounded-[1.15rem] border border-[#dbcdb8] bg-[#fff8f0] px-3 py-3 text-center">
+              <p className="text-[10px] uppercase tracking-[0.18em] text-[#7a6146]">Alerts</p>
+              <p className="mt-1 text-base font-semibold text-[var(--af-color-primary)]">On</p>
+              <p className="mt-1 text-[11px] leading-4 text-[#665746]">notification hub</p>
+            </div>
+            <div className="rounded-[1.15rem] border border-[#dbcdb8] bg-[#fff8f0] px-3 py-3 text-center">
+              <p className="text-[10px] uppercase tracking-[0.18em] text-[#7a6146]">Share</p>
+              <p className="mt-1 text-base font-semibold text-[var(--af-color-primary)]">Ready</p>
+              <p className="mt-1 text-[11px] leading-4 text-[#665746]">distribution tools</p>
+            </div>
+            <div className="rounded-[1.15rem] border border-[#dbcdb8] bg-[#fff8f0] px-3 py-3 text-center">
+              <p className="text-[10px] uppercase tracking-[0.18em] text-[#7a6146]">Role</p>
+              <p className="mt-1 text-base font-semibold text-[var(--af-color-primary)]">Guide</p>
+              <p className="mt-1 text-[11px] leading-4 text-[#665746]">not admin clutter</p>
+            </div>
+          </div>
+
+          <PocketSection title="Settings philosophy" description="Mobile settings should stay narrow, calm, and operationally useful." className="mb-4 bg-[#fff8f0]">
+            <div className="af-mobile-rail">
+              {[
+                "Link out to the surfaces that actually change the live loop instead of duplicating controls here.",
+                "Keep this page as a control room, not a dumping ground for desktop-style configuration.",
+              ].map((line) => (
+                <div key={line} className="af-mobile-rail-card rounded-[1.1rem] border border-[#dbcdb8] bg-[#fffdf8] p-3.5 text-sm leading-6 text-[#5c5146]">{line}</div>
+              ))}
+            </div>
+          </PocketSection>
+
           <PocketSection
             title="Loop controls"
             description="These are the settings-adjacent actions that matter most on mobile right now."

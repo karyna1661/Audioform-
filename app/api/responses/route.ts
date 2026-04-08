@@ -27,6 +27,7 @@ import { findUserById } from "@/lib/server/auth-store"
 import { sendOrQueueEmail } from "@/lib/server/queued-email"
 import { getCorsHeaders, hasAllowedApiOrigin } from "@/lib/server/cors"
 import { listInsightsByTranscriptIds } from "@/lib/server/insight-store"
+import { aggregateAndStoreReleaseInsight } from "@/lib/server/release-insight-engine"
 import { getRequestId, logServerEvent, logServerError } from "@/lib/server/observability"
 import { applyRateLimit, getRequestClientIp } from "@/lib/server/rate-limit"
 import { listTranscriptsByResponseIds } from "@/lib/server/transcript-store"
@@ -164,7 +165,7 @@ export async function POST(request: NextRequest) {
       storagePath = uploaded.storagePath
       storageFileId = uploaded.storageFileId ?? null
 
-      const stored = await finalizeUploadedResponse({
+        const stored = await finalizeUploadedResponse({
         id: pending.id,
         fileName: audioFile.name || `${pending.id}.audio`,
         mimeType: audioFile.type || "application/octet-stream",
@@ -382,8 +383,21 @@ export async function GET(request: NextRequest) {
   }
   const insights = await listInsightsByTranscriptIds(transcripts.map((item) => item.id))
   const insightByTranscriptId = new Map(insights.map((insight) => [insight.transcriptId, insight]))
+  const releaseInsight = surveyId ? await aggregateAndStoreReleaseInsight(surveyId).catch(() => null) : null
 
   return NextResponse.json({
+    releaseInsight: releaseInsight
+      ? {
+          id: releaseInsight.id,
+          surveyId: releaseInsight.surveyId,
+          narrativeSummary: releaseInsight.narrativeSummary,
+          signalSummary: releaseInsight.signalSummary,
+          clusters: releaseInsight.clusters,
+          shareArtifacts: releaseInsight.shareArtifacts,
+          provider: releaseInsight.provider,
+          extractorVersion: releaseInsight.extractorVersion,
+        }
+      : null,
     responses: responses.map((item) => {
       const questionList = surveyQuestionsById.get(item.surveyId) ?? []
       const questionIndex = Number.parseInt(item.questionId.replace(/^q/i, ""), 10) - 1
@@ -414,7 +428,7 @@ export async function GET(request: NextRequest) {
             durationSeconds: item.durationSeconds,
             transcriptText: transcript?.transcriptText ?? null,
             transcriptStatus: transcript?.status ?? null,
-            summary: insight?.summary ?? null,
+            narrativeSummary: insight?.narrativeSummary ?? null,
             primaryTheme: insight?.primaryTheme ?? null,
             themes: insight?.themes ?? [],
             signalScore: insight?.signalScore ?? null,
@@ -431,7 +445,7 @@ export async function GET(request: NextRequest) {
             item.hotTake ||
             deriveHotTake({
               durationSeconds: item.durationSeconds,
-              summary: insight?.summary ?? null,
+              narrativeSummary: insight?.narrativeSummary ?? null,
               primaryTheme: insight?.primaryTheme ?? null,
               highSignal: item.highSignal,
               bookmarked: item.bookmarked,
@@ -464,13 +478,16 @@ export async function GET(request: NextRequest) {
         insight: insight
           ? {
               id: insight.id,
-              summary: insight.summary,
+              narrativeSummary: insight.narrativeSummary,
+              signalSummary: insight.signalSummary,
+              powerQuote: insight.powerQuote,
+              verbatimQuotes: insight.verbatimQuotes,
+              quoteCandidates: insight.quoteCandidates,
               primaryTheme: insight.primaryTheme,
               themes: insight.themes,
               sentiment: insight.sentiment,
               sentimentScore: insight.sentimentScore,
               signalScore: insight.signalScore,
-              quotes: insight.quotes,
               provider: insight.provider,
               extractorVersion: insight.extractorVersion,
             }

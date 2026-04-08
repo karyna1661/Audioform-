@@ -1,6 +1,9 @@
 import { evalRedis, isRedisConfigured } from "@/lib/server/redis-client"
 
 const windows = new Map<string, { count: number; resetAt: number }>()
+const REDIS_RETRY_COOLDOWN_MS = 30_000
+let redisRetryAllowedAt = 0
+let lastRedisFailureMessage: string | null = null
 
 const RATE_LIMIT_LUA = [
   'local current = redis.call("INCR", KEYS[1])',
@@ -75,11 +78,20 @@ export async function applyRateLimit(input: {
   windowMs: number
   max: number
 }): Promise<RateLimitResult> {
-  if (isRedisConfigured()) {
+  const now = Date.now()
+  if (isRedisConfigured() && now >= redisRetryAllowedAt) {
     try {
-      return await applyRedisRateLimit(input)
+      const result = await applyRedisRateLimit(input)
+      redisRetryAllowedAt = 0
+      lastRedisFailureMessage = null
+      return result
     } catch (error) {
-      console.error("Redis rate limit failed, falling back to memory:", error)
+      redisRetryAllowedAt = now + REDIS_RETRY_COOLDOWN_MS
+      const message = error instanceof Error ? error.message : String(error)
+      if (message !== lastRedisFailureMessage) {
+        console.error("Redis rate limit failed, falling back to memory:", error)
+        lastRedisFailureMessage = message
+      }
     }
   }
 

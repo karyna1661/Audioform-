@@ -1,4 +1,5 @@
 import { ImageResponse } from "next/og"
+import { getReleaseInsightBySurveyId } from "@/lib/server/release-insight-store"
 import { getLatestPublishedSurveyQuestions, getPublishedSurveyById } from "@/lib/server/survey-store"
 import { isUuidLike } from "@/lib/share-links"
 
@@ -10,11 +11,14 @@ export async function GET(request: Request) {
 
   const resolvedSurveyId = surveyId && isUuidLike(surveyId) ? surveyId : null
   const survey = resolvedSurveyId ? await getPublishedSurveyById(resolvedSurveyId) : null
+  const releaseInsight = resolvedSurveyId ? await getReleaseInsightBySurveyId(resolvedSurveyId).catch(() => null) : null
   const prompts = resolvedSurveyId ? await getLatestPublishedSurveyQuestions(resolvedSurveyId) : []
 
   const title = survey?.title?.trim() || "Audioform voice survey"
   const firstPrompt = prompts[0]?.trim() || "Share one concrete moment by voice."
   const prompt = firstPrompt.length > 150 ? `${firstPrompt.slice(0, 147)}...` : firstPrompt
+  const narrative = releaseInsight?.narrativeSummary ? (releaseInsight.narrativeSummary.length > 190 ? `${releaseInsight.narrativeSummary.slice(0, 187)}...` : releaseInsight.narrativeSummary) : null
+  const powerQuote = releaseInsight?.shareArtifacts?.topQuotes?.[0] || null
 
   return new ImageResponse(
     (
@@ -64,6 +68,12 @@ export async function GET(request: Request) {
               First prompt preview
             </div>
             <div style={{ fontSize: 42, fontWeight: 600, lineHeight: 1.18 }}>{prompt}</div>
+            {narrative ? (
+              <div style={{ fontSize: 22, lineHeight: 1.35, color: "#5c5146" }}>{narrative}</div>
+            ) : null}
+            {powerQuote ? (
+              <div style={{ fontSize: 28, lineHeight: 1.3, fontStyle: "italic", color: "#6e3316" }}>{`"${powerQuote}"`}</div>
+            ) : null}
           </div>
         </div>
 

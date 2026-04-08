@@ -18,6 +18,35 @@ export default function AdminHelpPage() {
           title="Help center"
           description="This mobile help surface now routes creators to the fastest unblock path instead of leaving them in a dead-end placeholder."
         >
+          <div className="mb-4 grid grid-cols-3 gap-2">
+            <div className="rounded-[1.15rem] border border-[#dbcdb8] bg-[#fff8f0] px-3 py-3 text-center">
+              <p className="text-[10px] uppercase tracking-[0.18em] text-[#7a6146]">Tracks</p>
+              <p className="mt-1 text-base font-semibold text-[var(--af-color-primary)]">Review</p>
+              <p className="mt-1 text-[11px] leading-4 text-[#665746]">signal first</p>
+            </div>
+            <div className="rounded-[1.15rem] border border-[#dbcdb8] bg-[#fff8f0] px-3 py-3 text-center">
+              <p className="text-[10px] uppercase tracking-[0.18em] text-[#7a6146]">Studio</p>
+              <p className="mt-1 text-base font-semibold text-[var(--af-color-primary)]">Refine</p>
+              <p className="mt-1 text-[11px] leading-4 text-[#665746]">prompt loop</p>
+            </div>
+            <div className="rounded-[1.15rem] border border-[#dbcdb8] bg-[#fff8f0] px-3 py-3 text-center">
+              <p className="text-[10px] uppercase tracking-[0.18em] text-[#7a6146]">Share</p>
+              <p className="mt-1 text-base font-semibold text-[var(--af-color-primary)]">Check</p>
+              <p className="mt-1 text-[11px] leading-4 text-[#665746]">distribution path</p>
+            </div>
+          </div>
+
+          <PocketSection title="Support posture" description="Help should route you to the real product surface that fixes the problem fastest." className="mb-4 bg-[#fff8f0]">
+            <div className="af-mobile-rail">
+              {[
+                "Use help as a routing layer, not a dead-end documentation page.",
+                "If the issue is live signal, distribution, or alerts, jump straight into the operational screen that controls it.",
+              ].map((line) => (
+                <div key={line} className="af-mobile-rail-card rounded-[1.1rem] border border-[#dbcdb8] bg-[#fffdf8] p-3.5 text-sm leading-6 text-[#5c5146]">{line}</div>
+              ))}
+            </div>
+          </PocketSection>
+
           <PocketSection title="Fix the loop fast" description="Most mobile questions map to one of these working product surfaces." className="bg-[#fff6ed]">
             <PocketActionStack>
               <Link href="/admin/responses">

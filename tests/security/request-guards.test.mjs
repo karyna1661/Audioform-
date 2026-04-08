@@ -1,10 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {
+import requestGuards from "../../lib/server/request-guards.js";
+
+const {
   hasMatchingState,
   hasTrustedOrigin,
   resolveExpectedOrigin,
-} from "../../lib/server/request-guards.js";
+} = requestGuards;
 
 test("resolveExpectedOrigin prefers configured app url", () => {
   assert.equal(
@@ -58,6 +60,18 @@ test("hasTrustedOrigin accepts localhost requests even when configured app url d
       requestOrigin: "http://localhost:3001",
       requestReferer: null,
       requestUrl: "http://localhost:3001/api/auth/login",
+      configuredAppUrl: "https://audioform-production.up.railway.app",
+    }),
+    true,
+  );
+});
+
+test("hasTrustedOrigin accepts private-network requests for local device testing", () => {
+  assert.equal(
+    hasTrustedOrigin({
+      requestOrigin: "http://192.168.1.25:3000",
+      requestReferer: null,
+      requestUrl: "http://192.168.1.25:3000/api/auth/login",
       configuredAppUrl: "https://audioform-production.up.railway.app",
     }),
     true,

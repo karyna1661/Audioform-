@@ -18,6 +18,35 @@ export default function AdminProfilePage() {
           title="Profile"
           description="This mobile account surface now acts as your creator orientation point while deeper identity controls are still being built."
         >
+          <div className="mb-4 grid grid-cols-3 gap-2">
+            <div className="rounded-[1.15rem] border border-[#dbcdb8] bg-[#fff8f0] px-3 py-3 text-center">
+              <p className="text-[10px] uppercase tracking-[0.18em] text-[#7a6146]">Listen</p>
+              <p className="mt-1 text-base font-semibold text-[var(--af-color-primary)]">Fast</p>
+              <p className="mt-1 text-[11px] leading-4 text-[#665746]">return path</p>
+            </div>
+            <div className="rounded-[1.15rem] border border-[#dbcdb8] bg-[#fff8f0] px-3 py-3 text-center">
+              <p className="text-[10px] uppercase tracking-[0.18em] text-[#7a6146]">Share</p>
+              <p className="mt-1 text-base font-semibold text-[var(--af-color-primary)]">Near</p>
+              <p className="mt-1 text-[11px] leading-4 text-[#665746]">handoff tools</p>
+            </div>
+            <div className="rounded-[1.15rem] border border-[#dbcdb8] bg-[#fff8f0] px-3 py-3 text-center">
+              <p className="text-[10px] uppercase tracking-[0.18em] text-[#7a6146]">Role</p>
+              <p className="mt-1 text-base font-semibold text-[var(--af-color-primary)]">Launch</p>
+              <p className="mt-1 text-[11px] leading-4 text-[#665746]">orientation point</p>
+            </div>
+          </div>
+
+          <PocketSection title="Profile posture" description="On mobile this page should orient you, then get out of the way." className="mb-4 bg-[#fff8f0]">
+            <div className="af-mobile-rail">
+              {[
+                "Use profile as a clean re-entry point into Listen, Share, and release review.",
+                "Keep identity controls light until the operational loop is fully hardened across mobile.",
+              ].map((line) => (
+                <div key={line} className="af-mobile-rail-card rounded-[1.1rem] border border-[#dbcdb8] bg-[#fffdf8] p-3.5 text-sm leading-6 text-[#5c5146]">{line}</div>
+              ))}
+            </div>
+          </PocketSection>
+
           <PocketSection title="Creator quick start" description="Jump into the core mobile loop from here without hunting through admin menus." className="bg-[#fff6ed]">
             <PocketActionStack>
               <Link href="/admin/dashboard/v4">

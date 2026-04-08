@@ -39,12 +39,24 @@ type AudioformEvent = {
   timestamp: string
 }
 
+function createSessionId(): string {
+  if (typeof globalThis.crypto !== "undefined" && typeof globalThis.crypto.randomUUID === "function") {
+    return globalThis.crypto.randomUUID()
+  }
+
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (char) => {
+    const random = Math.floor(Math.random() * 16)
+    const value = char === "x" ? random : (random & 0x3) | 0x8
+    return value.toString(16)
+  })
+}
+
 function getSessionId(): string {
   if (typeof window === "undefined") return "server"
   const key = "audioform_session_id"
   const existing = window.sessionStorage.getItem(key)
   if (existing) return existing
-  const created = crypto.randomUUID()
+  const created = createSessionId()
   window.sessionStorage.setItem(key, created)
   return created
 }

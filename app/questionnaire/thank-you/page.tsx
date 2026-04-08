@@ -92,6 +92,24 @@ export default function ThankYouPage() {
         title="Your voice is now part of this conversation."
         description={mobileDescription}
       >
+        <div className="mb-5 grid grid-cols-3 gap-2">
+          <div className="rounded-[1.15rem] border border-[#dbcdb8] bg-[#fff8f0] px-3 py-3 text-center">
+            <p className="text-[10px] uppercase tracking-[0.18em] text-[#7a6146]">Status</p>
+            <p className="mt-1 text-base font-semibold text-[var(--af-color-primary)]">In</p>
+            <p className="mt-1 text-[11px] leading-4 text-[#665746]">take received</p>
+          </div>
+          <div className="rounded-[1.15rem] border border-[#dbcdb8] bg-[#fff8f0] px-3 py-3 text-center">
+            <p className="text-[10px] uppercase tracking-[0.18em] text-[#7a6146]">Room</p>
+            <p className="mt-1 text-base font-semibold text-[var(--af-color-primary)]">{canListen ? "Live" : publicButEmpty ? "Warming" : "Private"}</p>
+            <p className="mt-1 text-[11px] leading-4 text-[#665746]">next state</p>
+          </div>
+          <div className="rounded-[1.15rem] border border-[#dbcdb8] bg-[#fff8f0] px-3 py-3 text-center">
+            <p className="text-[10px] uppercase tracking-[0.18em] text-[#7a6146]">Source</p>
+            <p className="mt-1 text-base font-semibold text-[var(--af-color-primary)]">{isSocialEntry ? "Social" : isQrEntry ? "QR" : "Direct"}</p>
+            <p className="mt-1 text-[11px] leading-4 text-[#665746]">entry path</p>
+          </div>
+        </div>
+
         <div className="flex justify-center">
           <div className="inline-flex size-20 items-center justify-center rounded-full border border-[#d5c7b3] bg-[#fff6ed]">
             <CheckCircle2 className="size-10 text-[#2d5a17]" aria-hidden="true" />
@@ -122,6 +140,21 @@ export default function ThankYouPage() {
           ) : null}
         </PocketSection>
 
+        <div className="af-mobile-rail mt-5">
+          {[
+            canListen
+              ? "The listening room opens in preview mode so you hear the strongest clips first."
+              : publicButEmpty
+                ? "The room is live but waiting for enough public takes to make playback worth opening."
+                : "This release stays private after submission, so the creator reviews the take directly.",
+            "Audioform keeps verbatim voice and AI interpretation separate so shared signal stays trustworthy.",
+          ].map((line) => (
+            <div key={line} className="af-mobile-rail-card rounded-[1.1rem] border border-[#dbcdb8] bg-[#fffdf8] p-3.5 text-sm leading-6 text-[#5c5146]">
+              {line}
+            </div>
+          ))}
+        </div>
+
         {canListen ? (
           <>
             <PocketSection
@@ -146,6 +179,15 @@ export default function ThankYouPage() {
                 </div>
               </div>
             </PocketSection>
+
+            <PocketActionStack className="mt-5">
+              <Link href={`/questionnaire/listen?surveyId=${encodeURIComponent(surveyId ?? "")}${responseId ? `&responseId=${encodeURIComponent(responseId)}` : ""}${arrivalSource !== "direct" ? `&src=${arrivalSource}` : ""}`}>
+                <Button className="w-full bg-[#b85e2d] text-[#fff6ed] hover:bg-[#a05227]">
+                  Start listening
+                  <ArrowRight className="ml-2 size-4" aria-hidden="true" />
+                </Button>
+              </Link>
+            </PocketActionStack>
 
             <div className="mt-5">
               <AudioSequencePlayer

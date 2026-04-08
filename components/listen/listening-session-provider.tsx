@@ -117,6 +117,10 @@ function formatPlaybackTime(seconds?: number | null) {
   return `${mins}:${secs.toString().padStart(2, "0")}`
 }
 
+function shouldDefaultToMinimized() {
+  return typeof window !== "undefined" && window.matchMedia("(max-width: 639px)").matches
+}
+
 export function ListeningSessionProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname()
   const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -128,7 +132,7 @@ export function ListeningSessionProvider({ children }: { children: ReactNode }) 
   const [playingId, setPlayingId] = useState<string | null>(null)
   const [previewMode, setPreviewModeState] = useState(true)
   const [activeSource, setActiveSource] = useState<string | null>(null)
-  const [isMinimized, setIsMinimized] = useState(false)
+  const [isMinimized, setIsMinimized] = useState(true)
   const [playbackError, setPlaybackError] = useState<string | null>(null)
   const [currentTimeSeconds, setCurrentTimeSeconds] = useState(0)
   const [durationSeconds, setDurationSeconds] = useState(0)
@@ -228,7 +232,11 @@ export function ListeningSessionProvider({ children }: { children: ReactNode }) 
       }
       if (typeof parsed.previewMode === "boolean") setPreviewModeState(parsed.previewMode)
       if (typeof parsed.activeSource === "string") setActiveSource(parsed.activeSource)
-      if (typeof parsed.isMinimized === "boolean") setIsMinimized(parsed.isMinimized)
+      if (typeof parsed.isMinimized === "boolean") {
+        setIsMinimized(parsed.isMinimized)
+      } else {
+        setIsMinimized(shouldDefaultToMinimized())
+      }
     } catch {
       // Ignore stale session payloads.
     }
@@ -357,7 +365,7 @@ export function ListeningSessionProvider({ children }: { children: ReactNode }) 
     const nextPreviewMode = options?.previewMode ?? previewMode
     setPreviewModeState(nextPreviewMode)
     setActiveSource(options?.source ?? null)
-    setIsMinimized(false)
+    setIsMinimized(shouldDefaultToMinimized())
     const nextSelected = options?.selectedTrackId ?? nextTracks[0]?.id ?? null
     setSelectedTrackId(nextSelected)
 
@@ -439,10 +447,16 @@ export function ListeningSessionProvider({ children }: { children: ReactNode }) 
     activeSource?.startsWith("release:") && activeSource.slice("release:".length)
       ? `/admin/responses?surveyId=${encodeURIComponent(activeSource.slice("release:".length))}`
       : "/admin/responses"
+  const mobileSpacerHeightClass = showDock
+    ? isMinimized
+      ? "block h-28 sm:h-0"
+      : "block h-40 sm:h-0"
+    : "hidden"
 
   return (
     <ListeningSessionContext.Provider value={value}>
       {children}
+      <div aria-hidden="true" className={mobileSpacerHeightClass} />
       <audio
         ref={audioRef}
         preload="metadata"
@@ -450,18 +464,18 @@ export function ListeningSessionProvider({ children }: { children: ReactNode }) 
         className="pointer-events-none fixed -left-[9999px] top-auto h-px w-px opacity-0"
       />
       {showDock ? (
-        <div className="pointer-events-none fixed inset-x-0 bottom-4 z-50 flex justify-center px-4">
+        <div className="pointer-events-none fixed inset-x-0 bottom-[4.5rem] z-50 flex justify-center px-3 sm:bottom-4 sm:px-4">
           {isMinimized ? (
-            <div className="pointer-events-auto flex w-full max-w-sm items-center justify-between gap-3 rounded-full border border-[#cfbea4] bg-[#fff7ee]/95 px-4 py-3 shadow-[0_18px_40px_rgba(63,35,16,0.18)] backdrop-blur">
+            <div className="pointer-events-auto flex w-full max-w-[14.25rem] items-center justify-between gap-2 rounded-full border border-[#dbcdb8]/45 bg-[#fffdf8]/94 px-3 py-2 shadow-[0_8px_18px_rgba(63,35,16,0.08)] backdrop-blur sm:max-w-sm">
               <div className="min-w-0">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-[#8a431f]">Listening</p>
-                <p className="truncate text-sm font-semibold text-[var(--af-color-primary)]">
+                <p className="text-[9px] uppercase tracking-[0.16em] text-[#8a431f]">Listening</p>
+                <p className="truncate text-[12px] font-semibold text-[var(--af-color-primary)]">
                   {currentTrack?.title || "Persistent player"}
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <Button
-                  className="bg-[#b85e2d] text-[#fff6ed] hover:bg-[#a05227]"
+                  className="h-8 min-h-8 rounded-full bg-[#b85e2d] px-2.5 text-[#fff6ed] hover:bg-[#a05227]"
                   size="sm"
                   onClick={() => {
                     if (!currentTrack) return
@@ -473,71 +487,71 @@ export function ListeningSessionProvider({ children }: { children: ReactNode }) 
                 <Button
                   variant="outline"
                   size="icon"
-                  className="border-[#dbcdb8] bg-[#fffdf8]"
+                  className="h-8 w-8 border-[#dbcdb8]/55 bg-[#fffdf8]"
                   onClick={() => setIsMinimized(false)}
                 >
-                  <Maximize2 className="size-4" />
+                  <Maximize2 className="size-3.5" />
                 </Button>
               </div>
             </div>
           ) : (
-            <div className="pointer-events-auto w-full max-w-3xl rounded-[1.4rem] border border-[#cfbea4] bg-[#fff7ee]/95 px-4 py-3 shadow-[0_18px_40px_rgba(63,35,16,0.18)] backdrop-blur">
+            <div className="pointer-events-auto w-full max-w-[18.5rem] rounded-[1rem] border border-[#dbcdb8]/45 bg-[#fffdf8]/94 px-3 py-2.5 shadow-[0_10px_22px_rgba(63,35,16,0.08)] backdrop-blur sm:max-w-3xl sm:rounded-[1.4rem] sm:px-4 sm:py-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-[#8a431f]">Persistent player</p>
-                  <div className="mt-1 flex min-w-0 items-center gap-2">
-                    <Headphones className="size-4 shrink-0 text-[#8a431f]" />
-                    <p className="truncate text-sm font-semibold text-[var(--af-color-primary)]">{currentTrack?.title}</p>
+                  <p className="text-[9px] uppercase tracking-[0.16em] text-[#8a431f] sm:text-[11px] sm:tracking-[0.18em]">Now playing</p>
+                  <div className="mt-1 flex min-w-0 items-center gap-1.5 sm:gap-2">
+                    <Headphones className="size-3.5 shrink-0 text-[#8a431f] sm:size-4" />
+                    <p className="truncate text-[12px] font-semibold text-[var(--af-color-primary)] sm:text-sm">{currentTrack?.title}</p>
                   </div>
-                  <p className="truncate text-xs text-[#665746]">
+                  <p className="hidden truncate text-[11px] text-[#665746] min-[381px]:block sm:block sm:text-xs">
                     {currentTrack?.listening.hotTake} {currentTrack?.durationSeconds ? `• ${formatDuration(currentTrack.durationSeconds)}` : ""}
                   </p>
                 </div>
                 <Button
                   variant="outline"
                   size="icon"
-                  className="border-[#dbcdb8] bg-[#fffdf8]"
+                  className="h-8 w-8 border-[#dbcdb8]/55 bg-[#fffdf8] sm:h-9 sm:w-9"
                   onClick={() => setIsMinimized(true)}
                 >
-                  <Minimize2 className="size-4" />
+                  <Minimize2 className="size-3.5 sm:size-4" />
                 </Button>
               </div>
 
-              <div className="mt-3">
-                <div className="h-1.5 overflow-hidden rounded-full bg-[#eadcca]">
+              <div className="mt-2.5 sm:mt-3">
+                <div className="h-1 overflow-hidden rounded-full bg-[#eadcca] sm:h-1.5">
                   <div
                     className="h-full rounded-full bg-[#b85e2d] transition-[width] duration-150 ease-linear"
                     style={{ width: `${progressPercent}%` }}
                   />
                 </div>
-                <div className="mt-2 flex items-center justify-between text-xs text-[#7a6146]">
+                <div className="mt-1.5 flex items-center justify-between text-[10px] text-[#7a6146] sm:mt-2 sm:text-xs">
                   <span>{formatPlaybackTime(displayElapsedSeconds)}</span>
                   <span>{formatPlaybackTime(safeDurationSeconds)}</span>
                 </div>
               </div>
-              <div className="mt-3 flex flex-wrap items-center gap-2">
+              <div className="mt-2.5 flex flex-wrap items-center gap-1.5 sm:mt-3 sm:gap-2">
                 <Button
                   variant="outline"
                   size="sm"
-                  className="border-[#dbcdb8] bg-[#fffdf8]"
+                  className="h-8 min-h-8 border-[#dbcdb8]/55 bg-[#fff7ef] px-2.5 text-[11px]"
                   onClick={() => setPreviewMode(!previewMode)}
                 >
-                  <Sparkles className="mr-2 size-4" />
+                  <Sparkles className="mr-1.5 size-3" />
                   {previewMode ? "Preview clip" : "Full take"}
                 </Button>
                 <Button
-                  className="bg-[#b85e2d] text-[#fff6ed] hover:bg-[#a05227]"
+                  className="h-8 min-h-8 bg-[#b85e2d] px-2.5 text-[11px] text-[#fff6ed] hover:bg-[#a05227]"
                   size="sm"
                   onClick={() => {
                     if (!currentTrack) return
                     void toggleTrack(currentTrack.id)
                   }}
                 >
-                  {playingId === currentTrack?.id ? <Pause className="mr-2 size-4" /> : <Play className="mr-2 size-4" />}
+                  {playingId === currentTrack?.id ? <Pause className="mr-1.5 size-3.5" /> : <Play className="mr-1.5 size-3.5" />}
                   {playingId === currentTrack?.id ? "Pause" : "Play"}
                 </Button>
-                <Button variant="outline" size="icon" className="border-[#dbcdb8] bg-[#fffdf8]" onClick={() => void nextTrack()}>
-                  <SkipForward className="size-4" />
+                <Button variant="outline" size="icon" className="h-8 w-8 border-[#dbcdb8]/55 bg-[#fffdf8]" onClick={() => void nextTrack()}>
+                  <SkipForward className="size-3.5" />
                 </Button>
                 <Link href={openReleaseHref} className={cn("hidden sm:block")}>
                   <Button variant="outline" size="sm" className="border-[#dbcdb8] bg-[#fffdf8]">

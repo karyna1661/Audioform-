@@ -5,14 +5,16 @@ import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { useRequireAdmin } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, CheckCircle2, ChevronRight, Copy, GripVertical, Heart, LayoutTemplate, Library, Lightbulb, Plus, Rocket, Search, Sparkles, Star, Target, Trash2, Undo2 } from "lucide-react"
+import { ArrowLeft, CheckCircle2, ChevronRight, Copy, GripVertical, Heart, LayoutTemplate, Library, Lightbulb, Mic, Plus, Rocket, Search, Share2, Sparkles, Star, Target, Trash2, Undo2 } from "lucide-react"
 import { trackEvent } from "@/lib/analytics"
 import { recordSurveyPublished } from "@/lib/behavior-metrics"
 import { buildSurveyShareUrl } from "@/lib/share-links"
+import { cn } from "@/lib/utils"
 import { AdminMobileNav } from "@/components/admin-mobile-nav"
 import { SurveyLoadingSkeleton } from "@/components/survey-loading-skeleton"
 import { useIsMobile } from "@/components/ui/use-mobile"
-import { PocketActionStack, PocketSection, PocketShell } from "@/components/mobile/pocket-shell"
+import { MobilePage, MobileSection, PocketActionStack } from "@/components/mobile/pocket-shell"
+import { ReleaseCard as MobileReleaseCard } from "@/components/mobile/audioform-mobile-cards"
 
 
 const EMPTY_QUESTIONS: string[] = []
@@ -145,6 +147,14 @@ const surveyTemplates = [
 const DEFAULT_SURVEY_TITLE = ""
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
+type SurveyListItem = {
+  id: string
+  title: string
+  status: "draft" | "published" | "live" | "closed"
+  questionCount: number
+  publicListeningEnabled?: boolean
+}
+
 // REMOVED: starterPackOptions - Replaced by surveyTemplates in Question Intelligence System
 
 function createSurveyId(_title: string, _creatorId: string): string {
@@ -234,6 +244,8 @@ export default function QuestionnairesV1Page() {
   const [draftLoading, setDraftLoading] = useState(false)
   const [showTemplates, setShowTemplates] = useState(true) // Toggle for mobile: templates vs categories
   const [mobileStep, setMobileStep] = useState(0)
+  const [mobileReleases, setMobileReleases] = useState<SurveyListItem[]>([])
+  const [showMobileDashboard, setShowMobileDashboard] = useState(() => !requestedSurveyId)
 
   const commitQuestionChange = useCallback(
     (nextQuestions: string[], nextSelectedIndex: number) => {
@@ -251,6 +263,27 @@ export default function QuestionnairesV1Page() {
     },
     [questions, selectedIndex],
   )
+
+  useEffect(() => {
+    if (status !== "authenticated") return
+    let cancelled = false
+
+    const loadReleases = async () => {
+      try {
+        const response = await fetch("/api/surveys", { credentials: "include", cache: "no-store" })
+        if (!response.ok) throw new Error("Failed to load releases.")
+        const json = (await response.json()) as { surveys?: SurveyListItem[] }
+        if (!cancelled) setMobileReleases(json.surveys ?? [])
+      } catch {
+        if (!cancelled) setMobileReleases([])
+      }
+    }
+
+    void loadReleases()
+    return () => {
+      cancelled = true
+    }
+  }, [status])
 
   const undoQuestionChange = useCallback(() => {
     let restored = false
@@ -388,6 +421,12 @@ export default function QuestionnairesV1Page() {
   }, [status, draftSurveyId, title, user?.id])
 
   useEffect(() => {
+    if (requestedSurveyId) {
+      setShowMobileDashboard(false)
+    }
+  }, [requestedSurveyId])
+
+  useEffect(() => {
     if (status !== "authenticated" || !requestedSurveyId) return
     let canceled = false
 
@@ -475,6 +514,11 @@ export default function QuestionnairesV1Page() {
       done: Boolean(publishedSurveyId),
     },
   ]
+  const studioDashboardMetrics = [
+    { value: "73", label: "Total Takes", tone: "bg-[#f2ddcd] text-[#8a431f]", icon: Mic },
+    { value: "4.2m", label: "Avg Duration", tone: "bg-[#e8f2e0] text-[#2d5a17]", icon: Sparkles },
+    { value: "12h", label: "Listen Time", tone: "bg-[#f3ecdf] text-[#7a6146]", icon: Heart },
+  ] as const
 
   const creatorId = user?.id || ""
   const mobileSteps = ["Brief", "Source", "Sequence", "Refine", "Publish"]
@@ -500,6 +544,34 @@ export default function QuestionnairesV1Page() {
   const workingRuleCopy = "Keep this to 2-3 prompts, ask for one concrete moment, and avoid anything that can be answered with yes or no."
   const qualityCoachCopy = "Target 80%+ before publish. Ask for one concrete moment, not a rating or yes/no answer."
   const releaseDeskCopy = "Publish when the title is clear, the sequence is short, and each prompt asks for one concrete moment."
+  const goToMobileStep = (step: number) => setMobileStep(Math.max(0, Math.min(step, mobileSteps.length - 1)))
+
+  const applyMobileTemplate = (template: (typeof surveyTemplates)[number]) => {
+    commitQuestionChange(template.questions, 0)
+    setDraftMessage(`Applied ${template.label} template. These prompts are optimized for voice responses.`)
+    trackEvent("prompt_template_applied", {
+      template_id: template.id,
+      template_label: template.label,
+      question_count: template.questions.length,
+    })
+    goToMobileStep(2)
+  }
+
+  const addPromptFromCategory = (category: (typeof questionCategories)[number], question: string) => {
+    const next = [...questions, question]
+    commitQuestionChange(next, questions.length)
+    trackEvent("decision_intent_prompt_viewed", {
+      category_id: category.id,
+      category_label: category.label,
+    })
+    setDraftMessage("Prompt added. Keep shaping the sequence before you refine.")
+    goToMobileStep(2)
+  }
+
+  const routeToPromptSource = () => {
+    setDraftMessage("Choose the next prompt from a template or the category bank.")
+    goToMobileStep(1)
+  }
 
   const handlePublishSurvey = async () => {
     if (!readyChecks.hasTitle || !readyChecks.hasPrompt) {
@@ -537,37 +609,180 @@ export default function QuestionnairesV1Page() {
   if (isMobile) {
     return (
       <>
-        <PocketShell
-          eyebrow="Pocket Studio"
-          title="Build a survey that earns a real story."
-          description="On mobile, keep the loop tight: define the decision, choose a strong angle, refine only the prompts that matter, then publish."
-        >
-          {draftMessage ? (
-            <p className="font-body mb-4 rounded-2xl border border-[#cfbea4] bg-[#fff8f0] px-4 py-3 text-sm text-[#665746]">
-              {draftMessage}
-            </p>
-          ) : null}
+        {showMobileDashboard ? (
+          <MobilePage title="Studio">
+            <div className="flex items-start justify-between gap-3 rounded-[1rem] border border-[#cfbea4]/45 bg-[#fffdf8] px-3 py-3 shadow-[0_4px_12px_rgba(86,57,25,0.03)]">
+              <div>
+                <p className="text-[1.75rem] font-semibold leading-none tracking-[-0.03em] text-[var(--af-color-primary)]">Studio</p>
+                <p className="mt-1 text-[12px] leading-5 text-[#665746]">Create and manage your listening releases.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  startNewDraft()
+                  goToMobileStep(0)
+                  setShowMobileDashboard(false)
+                }}
+                className="inline-flex size-11 shrink-0 items-center justify-center rounded-[0.95rem] bg-[#b85e2d] text-[#fff6ed]"
+                aria-label="Create release"
+              >
+                <Plus className="size-5" aria-hidden="true" />
+              </button>
+            </div>
 
-          <PocketSection title="Builder brief" description="Name the survey after the decision it should help you make.">
+            <div className="grid grid-cols-3 gap-2">
+              {studioDashboardMetrics.map((metric) => {
+                const Icon = metric.icon
+                return (
+                    <div key={metric.label} className="rounded-[0.95rem] border border-[#cfbea4]/45 bg-[#fffdf8] px-2.5 py-3 text-center shadow-[0_4px_12px_rgba(86,57,25,0.03)]">
+                    <span className={cn("mx-auto inline-flex size-8 items-center justify-center rounded-[0.75rem]", metric.tone)}>
+                      <Icon className="size-4" aria-hidden="true" />
+                    </span>
+                      <p className="mt-2 text-[1.15rem] font-semibold leading-none text-[var(--af-color-primary)]">{metric.value}</p>
+                      <p className="mt-1 text-[10px] leading-4 text-[#665746]">{metric.label}</p>
+                  </div>
+                )
+              })}
+            </div>
+
+            <MobileSection title="Active releases" description="Jump back into a release already in motion.">
+              <div className="-mx-1 overflow-x-auto pb-1 af-scrollless">
+                <div className="flex gap-2 px-1">
+                  {mobileReleases.slice(0, 6).map((release) => (
+                    <MobileReleaseCard
+                      key={release.id}
+                      release={{
+                        id: release.id,
+                        title: release.title,
+                        description: `${release.questionCount} prompt${release.questionCount === 1 ? "" : "s"} · ${release.status}`,
+                        publicListening: Boolean(release.publicListeningEnabled),
+                        takeCount: release.questionCount,
+                      }}
+                      onPress={() => window.location.assign(`/admin/questionnaires/v1?surveyId=${encodeURIComponent(release.id)}`)}
+                    />
+                  ))}
+                  {mobileReleases.length === 0 ? (
+                    <div className="rounded-[1rem] border border-dashed border-[#cfbea4]/55 bg-[#fffdf8] px-4 py-5 text-[12px] leading-5 text-[#665746]">
+                      No releases yet. Tap the plus button to create your first one.
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            </MobileSection>
+          </MobilePage>
+        ) : (
+        <MobilePage
+          title="Studio"
+          action={
+            <Button
+              variant="outline"
+              className="min-h-9 border-[#cfbea4]/45 bg-[#fffdf8] px-3 text-[11px]"
+              onClick={() => setShowMobileDashboard(true)}
+            >
+              Dashboard
+            </Button>
+          }
+        >
+            <div className="rounded-[1rem] border border-[#cfbea4]/35 bg-[#fffdf8] px-3 py-3 shadow-[0_4px_12px_rgba(86,57,25,0.03)]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#7a6146]">
+                Step {mobileStep + 1} of {mobileSteps.length}: {mobileSteps[mobileStep]}
+              </p>
+            <div className="mt-3 flex gap-2 overflow-x-auto pb-1 af-scrollless">
+              {mobileSteps.map((label, index) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => goToMobileStep(index)}
+                  className={cn(
+                    "shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-colors",
+                    mobileStep === index
+                      ? "border-[#b85e2d] bg-[#fff1e6] text-[#8a431f]"
+                      : "border-[#cfbea4]/55 bg-[#fff8f0] text-[#665746]",
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {draftMessage ? (
+              <p className="mt-3 rounded-[0.9rem] bg-[#fff7ee] px-3 py-2 text-[12px] leading-5 text-[#665746]">{draftMessage}</p>
+            ) : null}
+          </div>
+          <MobileSection title="Active releases" description="Studio manages the releases already in motion while you shape the next one." className="hidden">
+            <div className="-mx-1 overflow-x-auto pb-1 af-scrollless">
+              <div className="flex gap-2 px-1">
+                {mobileReleases.slice(0, 6).map((release) => (
+                  <MobileReleaseCard
+                    key={release.id}
+                    release={{
+                      id: release.id,
+                      title: release.title,
+                      description: `${release.questionCount} prompt${release.questionCount === 1 ? "" : "s"} · ${release.status}`,
+                      publicListening: Boolean(release.publicListeningEnabled),
+                      takeCount: release.questionCount,
+                    }}
+                    onPress={() => window.location.assign(`/admin/questionnaires/v1?surveyId=${encodeURIComponent(release.id)}`)}
+                  />
+                ))}
+                {mobileReleases.length === 0 ? (
+                  <div className="rounded-[1rem] border border-dashed border-[#cfbea4]/55 bg-[#fffdf8] px-4 py-5 text-[12px] leading-5 text-[#665746]">
+                    No releases yet. Use starter packs and categories below to build the first one.
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </MobileSection>
+
+          <MobileSection title="Quick actions" description="Keep Studio focused on shaping prompts and moving releases toward publish." className="hidden">
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button" onClick={startNewDraft} className="rounded-[1rem] border border-[#cfbea4]/55 bg-[#fffdf8] px-3 py-3 text-left">
+                <span className="inline-flex h-9 w-9 items-center justify-center rounded-[0.7rem] bg-[#f2ddcd] text-[#8a431f]"><Mic className="size-4" /></span>
+                <p className="mt-3 text-[13px] font-semibold text-[var(--af-color-primary)]">New draft</p>
+                <p className="mt-1 text-[11px] leading-4 text-[#665746]">Start a fresh release workspace.</p>
+              </button>
+              <button type="button" onClick={() => setShowTemplates(true)} className="rounded-[1rem] border border-[#cfbea4]/55 bg-[#fffdf8] px-3 py-3 text-left">
+                <span className="inline-flex h-9 w-9 items-center justify-center rounded-[0.7rem] bg-[#e8f2e0] text-[#2d5a17]"><Sparkles className="size-4" /></span>
+                <p className="mt-3 text-[13px] font-semibold text-[var(--af-color-primary)]">Starter packs</p>
+                <p className="mt-1 text-[11px] leading-4 text-[#665746]">Apply proven voice prompt sequences.</p>
+              </button>
+              <button type="button" onClick={() => setShowTemplates(false)} className="rounded-[1rem] border border-[#cfbea4]/55 bg-[#fffdf8] px-3 py-3 text-left">
+                <span className="inline-flex h-9 w-9 items-center justify-center rounded-[0.7rem] bg-[#f3ecdf] text-[#7a6146]"><LayoutTemplate className="size-4" /></span>
+                <p className="mt-3 text-[13px] font-semibold text-[var(--af-color-primary)]">Categories</p>
+                <p className="mt-1 text-[11px] leading-4 text-[#665746]">Pull focused prompts from the question bank.</p>
+              </button>
+              <Link href="/admin/share" className="rounded-[1rem] border border-[#cfbea4]/55 bg-[#fffdf8] px-3 py-3 text-left">
+                <span className="inline-flex h-9 w-9 items-center justify-center rounded-[0.7rem] bg-[#fff1e6] text-[#b85e2d]"><Share2 className="size-4" /></span>
+                <p className="mt-3 text-[13px] font-semibold text-[var(--af-color-primary)]">Share hub</p>
+                <p className="mt-1 text-[11px] leading-4 text-[#665746]">Move published releases into distribution.</p>
+              </Link>
+            </div>
+          </MobileSection>
+
+          <MobileSection title="Brief" description="Name the survey after the decision it should help you make." className={mobileStep === 0 ? "" : "hidden"}>
             <div className="space-y-2">
               <label className="text-sm font-semibold" htmlFor="survey-title-mobile">
                 Survey title
               </label>
               <input
                 id="survey-title-mobile"
-                className="w-full rounded-2xl border border-[#cfbea4] bg-[#fffdf8] px-4 py-3 text-base"
+                className="w-full rounded-[1rem] border border-[#cfbea4]/45 bg-[#fffdf8] px-3 py-3 text-[14px]"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="e.g. Why are users dropping after onboarding?"
               />
-              <p className="font-body text-sm leading-6 text-[#665746]">
+              <p className="font-body text-[12px] leading-5 text-[#665746]">
                 Strong titles read like working briefs, not generic feedback forms.
               </p>
             </div>
-          </PocketSection>
+            <div className="mt-3 flex items-center justify-end">
+              <Button className="min-h-9 bg-[#b85e2d] px-4 text-[12px] text-[#fff6ed] hover:bg-[#a05227]" onClick={() => goToMobileStep(1)}>
+                Next: Source
+              </Button>
+            </div>
+          </MobileSection>
 
-          <PocketSection title="Prompt source" description="Start with a template or add individual prompts from the question bank." className="mt-4">
-            <div className="mb-4 flex rounded-xl border border-[#cfbea4] bg-[#fffdf8] p-1">
+          <MobileSection title="Prompt source" description="Start with a template or add individual prompts from the question bank." className={mobileStep === 1 ? "" : "hidden"}>
+            <div className="mb-3 flex rounded-[0.95rem] bg-[#f8efdf] p-1">
               <button
                 type="button"
                 onClick={() => setShowTemplates(true)}
@@ -596,19 +811,11 @@ export default function QuestionnairesV1Page() {
                   <button
                     key={template.id}
                     type="button"
-                    onClick={() => {
-                      commitQuestionChange(template.questions, 0)
-                      setDraftMessage(`Applied ${template.label} template. These prompts are optimized for voice responses.`)
-                      trackEvent("prompt_template_applied", {
-                        template_id: template.id,
-                        template_label: template.label,
-                        question_count: template.questions.length,
-                      })
-                    }}
-                    className="w-full rounded-[1.2rem] border border-[#cfbea4] bg-[#fffdf8] px-4 py-4 text-left"
+                    onClick={() => applyMobileTemplate(template)}
+                    className="w-full rounded-[1rem] border border-[#cfbea4]/35 bg-[#fffdf8] px-3 py-3 text-left"
                   >
-                    <p className="text-sm font-semibold text-[#6e3316]">{template.label}</p>
-                    <p className="font-body mt-1 text-sm leading-6 text-[#665746]">{template.description}</p>
+                    <p className="text-[13px] font-semibold text-[#6e3316]">{template.label}</p>
+                    <p className="font-body mt-1 text-[12px] leading-5 text-[#665746]">{template.description}</p>
                     <p className="font-body mt-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8c7f70]">
                       {template.questions.length} prompt{template.questions.length !== 1 ? "s" : ""}
                     </p>
@@ -620,15 +827,15 @@ export default function QuestionnairesV1Page() {
                 {questionCategories.map((category) => {
                   const Icon = category.icon
                   return (
-                    <details key={category.id} className="group rounded-[1.2rem] border border-[#cfbea4] bg-[#fffdf8] p-4">
+                    <details key={category.id} className="group rounded-[1rem] border border-[#cfbea4]/35 bg-[#fffdf8] p-3">
                       <summary className="flex cursor-pointer list-none items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <span className="inline-flex size-9 items-center justify-center rounded-full border border-[#d8c7b3] bg-[#f8efdf] text-[#b85e2d]">
+                          <span className="inline-flex size-8 items-center justify-center rounded-full border border-[#d8c7b3]/55 bg-[#f8efdf] text-[#b85e2d]">
                             <Icon className="size-4" />
                           </span>
                           <div className="text-left">
-                            <p className="text-sm font-semibold text-[#6e3316]">{category.label}</p>
-                            <p className="font-body text-xs leading-5 text-[#665746]">{category.description}</p>
+                            <p className="text-[13px] font-semibold text-[#6e3316]">{category.label}</p>
+                            <p className="font-body text-[11px] leading-4 text-[#665746]">{category.description}</p>
                           </div>
                         </div>
                         <ChevronRight className="size-4 transition-transform group-open:rotate-90" />
@@ -638,15 +845,8 @@ export default function QuestionnairesV1Page() {
                           <button
                             key={idx}
                             type="button"
-                            onClick={() => {
-                              const next = [...questions, question]
-                              commitQuestionChange(next, questions.length)
-                              trackEvent("decision_intent_prompt_viewed", {
-                                category_id: category.id,
-                                category_label: category.label,
-                              })
-                            }}
-                            className="w-full rounded-xl border border-[#cfbea4] bg-[#f8efdf] px-3 py-3 text-left text-sm leading-6 text-[#665746] hover:border-[#b85e2d] hover:bg-[#fff7ee]"
+                            onClick={() => addPromptFromCategory(category, question)}
+                            className="w-full rounded-[0.9rem] bg-[#f8efdf] px-3 py-2.5 text-left text-[12px] leading-5 text-[#665746] hover:bg-[#fff7ee]"
                           >
                             {question}
                           </button>
@@ -657,14 +857,22 @@ export default function QuestionnairesV1Page() {
                 })}
               </div>
             )}
-          </PocketSection>
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <Button variant="outline" className="min-h-9 border-[#cfbea4]/55 bg-[#fff7ee] px-3 text-[12px]" onClick={() => goToMobileStep(0)}>
+                Back
+              </Button>
+              <Button className="min-h-9 bg-[#b85e2d] px-4 text-[12px] text-[#fff6ed] hover:bg-[#a05227]" onClick={() => goToMobileStep(2)}>
+                Next: Sequence
+              </Button>
+            </div>
+          </MobileSection>
 
-          <PocketSection title="Prompt sequence" description="Keep the interview short and deliberate. Tap a prompt to edit it." className="mt-4">
-            <div className="space-y-2">
+          <MobileSection title="Prompt sequence" description="Keep the interview short and deliberate. Tap a prompt to edit it." className={mobileStep === 2 ? "" : "hidden"}>
+            <div className="space-y-1.5">
               {questions.length === 0 ? (
-                <div className="rounded-[1.2rem] border border-dashed border-[#cfbea4] bg-[#fff8f0] px-4 py-6">
-                  <p className="text-sm font-semibold text-[#6e3316]">No prompts yet.</p>
-                  <p className="font-body mt-2 text-sm leading-6 text-[#665746]">
+                <div className="rounded-[1rem] border border-dashed border-[#cfbea4]/55 bg-[#fff8f0] px-3 py-5">
+                  <p className="text-[13px] font-semibold text-[#6e3316]">No prompts yet.</p>
+                  <p className="font-body mt-2 text-[12px] leading-5 text-[#665746]">
                     Start from a template or add prompts from the question bank. Mobile works best with 1-3 thoughtful prompts.
                   </p>
                 </div>
@@ -677,13 +885,16 @@ export default function QuestionnairesV1Page() {
                   <button
                     key={`${q}-${i}`}
                     type="button"
-                    onClick={() => setSelectedIndex(i)}
-                    className={`w-full rounded-[1.2rem] border px-4 py-4 text-left ${
+                    onClick={() => {
+                      setSelectedIndex(i)
+                      goToMobileStep(3)
+                    }}
+                    className={`w-full rounded-[1rem] border px-3 py-3 text-left ${
                       i === selectedIndex
                         ? "border-[#b85e2d] bg-[#fff7ee]"
                         : isLowQuality
-                          ? "border-[#d8b2a7] bg-[#fcf2ef]"
-                          : "border-[#cfbea4] bg-[#f8efdf]"
+                          ? "border-[#d8b2a7]/75 bg-[#fcf2ef]"
+                          : "border-[#cfbea4]/35 bg-[#fffdf8]"
                     }`}
                   >
                     <div className="flex items-center justify-between gap-3">
@@ -692,27 +903,24 @@ export default function QuestionnairesV1Page() {
                         {questionQuality.score}%
                       </span>
                     </div>
-                    <p className="font-body mt-2 text-sm leading-6 text-[#665746]">{q}</p>
+                    <p className="font-body mt-1.5 text-[12px] leading-5 text-[#665746]">{q}</p>
                   </button>
                 )
               })}
             </div>
 
-            <div className="mt-3 grid gap-2">
+            <div className="mt-2.5 grid gap-1.5">
               <Button
                 variant="outline"
-                className="w-full border-dashed border-[#c5b296] bg-[#f8efdf] text-[#665746]"
-                onClick={() => {
-                  const nextQuestions = [...questions, "New prompt"]
-                  commitQuestionChange(nextQuestions, questions.length)
-                }}
+                className="min-h-9 w-full border-dashed border-[#c5b296]/65 bg-[#f8efdf] px-3 text-[12px] text-[#665746]"
+                onClick={routeToPromptSource}
               >
                 <Plus className="mr-2 size-4" aria-hidden="true" />
                 Add prompt
               </Button>
               <Button
                 variant="outline"
-                className="w-full border-[#cfbea4] bg-[#fff7ee]"
+                className="min-h-9 w-full border-[#cfbea4]/55 bg-[#fff7ee] px-3 text-[12px]"
                 onClick={undoQuestionChange}
                 disabled={questionHistory.length === 0}
               >
@@ -720,174 +928,215 @@ export default function QuestionnairesV1Page() {
                 Undo change
               </Button>
             </div>
-          </PocketSection>
-
-          <PocketSection title="Refine selected prompt" description="Use the quality coach to push the current prompt into story territory." className="mt-4 bg-[#fff6ed]">
-            <textarea
-              id="question-editor-mobile"
-              className="font-body min-h-36 w-full rounded-[1.2rem] border border-[#cfbea4] bg-[#fffdf8] px-4 py-4 text-sm leading-6 text-pretty"
-              value={selected}
-              placeholder="Choose a template or add a prompt from the question bank to begin editing."
-              disabled={questions.length === 0}
-              onChange={(e) => {
-                const next = [...questions]
-                next[selectedIndex] = e.target.value
-                commitQuestionChange(next, selectedIndex)
-              }}
-            />
-
-            <div className="mt-3 rounded-xl border border-[#cfbea4] bg-[#fff7ee] px-4 py-3">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-xs uppercase tracking-[0.18em] text-[#7a6146]">Quality score</p>
-                <p className="text-lg font-semibold text-[#6e3316]">{selectedQuestionQuality.score}%</p>
-              </div>
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <Button variant="outline" className="min-h-9 border-[#cfbea4]/55 bg-[#fff7ee] px-3 text-[12px]" onClick={() => goToMobileStep(1)}>
+                Back
+              </Button>
+              <Button className="min-h-9 bg-[#b85e2d] px-4 text-[12px] text-[#fff6ed] hover:bg-[#a05227]" onClick={() => goToMobileStep(3)} disabled={questions.length === 0}>
+                Next: Refine
+              </Button>
             </div>
+          </MobileSection>
 
-            <ul className="mt-3 space-y-1.5">
-              {selectedQuestionQuality.checks.map((item) => (
-                <li key={item.label} className="flex items-center gap-2 text-xs">
-                  <CheckCircle2 className={`size-3.5 ${item.ok ? "text-[#2d5a17]" : "text-[#8c7f70]"}`} aria-hidden="true" />
-                  <span className={item.ok ? "text-[#2d5a17]" : "text-[#665746]"}>{item.label}</span>
-                </li>
-              ))}
-            </ul>
+          <MobileSection title="Refine prompts" description="Edit every prompt here before you move into publish." className={mobileStep === 3 ? "" : "hidden"}>
+            <div className="space-y-3">
+              {questions.map((question, index) => {
+                const quality = evaluateQuestionQuality(question)
+                const isLowQuality = quality.score < minimumQualityThreshold
 
-            <PocketActionStack className="mt-3">
-              <Button
-                variant="outline"
-                className="w-full border-[#cfbea4] bg-[#fff7ee] text-xs"
-                disabled={questions.length === 0}
-                onClick={() => {
-                  if (!selected.trim()) return
-                  const next = [...questions]
-                  next[selectedIndex] = /last|week|day|recent|moment/i.test(selected)
-                    ? selected
-                    : `In the last week, ${selected.charAt(0).toLowerCase()}${selected.slice(1)}`
-                  commitQuestionChange(next, selectedIndex)
-                }}
-              >
-                Add timeframe
-              </Button>
-              <Button
-                variant="outline"
-                className="w-full border-[#cfbea4] bg-[#fff7ee] text-xs"
-                disabled={questions.length === 0}
-                onClick={() => {
-                  if (!selected.trim()) return
-                  const next = [...questions]
-                  next[selectedIndex] = selected.replace(/^(is|are|do|did|can|will|would|should|could)\b/i, "What")
-                  commitQuestionChange(next, selectedIndex)
-                }}
-              >
-                Convert to open question
-              </Button>
-              <Button
-                variant="outline"
-                className="w-full border-[#cfbea4] bg-[#fff7ee] text-xs"
-                disabled={questions.length === 0}
-                onClick={() => {
-                  if (!selected.trim()) return
-                  const next = [...questions]
-                  next[selectedIndex] = /example|specific|moment/i.test(selected)
-                    ? selected
-                    : `${selected.replace(/\?*$/, "?")} Share one concrete moment.`
-                  commitQuestionChange(next, selectedIndex)
-                }}
-              >
-                Add depth cue
-              </Button>
-              <Button
-                variant="outline"
-                className="w-full border-[#cfbea4] bg-[#fff7ee] text-[#8a3d2b]"
-                disabled={questions.length === 0}
-                onClick={() => {
-                  if (questions.length === 0) return
-                  const nextQuestions = questions.filter((_, index) => index !== selectedIndex)
-                  commitQuestionChange(nextQuestions, Math.max(0, selectedIndex - 1))
-                  setDraftMessage("Prompt removed from the sequence.")
-                }}
-              >
-                <Trash2 className="mr-2 size-4" aria-hidden="true" />
-                Delete prompt
-              </Button>
-            </PocketActionStack>
-          </PocketSection>
+                return (
+                  <div key={`${question}-${index}`} className="rounded-[1rem] border border-[#cfbea4]/35 bg-[#fffdf8] p-3.5">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#7a6146]">Prompt {index + 1}</p>
+                      <p className={`text-sm font-semibold ${isLowQuality ? "text-[#8a3d2b]" : "text-[#2d5a17]"}`}>{quality.score}%</p>
+                    </div>
 
-          <PocketSection title="Responder preview" description="Read this out loud. If it sounds vague, refine it before you publish." className="mt-4">
-            <div className="rounded-[1.2rem] border border-[#cfbea4] bg-[#fffdf8] p-4">
+                    <textarea
+                      id={`question-editor-mobile-${index}`}
+                      className="font-body mt-3 min-h-28 w-full rounded-[1rem] border border-[#cfbea4]/45 bg-[#fffdf8] px-3 py-3 text-[12px] leading-5 text-pretty"
+                      value={question}
+                      placeholder="Choose a template or add a prompt from the question bank to begin editing."
+                      onChange={(e) => {
+                        const next = [...questions]
+                        next[index] = e.target.value
+                        commitQuestionChange(next, index)
+                      }}
+                    />
+
+                    <ul className="mt-2.5 space-y-1">
+                      {quality.checks.map((item) => (
+                        <li key={item.label} className="flex items-center gap-2 text-[11px]">
+                          <CheckCircle2 className={`size-3.5 ${item.ok ? "text-[#2d5a17]" : "text-[#8c7f70]"}`} aria-hidden="true" />
+                          <span className={item.ok ? "text-[#2d5a17]" : "text-[#665746]"}>{item.label}</span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    <PocketActionStack className="mt-3">
+                      <Button
+                        variant="outline"
+                        className="min-h-8 w-full border-[#cfbea4]/45 bg-[#fffdf8] px-3 text-[11px]"
+                        onClick={() => {
+                          if (!question.trim()) return
+                          const next = [...questions]
+                          next[index] = /last|week|day|recent|moment/i.test(question)
+                            ? question
+                            : `In the last week, ${question.charAt(0).toLowerCase()}${question.slice(1)}`
+                          commitQuestionChange(next, index)
+                        }}
+                      >
+                        Add timeframe
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="min-h-8 w-full border-[#cfbea4]/45 bg-[#fffdf8] px-3 text-[11px]"
+                        onClick={() => {
+                          if (!question.trim()) return
+                          const next = [...questions]
+                          next[index] = question.replace(/^(is|are|do|did|can|will|would|should|could)\b/i, "What")
+                          commitQuestionChange(next, index)
+                        }}
+                      >
+                        Convert to open question
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="min-h-8 w-full border-[#cfbea4]/45 bg-[#fffdf8] px-3 text-[11px]"
+                        onClick={() => {
+                          if (!question.trim()) return
+                          const next = [...questions]
+                          next[index] = /example|specific|moment/i.test(question)
+                            ? question
+                            : `${question.replace(/\?*$/, "?")} Share one concrete moment.`
+                          commitQuestionChange(next, index)
+                        }}
+                      >
+                        Add depth cue
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="min-h-8 w-full border-[#cfbea4]/45 bg-[#fffdf8] px-3 text-[11px] text-[#8a3d2b]"
+                        onClick={() => {
+                          const nextQuestions = questions.filter((_, currentIndex) => currentIndex !== index)
+                          commitQuestionChange(nextQuestions, Math.max(0, Math.min(index, nextQuestions.length - 1)))
+                          setDraftMessage("Prompt removed from the sequence.")
+                          goToMobileStep(nextQuestions.length ? 3 : 2)
+                        }}
+                      >
+                        <Trash2 className="mr-2 size-4" aria-hidden="true" />
+                        Delete prompt
+                      </Button>
+                    </PocketActionStack>
+                  </div>
+                )
+              })}
+            </div>
+          </MobileSection>
+
+          <MobileSection title="Responder preview" description="Read this out loud. If it sounds vague, refine it before you publish." className={mobileStep === 3 ? "" : "hidden"}>
+            <div className="rounded-[1rem] border border-[#cfbea4]/35 bg-[#fffdf8] p-3">
               <p className="font-body text-xs uppercase tracking-[0.18em] text-[#7a6146]">What the respondent hears</p>
-              <p className="mt-2 text-lg font-semibold text-[var(--af-color-primary)] text-balance">
+              <p className="mt-2 text-[15px] font-semibold leading-6 text-[var(--af-color-primary)] text-balance">
                 {selected || "Select a prompt to preview the respondent experience."}
               </p>
             </div>
-            <div className="mt-3 grid grid-cols-1 gap-2">
-              <div className="rounded-xl border border-[#cfbea4] bg-[#fff7ee] px-3 py-2 text-sm text-[#665746]">1 concrete example</div>
-              <div className="rounded-xl border border-[#cfbea4] bg-[#fff7ee] px-3 py-2 text-sm text-[#665746]">1 friction moment</div>
-              <div className="rounded-xl border border-[#cfbea4] bg-[#fff7ee] px-3 py-2 text-sm text-[#665746]">1 clear suggestion</div>
+            <div className="mt-2.5 grid grid-cols-1 gap-1.5">
+              <div className="rounded-[0.9rem] bg-[#f8efdf] px-3 py-2 text-[12px] text-[#665746]">1 concrete example</div>
+              <div className="rounded-[0.9rem] bg-[#f8efdf] px-3 py-2 text-[12px] text-[#665746]">1 friction moment</div>
+              <div className="rounded-[0.9rem] bg-[#f8efdf] px-3 py-2 text-[12px] text-[#665746]">1 clear suggestion</div>
             </div>
-          </PocketSection>
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <Button variant="outline" className="min-h-9 border-[#cfbea4]/55 bg-[#fff7ee] px-3 text-[12px]" onClick={() => goToMobileStep(2)}>
+                Back
+              </Button>
+              <Button className="min-h-9 bg-[#b85e2d] px-4 text-[12px] text-[#fff6ed] hover:bg-[#a05227]" onClick={() => goToMobileStep(4)}>
+                Next: Publish
+              </Button>
+            </div>
+          </MobileSection>
 
-          <PocketSection title="Release desk" description={releaseDeskCopy} className="mt-4 bg-[#fff6ed]">
-            <ul className="space-y-2">
-              {readinessItems.map((item) => (
-                <li key={item.label} className="flex items-center gap-2 text-sm">
-                  <CheckCircle2 className={`size-4 ${item.ok ? "text-[#2d5a17]" : "text-[#8c7f70]"}`} aria-hidden="true" />
-                  <span className={item.ok ? "text-[#2d5a17]" : "text-[#665746]"}>{item.label}</span>
-                </li>
-              ))}
-            </ul>
-            <p className="font-body mt-4 text-sm leading-6 text-[#665746]">
-              Current draft: {questions.length} {questions.length === 1 ? "prompt" : "prompts"} at {averageQuestionQuality}% average quality.
-            </p>
+          <MobileSection title="Release desk" description={releaseDeskCopy} className={mobileStep === 4 ? "" : "hidden"}>
+            <div className="rounded-[1rem] border border-[#cfbea4]/35 bg-[#fffdf8] p-3.5">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7a6146]">Final question preview</p>
+              {questions.length ? (
+                <div className="mt-3 space-y-2.5">
+                  {questions.map((question, index) => (
+                    <div key={`${question}-${index}`} className="rounded-[0.95rem] bg-[#f8efdf] px-3 py-3">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7a6146]">Prompt {index + 1}</p>
+                      <p className="mt-1.5 text-[13px] leading-5 text-[var(--af-color-primary)]">{question}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-2 text-[12px] leading-5 text-[#665746]">
+                  No prompts yet. Add at least one question in Source before you publish.
+                </p>
+              )}
+            </div>
+            <div className="rounded-[1rem] bg-[#fff8f0] p-3.5">
+              <ul className="space-y-1.5">
+                {readinessItems.map((item) => (
+                  <li key={item.label} className="flex items-center gap-2 text-[12px]">
+                    <CheckCircle2 className={`size-4 ${item.ok ? "text-[#2d5a17]" : "text-[#8c7f70]"}`} aria-hidden="true" />
+                    <span className={item.ok ? "text-[#2d5a17]" : "text-[#665746]"}>{item.label}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="font-body mt-3 text-[12px] leading-5 text-[#665746]">
+                Current draft: {questions.length} {questions.length === 1 ? "prompt" : "prompts"} at {averageQuestionQuality}% average quality.
+              </p>
 
-            <PocketActionStack className="mt-4">
-              <Button
-                className="w-full bg-[#b85e2d] text-[#fff6ed] hover:bg-[#a05227]"
-                onClick={() => void handlePublishSurvey()}
-                disabled={isPublishing}
-              >
-                <Rocket className="mr-2 size-4" aria-hidden="true" />
-                {isPublishing ? "Publishing..." : "Publish survey"}
-              </Button>
-              <Button
-                variant="outline"
-                className="w-full border-[#cfbea4] bg-[#fff7ee]"
-                onClick={() => void saveDraft()}
-                disabled={isSavingDraft}
-              >
-                {isSavingDraft ? "Saving..." : "Save draft"}
-              </Button>
-              <Button variant="outline" className="w-full border-[#cfbea4] bg-[#fff7ee]" onClick={startNewDraft}>
-                New draft
-              </Button>
-              {draftSurveyId ? (
+              <PocketActionStack className="mt-3">
+                <Button
+                  className="min-h-9 w-full bg-[#b85e2d] px-3 text-[12px] text-[#fff6ed] hover:bg-[#a05227]"
+                  onClick={() => void handlePublishSurvey()}
+                  disabled={isPublishing}
+                >
+                  <Rocket className="mr-2 size-4" aria-hidden="true" />
+                  {isPublishing ? "Publishing..." : "Publish survey"}
+                </Button>
                 <Button
                   variant="outline"
-                  className="w-full border-[#cfbea4] bg-[#fff7ee]"
-                  onClick={async () => {
-                    try {
-                      const draftLink = `${window.location.origin}/admin/questionnaires/v1?surveyId=${encodeURIComponent(draftSurveyId)}`
-                      await navigator.clipboard.writeText(draftLink)
-                      setDraftMessage("Draft link copied.")
-                    } catch {
-                      setDraftMessage("Could not copy draft link. Copy it from the browser address bar.")
-                    }
-                  }}
+                  className="min-h-9 w-full border-[#cfbea4]/45 bg-[#fffdf8] px-3 text-[12px]"
+                  onClick={() => void saveDraft()}
+                  disabled={isSavingDraft}
+                >
+                  {isSavingDraft ? "Saving..." : "Save draft"}
+                </Button>
+                <Button variant="outline" className="min-h-9 w-full border-[#cfbea4]/45 bg-[#fffdf8] px-3 text-[12px]" onClick={startNewDraft}>
+                  New draft
+                </Button>
+                {draftSurveyId ? (
+                  <Button
+                    variant="outline"
+                    className="min-h-9 w-full border-[#cfbea4]/45 bg-[#fffdf8] px-3 text-[12px]"
+                    onClick={async () => {
+                      try {
+                        const draftLink = `${window.location.origin}/admin/questionnaires/v1?surveyId=${encodeURIComponent(draftSurveyId)}`
+                        await navigator.clipboard.writeText(draftLink)
+                        setDraftMessage("Draft link copied.")
+                      } catch {
+                        setDraftMessage("Could not copy draft link. Copy it from the browser address bar.")
+                      }
+                    }}
                 >
                   <Copy className="mr-2 size-4" aria-hidden="true" />
                   Copy draft link
                 </Button>
-              ) : null}
-              {publishedSurveyId ? (
-                <Link href="/admin/share">
-                  <Button variant="outline" className="w-full border-[#cfbea4] bg-[#fff7ee]">
-                    Go to share hub
-                  </Button>
-                </Link>
-              ) : null}
-            </PocketActionStack>
-          </PocketSection>
-        </PocketShell>
+                ) : null}
+              </PocketActionStack>
+            </div>
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <Button variant="outline" className="min-h-9 border-[#cfbea4]/55 bg-[#fff7ee] px-3 text-[12px]" onClick={() => goToMobileStep(3)}>
+                Back
+              </Button>
+              <Button variant="outline" className="min-h-9 border-[#cfbea4]/55 bg-[#fff7ee] px-3 text-[12px]" onClick={() => goToMobileStep(1)}>
+                Edit source
+              </Button>
+            </div>
+          </MobileSection>
+        </MobilePage>
+        )}
         <AdminMobileNav />
       </>
     )

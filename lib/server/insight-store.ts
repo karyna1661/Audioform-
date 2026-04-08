@@ -1,35 +1,24 @@
+import type { ResponseQuoteCandidate, ResponseSignalSummary, StoredInsight } from "@/lib/server/insight-types"
+
 type InsightRow = {
   id: string
   transcript_id: string
   response_id: string | null
   summary: string | null
+  narrative_summary: string | null
+  signal_summary: ResponseSignalSummary | null
+  power_quote: string | null
+  quotes: string[] | null
+  quote_candidates: ResponseQuoteCandidate[] | null
   primary_theme: string | null
   themes: string[] | null
   sentiment: string | null
   sentiment_score: number | null
   signal_score: number | null
-  quotes: string[] | null
   provider: string | null
   extractor_version: string | null
   created_at: string
   updated_at: string
-}
-
-export type StoredInsight = {
-  id: string
-  transcriptId: string
-  responseId: string | null
-  summary: string | null
-  primaryTheme: string | null
-  themes: string[]
-  sentiment: string | null
-  sentimentScore: number | null
-  signalScore: number | null
-  quotes: string[]
-  provider: string | null
-  extractorVersion: string | null
-  createdAt: string
-  updatedAt: string
 }
 
 function decodeJwtPayload(token: string): Record<string, unknown> | null {
@@ -38,9 +27,7 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
   try {
     const payload = parts[1].replace(/-/g, "+").replace(/_/g, "/")
     const padded = payload + "=".repeat((4 - (payload.length % 4)) % 4)
-    const decoded = typeof Buffer !== "undefined" 
-      ? Buffer.from(padded, "base64").toString("utf8")
-      : atob(padded)
+    const decoded = typeof Buffer !== "undefined" ? Buffer.from(padded, "base64").toString("utf8") : atob(padded)
     return JSON.parse(decoded) as Record<string, unknown>
   } catch {
     return null
@@ -77,18 +64,31 @@ async function supabaseRequest<T>(path: string, init?: RequestInit): Promise<T> 
   return (await response.json()) as T
 }
 
+function isSignalSummary(value: unknown): value is ResponseSignalSummary {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value)
+}
+
+function isQuoteCandidate(value: unknown): value is ResponseQuoteCandidate {
+  return Boolean(value) && typeof value === "object" && typeof (value as ResponseQuoteCandidate).quote === "string"
+}
+
 function mapRow(row: InsightRow): StoredInsight {
+  const verbatimQuotes = Array.isArray(row.quotes) ? row.quotes.filter((value): value is string => typeof value === "string") : []
+  const powerQuote = row.power_quote || verbatimQuotes[0] || null
   return {
     id: row.id,
     transcriptId: row.transcript_id,
     responseId: row.response_id,
-    summary: row.summary,
+    narrativeSummary: row.narrative_summary ?? row.summary,
+    signalSummary: isSignalSummary(row.signal_summary) ? row.signal_summary : null,
+    powerQuote,
+    verbatimQuotes,
+    quoteCandidates: Array.isArray(row.quote_candidates) ? row.quote_candidates.filter(isQuoteCandidate) : [],
     primaryTheme: row.primary_theme,
     themes: Array.isArray(row.themes) ? row.themes : [],
     sentiment: row.sentiment,
     sentimentScore: row.sentiment_score,
     signalScore: row.signal_score,
-    quotes: Array.isArray(row.quotes) ? row.quotes : [],
     provider: row.provider,
     extractorVersion: row.extractor_version,
     createdAt: row.created_at,
@@ -96,49 +96,65 @@ function mapRow(row: InsightRow): StoredInsight {
   }
 }
 
+const INSIGHT_SELECT =
+  "id,transcript_id,response_id,summary,narrative_summary,signal_summary,power_quote,quotes,quote_candidates,primary_theme,themes,sentiment,sentiment_score,signal_score,provider,extractor_version,created_at,updated_at"
+
 export async function upsertInsightResult(input: {
   transcriptId: string
   responseId?: string | null
-  summary?: string | null
+  narrativeSummary?: string | null
+  signalSummary?: ResponseSignalSummary | null
+  powerQuote?: string | null
+  verbatimQuotes?: string[]
+  quoteCandidates?: ResponseQuoteCandidate[]
   primaryTheme?: string | null
   themes?: string[]
   sentiment?: string | null
   sentimentScore?: number | null
   signalScore?: number | null
-  quotes?: string[]
   provider?: string | null
   extractorVersion?: string | null
 }) {
-  const rows = await supabaseRequest<InsightRow[]>("/rest/v1/insight_results?on_conflict=transcript_id", {
+  const rows = await supabaseRequest<InsightRow[]>(`/rest/v1/insight_results?on_conflict=transcript_id&select=${INSIGHT_SELECT}`, {
     method: "POST",
     headers: { Prefer: "resolution=merge-duplicates,return=representation" },
     body: JSON.stringify([
       {
         transcript_id: input.transcriptId,
         response_id: input.responseId ?? null,
-        summary: input.summary ?? null,
+        summary: input.narrativeSummary ?? null,
+        narrative_summary: input.narrativeSummary ?? null,
+        signal_summary: input.signalSummary ?? {},
+        power_quote: input.powerQuote ?? null,
+        quotes: input.verbatimQuotes ?? [],
+        quote_candidates: input.quoteCandidates ?? [],
         primary_theme: input.primaryTheme ?? null,
         themes: input.themes ?? [],
         sentiment: input.sentiment ?? null,
         sentiment_score: input.sentimentScore ?? null,
         signal_score: input.signalScore ?? null,
-        quotes: input.quotes ?? [],
         provider: input.provider ?? null,
         extractor_version: input.extractorVersion ?? null,
         updated_at: new Date().toISOString(),
       },
     ]),
   })
+
   return mapRow(rows[0])
 }
 
 export async function getInsightByTranscriptId(transcriptId: string): Promise<StoredInsight | null> {
-  const rows = await supabaseRequest<InsightRow[]>(`/rest/v1/insight_results?transcript_id=eq.${encodeURIComponent(transcriptId)}&select=id,transcript_id,response_id,summary,primary_theme,themes,sentiment,sentiment_score,signal_score,quotes,provider,extractor_version,created_at,updated_at&limit=1`)
+  const rows = await supabaseRequest<InsightRow[]>(
+    `/rest/v1/insight_results?transcript_id=eq.${encodeURIComponent(transcriptId)}&select=${INSIGHT_SELECT}&limit=1`,
+  )
   return rows.length ? mapRow(rows[0]) : null
 }
 
 export async function listInsightsByTranscriptIds(transcriptIds: string[]): Promise<StoredInsight[]> {
   if (!transcriptIds.length) return []
-  const rows = await supabaseRequest<InsightRow[]>(`/rest/v1/insight_results?transcript_id=in.(${transcriptIds.map((id) => encodeURIComponent(id)).join(",")})&select=id,transcript_id,response_id,summary,primary_theme,themes,sentiment,sentiment_score,signal_score,quotes,provider,extractor_version,created_at,updated_at`)
+  const rows = await supabaseRequest<InsightRow[]>(
+    `/rest/v1/insight_results?transcript_id=in.(${transcriptIds.map((id) => encodeURIComponent(id)).join(",")})&select=${INSIGHT_SELECT}`,
+  )
   return rows.map(mapRow)
 }
+

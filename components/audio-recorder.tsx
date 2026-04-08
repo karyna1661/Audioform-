@@ -301,8 +301,22 @@ export function AudioRecorder({
 
   return (
     <div className="min-w-0 space-y-3 overflow-x-hidden sm:space-y-4" aria-busy={isUploading}>
+      {isMobile ? (
+        <div className="flex items-center justify-between gap-3 rounded-[0.95rem] border border-[#dbcdb8]/45 bg-[#fff8f0] px-2.5 py-2.5">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#7a6146]">Voice capture</p>
+            <p className="mt-1 text-[12px] font-medium text-[var(--af-color-primary)]">
+              {isRecording ? "Recording live" : audioBlob ? "Preview ready" : "Ready to record"}
+            </p>
+          </div>
+          <div className="rounded-full bg-[#fffdf8] px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-[#8a431f]">
+            {formatTime(Math.floor(isRecording ? recordingTime : playbackDuration || recordingTime))}
+          </div>
+        </div>
+      ) : null}
+
       {/* Waveform visualization */}
-      <div className="relative h-24 overflow-hidden rounded-[1rem] bg-muted sm:h-28">
+      <div className={`relative overflow-hidden rounded-[1rem] sm:h-28 ${isMobile ? "h-24 border border-[#dbcdb8]/45 bg-[linear-gradient(180deg,#fffdf8_0%,#f8efdf_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]" : "h-24 bg-muted"}`}>
         {isUploading ? (
             <div className="flex h-full items-center justify-center px-4">
               <div className="block w-full max-w-md animate-pulse space-y-2" aria-live="polite">
@@ -316,34 +330,51 @@ export function AudioRecorder({
         ) : audioBlob ? (
           <div className="flex h-full items-center justify-center px-3">
             <div className="block min-w-0 text-center">
-              <div className="text-xl font-semibold tabular-nums sm:text-2xl">
+              <div className={`font-semibold tabular-nums ${isMobile ? "text-[1.3rem] tracking-[-0.03em] text-[var(--af-color-primary)]" : "text-xl sm:text-2xl"}`}>
                 {formatTime(Math.floor(playbackTime || 0))} / {formatTime(Math.floor(playbackDuration || recordingTime))}
               </div>
-              <div className="text-[13px] text-muted-foreground break-words sm:text-sm">{isPlaying ? "Playing preview" : "Preview ready"}</div>
+              <div className={`break-words ${isMobile ? "mt-1 text-[12px] uppercase tracking-[0.18em] text-[#7a6146]" : "text-[13px] text-muted-foreground sm:text-sm"}`}>{isPlaying ? "Playing preview" : "Preview ready"}</div>
             </div>
           </div>
         ) : (
           <div className="flex h-full items-center justify-center px-3">
-            <div className="text-center text-[13px] text-muted-foreground break-words sm:text-sm">
+            <div className={`text-center break-words ${isMobile ? "max-w-[18rem] text-sm leading-6 text-[#5c5146]" : "text-[13px] text-muted-foreground sm:text-sm"}`}>
               {isMobile ? "Tap to record" : "Click to record"} your 30-second take
             </div>
           </div>
         )}
 
         {isRecording && (
-          <div className="absolute right-2 top-2 rounded-full bg-red-500 px-2 py-1 text-[11px] text-white animate-pulse sm:text-xs">
+          <div className={`absolute right-2 top-2 rounded-full px-2 py-1 text-[11px] text-white animate-pulse sm:text-xs ${isMobile ? "bg-[#8a431f]" : "bg-red-500"}`}>
             REC {formatTime(recordingTime)}
           </div>
         )}
       </div>
 
+      {isMobile ? (
+        <div className="grid grid-cols-3 gap-1.5">
+          <div className="rounded-[0.9rem] border border-[#dbcdb8]/45 bg-[#fffdf8] px-2 py-2 text-center">
+            <p className="text-[10px] uppercase tracking-[0.16em] text-[#7a6146]">Capture</p>
+            <p className="mt-1 text-[11px] font-semibold text-[var(--af-color-primary)]">One take</p>
+          </div>
+          <div className="rounded-[0.9rem] border border-[#dbcdb8]/45 bg-[#fffdf8] px-2 py-2 text-center">
+            <p className="text-[10px] uppercase tracking-[0.16em] text-[#7a6146]">Ideal</p>
+            <p className="mt-1 text-[11px] font-semibold text-[var(--af-color-primary)]">20-45s</p>
+          </div>
+          <div className="rounded-[0.9rem] border border-[#dbcdb8]/45 bg-[#fffdf8] px-2 py-2 text-center">
+            <p className="text-[10px] uppercase tracking-[0.16em] text-[#7a6146]">Finish</p>
+            <p className="mt-1 text-[11px] font-semibold text-[var(--af-color-primary)]">Send clean</p>
+          </div>
+        </div>
+      ) : null}
+
       {/* Controls */}
-      <div className="flex flex-wrap justify-center gap-3 sm:gap-4">
+      <div className={`flex flex-wrap justify-center gap-2.5 sm:gap-4 ${isMobile ? "rounded-[1rem] border border-[#dbcdb8]/45 bg-[#fff8f0] px-2.5 py-3" : ""}`}>
         {!isRecording && !audioBlob && (
           <Button
             size="lg"
             onClick={startRecording}
-            className="flex h-16 w-16 items-center justify-center rounded-full sm:h-[4.5rem] sm:w-[4.5rem]"
+            className={`flex items-center justify-center rounded-full ${isMobile ? "h-14 w-14 bg-[#b85e2d] text-[#fff6ed] hover:bg-[#a05227]" : "h-16 w-16 sm:h-[4.5rem] sm:w-[4.5rem]"}`}
           >
             <Mic className="h-6 w-6 sm:h-7 sm:w-7" />
           </Button>
@@ -354,7 +385,7 @@ export function AudioRecorder({
             size="lg"
             variant="destructive"
             onClick={stopRecording}
-            className="flex h-16 w-16 items-center justify-center rounded-full sm:h-[4.5rem] sm:w-[4.5rem]"
+            className={`flex items-center justify-center rounded-full ${isMobile ? "h-14 w-14 bg-[#8a431f] hover:bg-[#733716]" : "h-16 w-16 sm:h-[4.5rem] sm:w-[4.5rem]"}`}
           >
             <Square className="h-6 w-6 sm:h-7 sm:w-7" />
           </Button>
@@ -362,7 +393,7 @@ export function AudioRecorder({
 
         {!isRecording && audioBlob && !isUploading && (
           <>
-            <Button size="icon" variant="outline" onClick={resetRecorder} className="h-12 w-12 rounded-full sm:h-14 sm:w-14" aria-label="Re-record">
+            <Button size="icon" variant="outline" onClick={resetRecorder} className={`rounded-full ${isMobile ? "h-11 w-11 border-[#dbcdb8]/55 bg-[#fffdf8]" : "h-12 w-12 sm:h-14 sm:w-14"}`} aria-label="Re-record">
               <RotateCcw className="h-5 w-5 sm:h-6 sm:w-6" />
             </Button>
 
@@ -370,27 +401,27 @@ export function AudioRecorder({
                 size="icon"
                 variant={isPlaying ? "secondary" : "outline"}
                 onClick={isPlaying ? pauseAudio : playAudio}
-                className="h-12 w-12 rounded-full sm:h-14 sm:w-14"
+                className={`rounded-full ${isMobile ? "h-11 w-11 border-[#dbcdb8]/55 bg-[#fffdf8]" : "h-12 w-12 sm:h-14 sm:w-14"}`}
                 aria-label={isPlaying ? "Pause playback" : "Play recording"}
               >
               {isPlaying ? <Pause className="h-5 w-5 sm:h-6 sm:w-6" /> : <Play className="h-5 w-5 sm:h-6 sm:w-6" />}
             </Button>
 
-            <Button size="icon" onClick={handleSubmit} className="h-12 w-12 rounded-full sm:h-14 sm:w-14" aria-label="Submit recording">
+            <Button size="icon" onClick={handleSubmit} className={`rounded-full ${isMobile ? "h-11 w-11 bg-[#2d5a17] text-[#fff6ed] hover:bg-[#244812]" : "h-12 w-12 sm:h-14 sm:w-14"}`} aria-label="Submit recording">
               <Send className="h-5 w-5 sm:h-6 sm:w-6" />
             </Button>
           </>
         )}
 
         {isUploading && (
-          <Button size="lg" disabled className="flex h-16 w-16 items-center justify-center rounded-full sm:h-[4.5rem] sm:w-[4.5rem]">
+          <Button size="lg" disabled className={`flex items-center justify-center rounded-full ${isMobile ? "h-14 w-14" : "h-16 w-16 sm:h-[4.5rem] sm:w-[4.5rem]"}`}>
             <Loader2 className="h-6 w-6 animate-spin sm:h-7 sm:w-7" />
           </Button>
         )}
       </div>
 
       {audioBlob && !isUploading && (
-        <div className="px-2 text-center text-[13px] leading-6 text-muted-foreground break-words sm:text-sm">
+        <div className={`px-2 text-center break-words ${isMobile ? "text-sm leading-6 text-[#5c5146]" : "text-[13px] leading-6 text-muted-foreground sm:text-sm"}`}>
           {isPlaying
             ? `Playing preview ${formatTime(Math.floor(playbackTime))} / ${formatTime(Math.floor(playbackDuration || recordingTime))}`
             : submitState === "error"
@@ -400,7 +431,7 @@ export function AudioRecorder({
       )}
 
       {isUploading && (
-        <div className="px-2 text-center text-[13px] leading-6 text-muted-foreground break-words sm:text-sm">
+        <div className={`px-2 text-center break-words ${isMobile ? "text-sm leading-6 text-[#5c5146]" : "text-[13px] leading-6 text-muted-foreground sm:text-sm"}`}>
           Uploading your voice take. Keeping this recording here so you do not need to repeat it.
         </div>
       )}

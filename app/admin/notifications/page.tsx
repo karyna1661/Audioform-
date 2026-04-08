@@ -164,6 +164,35 @@ export default function NotificationsPage() {
           title="Email notifications"
           description="Save the rules, keep the template clear, then send one live test."
         >
+          <div className="mb-4 grid grid-cols-3 gap-2">
+            <div className="rounded-[1.15rem] border border-[#dbcdb8] bg-[#fff8f0] px-3 py-3 text-center">
+              <p className="text-[10px] uppercase tracking-[0.18em] text-[#7a6146]">Rules</p>
+              <p className="mt-1 text-base font-semibold text-[var(--af-color-primary)]">4</p>
+              <p className="mt-1 text-[11px] leading-4 text-[#665746]">delivery switches</p>
+            </div>
+            <div className="rounded-[1.15rem] border border-[#dbcdb8] bg-[#fff8f0] px-3 py-3 text-center">
+              <p className="text-[10px] uppercase tracking-[0.18em] text-[#7a6146]">Template</p>
+              <p className="mt-1 text-base font-semibold text-[var(--af-color-primary)]">Live</p>
+              <p className="mt-1 text-[11px] leading-4 text-[#665746]">shared format</p>
+            </div>
+            <div className="rounded-[1.15rem] border border-[#dbcdb8] bg-[#fff8f0] px-3 py-3 text-center">
+              <p className="text-[10px] uppercase tracking-[0.18em] text-[#7a6146]">Test</p>
+              <p className="mt-1 text-base font-semibold text-[var(--af-color-primary)]">Send</p>
+              <p className="mt-1 text-[11px] leading-4 text-[#665746]">before trust</p>
+            </div>
+          </div>
+
+          <PocketSection title="Notification posture" description="Alerts should help you act faster, not add more noise to the creator loop." className="mb-4 bg-[#fff8f0]">
+            <div className="af-mobile-rail">
+              {[
+                "Keep instant alerts for events that genuinely change what you do next.",
+                "Use one clear template voice so every notification feels like part of the same product.",
+              ].map((line) => (
+                <div key={line} className="af-mobile-rail-card rounded-[1.1rem] border border-[#dbcdb8] bg-[#fffdf8] p-3.5 text-sm leading-6 text-[#5c5146]">{line}</div>
+              ))}
+            </div>
+          </PocketSection>
+
           {success ? (
             <Alert className="mb-4 border-[#dbcdb8] bg-[#f9f4ea]">
               <Mail className="h-4 w-4" />

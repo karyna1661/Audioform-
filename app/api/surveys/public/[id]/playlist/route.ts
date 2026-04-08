@@ -36,7 +36,7 @@ export async function GET(
           durationSeconds: item.durationSeconds,
           transcriptText: transcript?.transcriptText ?? null,
           transcriptStatus: transcript?.status ?? null,
-          summary: insight?.summary ?? null,
+          narrativeSummary: insight?.narrativeSummary ?? null,
           primaryTheme: insight?.primaryTheme ?? null,
           themes: insight?.themes ?? [],
           signalScore: insight?.signalScore ?? null,
@@ -62,7 +62,7 @@ export async function GET(
               item.hotTake ||
               deriveHotTake({
                 durationSeconds: item.durationSeconds,
-                summary: insight?.summary ?? null,
+                narrativeSummary: insight?.narrativeSummary ?? null,
                 primaryTheme: insight?.primaryTheme ?? null,
                 highSignal: item.highSignal,
                 bookmarked: item.bookmarked,

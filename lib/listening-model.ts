@@ -13,6 +13,7 @@ type ListeningInput = {
   durationSeconds?: number | null
   transcriptText?: string | null
   transcriptStatus?: "pending" | "completed" | "failed" | null
+  narrativeSummary?: string | null
   summary?: string | null
   primaryTheme?: string | null
   themes?: string[] | null
@@ -31,6 +32,10 @@ function clamp(value: number, min: number, max: number): number {
 function textWordCount(value?: string | null): number {
   if (!value) return 0
   return value.trim().split(/\s+/).filter(Boolean).length
+}
+
+function summaryText(input: ListeningInput): string | null {
+  return input.narrativeSummary ?? input.summary ?? null
 }
 
 function inferToneFromText(value?: string | null): "positive" | "negative" | "neutral" {
@@ -62,7 +67,7 @@ function computeClarity(input: ListeningInput): number {
   if (input.transcriptStatus === "pending") return 48
 
   const words = textWordCount(input.transcriptText)
-  if (!words) return input.summary ? 62 : 45
+  if (!words) return summaryText(input) ? 62 : 45
   if (words < 12) return 55
   if (words < 35) return 74
   if (words < 80) return 88
@@ -76,7 +81,7 @@ function computeEmotion(input: ListeningInput): number {
 
 function computeNovelty(input: ListeningInput): number {
   const themeCount = input.themes?.length ?? 0
-  const summaryWords = textWordCount(input.summary)
+  const summaryWords = textWordCount(summaryText(input))
   const base = 44 + themeCount * 8 + Math.min(summaryWords, 10)
   return normalize100(input.bookmarked ? base + 10 : base)
 }
@@ -115,7 +120,7 @@ export function buildPreviewClipRange(durationSeconds?: number | null): Listenin
 
 export function deriveHotTake(input: ListeningInput): string {
   const theme = input.primaryTheme?.trim()
-  const tone = inferToneFromText(input.summary || input.transcriptText)
+  const tone = inferToneFromText(summaryText(input) || input.transcriptText)
 
   if (theme && tone === "negative") {
     return `Listen for the friction around ${theme}.`
